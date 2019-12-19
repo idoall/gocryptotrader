@@ -2,6 +2,7 @@ package engine
 
 import (
 	"errors"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -371,8 +372,12 @@ func (e *ExchangeCurrencyPairSyncer) worker() {
 										c.Ticker.IsUsingWebsocket = false
 										c.Ticker.IsUsingREST = true
 										log.Warnf(log.SyncMgr,
-											"%s %s: No ticker update after %s, switching from websocket to rest\n",
-											c.Exchange, FormatCurrency(enabledPairs[i]).String(), e.Cfg.SyncTimeout)
+											"%s %s %s: No ticker update after %s, switching from websocket to rest\n",
+											c.Exchange,
+											FormatCurrency(enabledPairs[i]).String(),
+											strings.ToUpper(c.AssetType.String()),
+											e.Cfg.SyncTimeout,
+										)
 										switchedToRest = true
 										e.setProcessing(c.Exchange, c.Pair, c.AssetType, SyncItemTicker, false)
 									}
@@ -380,7 +385,7 @@ func (e *ExchangeCurrencyPairSyncer) worker() {
 
 								if c.Ticker.IsUsingREST {
 									e.setProcessing(c.Exchange, c.Pair, c.AssetType, SyncItemTicker, true)
-									var result ticker.Price
+									var result *ticker.Price
 									var err error
 
 									if supportsRESTTickerBatching {
@@ -408,7 +413,7 @@ func (e *ExchangeCurrencyPairSyncer) worker() {
 									} else {
 										result, err = Bot.Exchanges[x].UpdateTicker(c.Pair, c.AssetType)
 									}
-									printTickerSummary(&result, c.Pair, c.AssetType, exchangeName, err)
+									printTickerSummary(result, c.Pair, c.AssetType, exchangeName, "REST", err)
 									if err == nil {
 										//nolint:gocritic Bot.CommsRelayer.StageTickerData(exchangeName, c.AssetType, result)
 										if Bot.Config.RemoteControl.WebsocketRPC.Enabled {
@@ -435,8 +440,12 @@ func (e *ExchangeCurrencyPairSyncer) worker() {
 										c.Orderbook.IsUsingWebsocket = false
 										c.Orderbook.IsUsingREST = true
 										log.Warnf(log.SyncMgr,
-											"%s %s: No orderbook update after %s, switching from websocket to rest\n",
-											c.Exchange, FormatCurrency(c.Pair).String(), e.Cfg.SyncTimeout)
+											"%s %s %s: No orderbook update after %s, switching from websocket to rest\n",
+											c.Exchange,
+											FormatCurrency(c.Pair).String(),
+											strings.ToUpper(c.AssetType.String()),
+											e.Cfg.SyncTimeout,
+										)
 										switchedToRest = true
 										e.setProcessing(c.Exchange, c.Pair, c.AssetType, SyncItemOrderbook, false)
 									}
@@ -444,7 +453,7 @@ func (e *ExchangeCurrencyPairSyncer) worker() {
 
 								e.setProcessing(c.Exchange, c.Pair, c.AssetType, SyncItemOrderbook, true)
 								result, err := Bot.Exchanges[x].UpdateOrderbook(c.Pair, c.AssetType)
-								printOrderbookSummary(&result, c.Pair, c.AssetType, exchangeName, err)
+								printOrderbookSummary(result, c.Pair, c.AssetType, exchangeName, "REST", err)
 								if err == nil {
 									//nolint:gocritic Bot.CommsRelayer.StageOrderbookData(exchangeName, c.AssetType, result)
 									if Bot.Config.RemoteControl.WebsocketRPC.Enabled {

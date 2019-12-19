@@ -14,7 +14,9 @@ import (
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
+	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	log "github.com/idoall/gocryptotrader/logger"
 )
@@ -153,6 +155,8 @@ func (b *BTCMarkets) WsHandleData() {
 					Exchange:     b.Name,
 					Price:        trade.Price,
 					Amount:       trade.Volume,
+					Side:         order.SideUnknown.String(),
+					EventType:    order.Unknown.String(),
 				}
 			case tick:
 				var tick WsTick
@@ -163,17 +167,18 @@ func (b *BTCMarkets) WsHandleData() {
 				}
 
 				p := currency.NewPairFromString(tick.Currency)
-				b.Websocket.DataHandler <- wshandler.TickerData{
-					Exchange:  b.Name,
-					Volume:    tick.Volume,
-					High:      tick.High24,
-					Low:       tick.Low24h,
-					Bid:       tick.Bid,
-					Ask:       tick.Ask,
-					Last:      tick.Last,
-					Timestamp: tick.Timestamp,
-					AssetType: asset.Spot,
-					Pair:      p,
+
+				b.Websocket.DataHandler <- &ticker.Price{
+					ExchangeName: b.Name,
+					Volume:       tick.Volume,
+					High:         tick.High24,
+					Low:          tick.Low24h,
+					Bid:          tick.Bid,
+					Ask:          tick.Ask,
+					Last:         tick.Last,
+					LastUpdated:  tick.Timestamp,
+					AssetType:    asset.Spot,
+					Pair:         p,
 				}
 			case fundChange:
 				var transferData WsFundTransfer

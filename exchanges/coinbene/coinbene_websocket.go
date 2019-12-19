@@ -15,6 +15,7 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
+	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wsorderbook"
 )
@@ -126,23 +127,26 @@ func (c *Coinbene) WsDataHandler() {
 			}
 			switch {
 			case strings.Contains(result[topic].(string), "ticker"):
-				var ticker WsTicker
-				err = json.Unmarshal(stream.Raw, &ticker)
+				var wsTicker WsTicker
+				err = json.Unmarshal(stream.Raw, &wsTicker)
 				if err != nil {
 					c.Websocket.DataHandler <- err
 					continue
 				}
-				for x := range ticker.Data {
-					c.Websocket.DataHandler <- wshandler.TickerData{
-						Volume: ticker.Data[x].Volume24h,
-						Last:   ticker.Data[x].LastPrice,
-						High:   ticker.Data[x].High24h,
-						Low:    ticker.Data[x].Low24h,
-						Pair: currency.NewPairFromFormattedPairs(ticker.Data[x].Symbol,
+				for x := range wsTicker.Data {
+					c.Websocket.DataHandler <- &ticker.Price{
+						Volume: wsTicker.Data[x].Volume24h,
+						Last:   wsTicker.Data[x].LastPrice,
+						High:   wsTicker.Data[x].High24h,
+						Low:    wsTicker.Data[x].Low24h,
+						Bid:    wsTicker.Data[x].BestBidPrice,
+						Ask:    wsTicker.Data[x].BestAskPrice,
+						Pair: currency.NewPairFromFormattedPairs(wsTicker.Data[x].Symbol,
 							c.GetEnabledPairs(asset.PerpetualSwap),
 							c.GetPairFormat(asset.PerpetualSwap, true)),
-						Exchange:  c.Name,
-						AssetType: asset.PerpetualSwap,
+						ExchangeName: c.Name,
+						AssetType:    asset.PerpetualSwap,
+						LastUpdated:  wsTicker.Data[x].Timestamp,
 					}
 				}
 			case strings.Contains(result[topic].(string), "tradeList"):
@@ -182,13 +186,22 @@ func (c *Coinbene) WsDataHandler() {
 					Side:      tradeList.Data[0][1],
 				}
 			case strings.Contains(result[topic].(string), "orderBook"):
-				var orderBook WsOrderbook
+				orderBook := struct {
+					Topic  string `json:"topic"`
+					Action string `json:"action"`
+					Data   []struct {
+						Bids      [][]string `json:"bids"`
+						Asks      [][]string `json:"asks"`
+						Version   int64      `json:"version"`
+						Timestamp time.Time  `json:"timestamp"`
+					} `json:"data"`
+				}{}
 				err = json.Unmarshal(stream.Raw, &orderBook)
 				if err != nil {
 					c.Websocket.DataHandler <- err
 					continue
 				}
-				p := strings.Replace(orderBook.Topic, "tradeList.", "", 1)
+				p := strings.Replace(orderBook.Topic, "orderBook.", "", 1)
 				cp := currency.NewPairFromFormattedPairs(p,
 					c.GetEnabledPairs(asset.PerpetualSwap),
 					c.GetPairFormat(asset.PerpetualSwap, true))
@@ -233,6 +246,7 @@ func (c *Coinbene) WsDataHandler() {
 					newOB.AssetType = asset.PerpetualSwap
 					newOB.Pair = cp
 					newOB.ExchangeName = c.Name
+					newOB.LastUpdated = orderBook.Data[0].Timestamp
 					err = c.Websocket.Orderbook.LoadSnapshot(&newOB)
 					if err != nil {
 						c.Websocket.DataHandler <- err
@@ -244,11 +258,12 @@ func (c *Coinbene) WsDataHandler() {
 					}
 				} else if orderBook.Action == "update" {
 					newOB := wsorderbook.WebsocketOrderbookUpdate{
-						Asks:     asks,
-						Bids:     bids,
-						Asset:    asset.PerpetualSwap,
-						Pair:     cp,
-						UpdateID: orderBook.Version,
+						Asks:       asks,
+						Bids:       bids,
+						Asset:      asset.PerpetualSwap,
+						Pair:       cp,
+						UpdateID:   orderBook.Data[0].Version,
+						UpdateTime: orderBook.Data[0].Timestamp,
 					}
 					err = c.Websocket.Orderbook.Update(&newOB)
 					if err != nil {

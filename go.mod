@@ -16,12 +16,14 @@ require (
 	github.com/pkg/errors v0.8.1
 	github.com/pquerna/otp v1.2.0
 	github.com/spf13/viper v1.4.0
-	github.com/thrasher-corp/gocryptotrader v0.0.0-20191218063607-467d8d91a2bb // indirect
+	github.com/idoall/gocryptotrader v0.0.0-20191219024030-98a277a4c33c
 	github.com/thrasher-corp/goose v2.7.0-rc4.0.20191002032028-0f2c2a27abdb+incompatible
 	github.com/thrasher-corp/sqlboiler v1.0.1-0.20191001234224-71e17f37a85e
 	github.com/toorop/go-pusher v0.0.0-20180521062818-4521e2eb39fb
 	github.com/urfave/cli v1.20.0
 	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413
+	golang.org/x/net v0.0.0-20190923162816-aa69164e4478 // indirect
 	google.golang.org/genproto v0.0.0-20191002211648-c459b9ce5143
 	google.golang.org/grpc v1.21.1
+	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )

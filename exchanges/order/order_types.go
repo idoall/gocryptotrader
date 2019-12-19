@@ -100,11 +100,12 @@ type Side string
 
 // Order side types
 const (
-	AnySide Side = "ANY"
-	Buy     Side = "BUY"
-	Sell    Side = "SELL"
-	Bid     Side = "BID"
-	Ask     Side = "ASK"
+	AnySide     Side = "ANY"
+	Buy         Side = "BUY"
+	Sell        Side = "SELL"
+	Bid         Side = "BID"
+	Ask         Side = "ASK"
+	SideUnknown Side = "SIDEUNKNOWN"
 )
 
 // Detail holds order detail data
@@ -170,7 +171,7 @@ const (
 	PartiallyCancelled Status = "PARTIALLY_CANCELLED"
 	PartiallyFilled    Status = "PARTIALLY_FILLED"
 	Filled             Status = "FILLED"
-	Cancelled          Status = "CANCELED"
+	Cancelled          Status = "CANCELLED"
 	PendingCancel      Status = "PENDING_CANCEL"
 	Rejected           Status = "REJECTED"
 	Expired            Status = "EXPIRED"
