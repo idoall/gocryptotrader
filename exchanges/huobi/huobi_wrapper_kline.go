@@ -4,6 +4,7 @@ import (
 	"errors"
 	"reflect"
 
+	"github.com/idoall/gocryptotrader/common/convert"
 	"github.com/idoall/gocryptotrader/exchanges/kline"
 )
 
@@ -18,31 +19,31 @@ func (b *HUOBI) GetKlines(arg interface{}) ([]*kline.Kline, error) {
 	}
 
 	// 判断类型是否是 KlinesRequestParams
-	// klineParams, ok := arg.(KlinesRequestParams)
-	// if !ok {
-	// 	return klines, errors.New("arg argument must be a KlinesRequestParams struct")
-	// }
+	klineParams, ok := arg.(KlinesRequestParams)
+	if !ok {
+		return klines, errors.New("arg argument must be a KlinesRequestParams struct")
+	}
 
 	// 获取数据
-	// candleStickList, err := b.GetSpotKline(klineParams)
-	// if err != nil {
-	// 	return klines, err
-	// }
+	candleStickList, err := b.GetSpotKline(klineParams)
+	if err != nil {
+		return klines, err
+	}
 
 	// 解析数据
-	// for _, v := range candleStickList {
-	// 	klines = append(klines,
-	// 		&kline.Kline{
-	// 			Open:      v.Open,
-	// 			Close:     v.Close,
-	// 			High:      v.High,
-	// 			Low:       v.Low,
-	// 			Vol:       v.Vol,
-	// 			Amount:    v.Amount,
-	// 			CloseTime: common.UnixTimestampToTime(v.ID),
-	// 		},
-	// 	)
-	// }
+	for _, v := range candleStickList {
+		klines = append(klines,
+			&kline.Kline{
+				Open:      v.Open,
+				Close:     v.Close,
+				High:      v.High,
+				Low:       v.Low,
+				Vol:       v.Volume,
+				Amount:    v.Amount,
+				CloseTime: convert.UnixTimestampToTime(v.ID),
+			},
+		)
+	}
 
 	return klines, nil
 }
