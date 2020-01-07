@@ -4,13 +4,8 @@
 
 
 [![Build Status](https://travis-ci.org/idoall/gocryptotrader.svg?branch=master)](https://travis-ci.org/idoall/gocryptotrader)
-<<<<<<< HEAD:events/README.md
-[![Software License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/idoall/gocryptotrader/blob/master/LICENSE)
-[![GoDoc](https://godoc.org/github.com/idoall/gocryptotrader?status.svg)](https://godoc.org/github.com/idoall/gocryptotrader/events)
-=======
 [![Software License](https://img.shields.io/badge/License-MIT-orange.svg?style=flat-square)](https://github.com/idoall/gocryptotrader/blob/master/LICENSE)
 [![GoDoc](https://godoc.org/github.com/idoall/gocryptotrader?status.svg)](https://godoc.org/github.com/idoall/gocryptotrader/currency/forexprovider/exchangeratesapi.io)
->>>>>>> upstrem/master:currency/forexprovider/exchangeratesapi.io/README.md
 [![Coverage Status](http://codecov.io/github/idoall/gocryptotrader/coverage.svg?branch=master)](http://codecov.io/github/idoall/gocryptotrader?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/idoall/gocryptotrader)](https://goreportcard.com/report/github.com/idoall/gocryptotrader)
 

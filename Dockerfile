@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-FROM golang:1.12 as build
-WORKDIR /go/src/github.com/idoall/gocryptotrader
-=======
 FROM golang:1.13 as build
 WORKDIR /go/src/github.com/idoall/gocryptotrader
->>>>>>> upstrem/master
 COPY . .
 RUN GO111MODULE=on go mod vendor
 RUN mv -vn config_example.json config.json \
@@ -17,13 +12,7 @@ FROM alpine:latest
 VOLUME /root/.gocryptotrader
 RUN apk update && apk add --no-cache ca-certificates bash
 COPY --from=build /go/bin/gocryptotrader /app/
-<<<<<<< HEAD
-COPY --from=build /go/src/github.com/idoall/gocryptotrader/config.json /app/
-EXPOSE 9050
-CMD ["/app/gocryptotrader"]
-=======
 COPY --from=build /go/bin/gctcli /app/
 COPY --from=build /go/src/github.com/idoall/gocryptotrader/config.json /app/
 EXPOSE 9050-9053
 ENTRYPOINT [ "/app/gocryptotrader" ]
->>>>>>> upstrem/master

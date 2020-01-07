@@ -29,13 +29,8 @@ Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader 
 + Individual package example below:
 ```go
 import (
-<<<<<<< HEAD
-"github.com/idoall/gocryptotrader/currency/forexprovider/base"
-"github.com/idoall/gocryptotrader/currency/forexprovider/currencylayer"
-=======
 	"github.com/idoall/gocryptotrader/currency/forexprovider/base"
 	"github.com/idoall/gocryptotrader/currency/forexprovider/currencylayer"
->>>>>>> upstrem/master
 )
 
 c := currencylayer.CurrencyLayer{}
