@@ -7,7 +7,6 @@ import (
 
 	"github.com/idoall/gocryptotrader/common"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
-	"github.com/idoall/gocryptotrader/exchanges/anx"
 	"github.com/idoall/gocryptotrader/exchanges/binance"
 	"github.com/idoall/gocryptotrader/exchanges/bitfinex"
 	"github.com/idoall/gocryptotrader/exchanges/bitflyer"
@@ -146,8 +145,6 @@ func LoadExchange(name string, useWG bool, wg *sync.WaitGroup) error {
 	}
 
 	switch nameLower {
-	case "anx":
-		exch = new(anx.ANX)
 	case "binance":
 		exch = new(binance.Binance)
 	case "bitfinex":
