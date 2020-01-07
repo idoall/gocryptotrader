@@ -26,8 +26,8 @@ var dialect = drivers.Dialect{
 // NewQuery initializes a new Query using the passed in QueryMods
 func NewQuery(mods ...qm.QueryMod) *queries.Query {
 	q := &queries.Query{}
-	queries.SetDialect(q, &dialect)
-	qm.Apply(q, mods...)
+	// queries.SetDialect(q, &dialect)
+	// qm.Apply(q, mods...)
 
 	return q
 }
