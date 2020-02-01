@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
@@ -60,6 +61,11 @@ const (
 // Bittrex is the overaching type across the bittrex methods
 type Bittrex struct {
 	exchange.Base
+}
+
+// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
+func (b *Bittrex) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
+	return nil, common.ErrNotYetImplemented
 }
 
 // GetMarkets is used to get the open and available trading markets at Bittrex
@@ -408,8 +414,8 @@ func (b *Bittrex) GetWithdrawalHistory(currency string) (WithdrawalHistory, erro
 
 // GetDepositHistory is used to retrieve your deposit history. If currency is
 // is omitted it will return the entire deposit history
-func (b *Bittrex) GetDepositHistory(currency string) (WithdrawalHistory, error) {
-	var history WithdrawalHistory
+func (b *Bittrex) GetDepositHistory(currency string) (DepositHistory, error) {
+	var history DepositHistory
 	values := url.Values{}
 
 	if !(currency == "" || currency == " ") {

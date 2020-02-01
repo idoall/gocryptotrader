@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
@@ -907,4 +908,9 @@ func calculateTradingFee(purchasePrice, amount float64, isMaker bool) float64 {
 	}
 
 	return fee * purchasePrice * amount
+}
+
+// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
+func (b *Bitmex) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
+	return nil, common.ErrNotYetImplemented
 }

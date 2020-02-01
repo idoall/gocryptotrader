@@ -481,8 +481,7 @@ func (w *Websocket) manageSubscriptions() {
 func (w *Websocket) appendSubscribedChannels() error {
 	w.subscriptionMutex.Lock()
 	defer w.subscriptionMutex.Unlock()
-	for i := 0; i < len(w.channelsToSubscribe); i++ {
-		// 判断要 订阅的数据 和 已订阅的数 是否一致
+	for i := range w.channelsToSubscribe {
 		channelIsSubscribed := false
 		for j := 0; j < len(w.subscribedChannels); j++ {
 			if w.subscribedChannels[j].Equal(&w.channelsToSubscribe[i]) {
@@ -514,7 +513,7 @@ func (w *Websocket) appendSubscribedChannels() error {
 func (w *Websocket) unsubscribeToChannels() error {
 	w.subscriptionMutex.Lock()
 	defer w.subscriptionMutex.Unlock()
-	for i := 0; i < len(w.subscribedChannels); i++ {
+	for i := range w.subscribedChannels {
 		subscriptionFound := false
 		for j := 0; j < len(w.channelsToSubscribe); j++ {
 			if w.channelsToSubscribe[j].Equal(&w.subscribedChannels[i]) {

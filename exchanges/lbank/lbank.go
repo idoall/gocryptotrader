@@ -15,7 +15,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/idoall/gocryptotrader/common"
 	gctcrypto "github.com/idoall/gocryptotrader/common/crypto"
+	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
@@ -577,4 +579,9 @@ func (l *Lbank) SendAuthHTTPRequest(method, endpoint string, vals url.Values, re
 		l.Verbose,
 		l.HTTPDebugging,
 		l.HTTPRecording)
+}
+
+// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
+func (l *Lbank) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
+	return nil, common.ErrFunctionNotSupported
 }

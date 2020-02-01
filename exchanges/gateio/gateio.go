@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/convert"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
@@ -45,6 +46,11 @@ const (
 type Gateio struct {
 	WebsocketConn *wshandler.WebsocketConnection
 	exchange.Base
+}
+
+// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
+func (g *Gateio) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
+	return nil, common.ErrNotYetImplemented
 }
 
 // GetSymbols returns all supported symbols

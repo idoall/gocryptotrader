@@ -13,6 +13,7 @@ import (
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/account"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
@@ -244,23 +245,39 @@ func (l *LocalBitcoins) UpdateOrderbook(p currency.Pair, assetType asset.Item) (
 	return orderbook.Get(l.Name, p, assetType)
 }
 
-// GetAccountInfo retrieves balances for all enabled currencies for the
+// UpdateAccountInfo retrieves balances for all enabled currencies for the
 // LocalBitcoins exchange
-func (l *LocalBitcoins) GetAccountInfo() (exchange.AccountInfo, error) {
-	var response exchange.AccountInfo
+func (l *LocalBitcoins) UpdateAccountInfo() (account.Holdings, error) {
+	var response account.Holdings
 	response.Exchange = l.Name
 	accountBalance, err := l.GetWalletBalance()
 	if err != nil {
 		return response, err
 	}
-	var exchangeCurrency exchange.AccountCurrencyInfo
+	var exchangeCurrency account.Balance
 	exchangeCurrency.CurrencyName = currency.BTC
 	exchangeCurrency.TotalValue = accountBalance.Total.Balance
 
-	response.Accounts = append(response.Accounts, exchange.Account{
-		Currencies: []exchange.AccountCurrencyInfo{exchangeCurrency},
+	response.Accounts = append(response.Accounts, account.SubAccount{
+		Currencies: []account.Balance{exchangeCurrency},
 	})
+
+	err = account.Process(&response)
+	if err != nil {
+		return account.Holdings{}, err
+	}
+
 	return response, nil
+}
+
+// FetchAccountInfo retrieves balances for all enabled currencies
+func (l *LocalBitcoins) FetchAccountInfo() (account.Holdings, error) {
+	acc, err := account.GetHoldings(l.Name)
+	if err != nil {
+		return l.UpdateAccountInfo()
+	}
+
+	return acc, nil
 }
 
 // GetFundingHistory returns funding history, deposits and
@@ -570,4 +587,11 @@ func (l *LocalBitcoins) GetSubscriptions() ([]wshandler.WebsocketChannelSubscrip
 // AuthenticateWebsocket sends an authentication message to the websocket
 func (l *LocalBitcoins) AuthenticateWebsocket() error {
 	return common.ErrFunctionNotSupported
+}
+
+// ValidateCredentials validates current credentials used for wrapper
+// functionality
+func (l *LocalBitcoins) ValidateCredentials() error {
+	_, err := l.UpdateAccountInfo()
+	return l.CheckTransientError(err)
 }

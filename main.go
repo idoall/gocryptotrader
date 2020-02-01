@@ -8,10 +8,13 @@ import (
 	"time"
 
 	"github.com/idoall/gocryptotrader/common"
+	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/core"
 	"github.com/idoall/gocryptotrader/dispatch"
 	"github.com/idoall/gocryptotrader/engine"
 	"github.com/idoall/gocryptotrader/exchanges/request"
+	"github.com/idoall/gocryptotrader/gctscript"
+	gctscriptVM "github.com/idoall/gocryptotrader/gctscript/vm"
 	log "github.com/idoall/gocryptotrader/logger"
 	"github.com/idoall/gocryptotrader/signaler"
 )
@@ -22,7 +25,7 @@ func main() {
 	versionFlag := flag.Bool("version", false, "retrieves current GoCryptoTrader version")
 
 	// Core settings
-	flag.StringVar(&settings.ConfigFile, "config", "", "config file to load")
+	flag.StringVar(&settings.ConfigFile, "config", config.DefaultFilePath(), "config file to load")
 	flag.StringVar(&settings.DataDir, "datadir", common.GetDefaultDataDir(runtime.GOOS), "default data directory for GoCryptoTrader files")
 	flag.IntVar(&settings.GoMaxProcs, "gomaxprocs", runtime.GOMAXPROCS(-1), "sets the runtime GOMAXPROCS value")
 	flag.BoolVar(&settings.EnableDryRun, "dryrun", false, "dry runs bot, doesn't save config file")
@@ -43,6 +46,7 @@ func main() {
 	flag.BoolVar(&settings.EnableDepositAddressManager, "depositaddressmanager", true, "enables the deposit address manager")
 	flag.BoolVar(&settings.EnableConnectivityMonitor, "connectivitymonitor", true, "enables the connectivity monitor")
 	flag.BoolVar(&settings.EnableDatabaseManager, "databasemanager", true, "enables database manager")
+	flag.BoolVar(&settings.EnableGCTScriptManager, "gctscriptmanager", true, "enables gctscript manager")
 	flag.DurationVar(&settings.EventManagerDelay, "eventmanagerdelay", time.Duration(0), "sets the event managers sleep delay between event checking")
 	flag.BoolVar(&settings.EnableNTPClient, "ntpclient", true, "enables the NTP client to check system clock drift")
 	flag.BoolVar(&settings.EnableDispatcher, "dispatch", true, "enables the dispatch system")
@@ -84,6 +88,9 @@ func main() {
 	flag.StringVar(&settings.GlobalHTTPUserAgent, "globalhttpuseragent", "", "sets the common HTTP client's user agent")
 	flag.StringVar(&settings.GlobalHTTPProxy, "globalhttpproxy", "", "sets the common HTTP client's proxy server")
 
+	// GCTScript tuning settings
+	flag.UintVar(&settings.MaxVirtualMachines, "maxvirtualmachines", uint(gctscriptVM.DefaultMaxVirtualMachines), "set max virtual machines that can load")
+
 	flag.Parse()
 
 	if *versionFlag {
@@ -101,6 +108,8 @@ func main() {
 		log.Errorf(log.Global, "Unable to initialise bot engine. Error: %s\n", err)
 		os.Exit(1)
 	}
+
+	gctscript.Setup()
 
 	engine.PrintSettings(&engine.Bot.Settings)
 	if err = engine.Bot.Start(); err != nil {

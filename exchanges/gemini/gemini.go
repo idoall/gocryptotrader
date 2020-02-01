@@ -11,6 +11,7 @@ import (
 
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
+	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	log "github.com/idoall/gocryptotrader/logger"
@@ -443,4 +444,9 @@ func calculateTradingFee(notionVolume *NotionalVolume, purchasePrice, amount flo
 	}
 
 	return volumeFee * amount * purchasePrice
+}
+
+// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
+func (g *Gemini) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
+	return nil, common.ErrFunctionNotSupported
 }

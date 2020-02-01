@@ -9,6 +9,7 @@ import (
 	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/database"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	gctscript "github.com/idoall/gocryptotrader/gctscript/vm"
 	log "github.com/idoall/gocryptotrader/logger"
 	"github.com/idoall/gocryptotrader/ntpclient"
 )
@@ -1608,6 +1609,20 @@ func TestCheckConnectionMonitorConfig(t *testing.T) {
 	}
 }
 
+func TestDefaultFilePath(t *testing.T) {
+	// This is tricky to test because we're dealing with a config file stored
+	// in a persons default directory and to properly test it, it would
+	// require causing os.Stat to return !os.IsNotExist and os.IsNotExist (which
+	// means moving a users config file around), a way of getting around this is
+	// to pass the datadir as a param line but adds a burden to everyone who
+	// uses it
+	result := DefaultFilePath()
+	if !strings.Contains(result, File) &&
+		!strings.Contains(result, EncryptedFile) {
+		t.Error("result should have contained config.json or config.dat")
+	}
+}
+
 func TestGetFilePath(t *testing.T) {
 	expected := "blah.json"
 	result, _ := GetFilePath("blah.json")
@@ -1746,25 +1761,12 @@ func TestCheckLoggerConfig(t *testing.T) {
 		*c.Logging.AdvancedSettings.ShowLogSystemName {
 		t.Error("unexpected result")
 	}
-
-	err = c.LoadConfig(TestFile, true)
-	if err != nil {
-		t.Errorf("Failed to load config: %v", err)
-	}
-	err = c.CheckLoggerConfig()
-	if err != nil {
-		t.Errorf("Failed to create logger with user settings: reason: %v", err)
-	}
 }
 
 func TestDisableNTPCheck(t *testing.T) {
 	t.Parallel()
 
-	c := GetConfig()
-	err := c.LoadConfig(TestFile, true)
-	if err != nil {
-		t.Fatal(err)
-	}
+	var c Config
 
 	warn, err := c.DisableNTPCheck(strings.NewReader("w\n"))
 	if err != nil {
@@ -1787,6 +1789,23 @@ func TestDisableNTPCheck(t *testing.T) {
 	_, err = c.DisableNTPCheck(strings.NewReader(" "))
 	if err.Error() != "EOF" {
 		t.Errorf("failed expected EOF got: %v", err)
+	}
+}
+
+func TestCheckGCTScriptConfig(t *testing.T) {
+	t.Parallel()
+
+	var c Config
+	if err := c.checkGCTScriptConfig(); err != nil {
+		t.Error(err)
+	}
+
+	if c.GCTScript.ScriptTimeout != gctscript.DefaultTimeoutValue {
+		t.Fatal("unexpected value return")
+	}
+
+	if c.GCTScript.MaxVirtualMachines != gctscript.DefaultMaxVirtualMachines {
+		t.Fatal("unexpected value return")
 	}
 }
 

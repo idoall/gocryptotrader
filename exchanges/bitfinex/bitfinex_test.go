@@ -278,7 +278,7 @@ func TestGetAccountInfo(t *testing.T) {
 	}
 	t.Parallel()
 
-	_, err := b.GetAccountInfo()
+	_, err := b.UpdateAccountInfo()
 	if err != nil {
 		t.Error("GetAccountInfo error", err)
 	}

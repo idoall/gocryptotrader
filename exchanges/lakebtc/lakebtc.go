@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
@@ -38,6 +39,11 @@ const (
 type LakeBTC struct {
 	exchange.Base
 	WebsocketConn
+}
+
+// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
+func (l *LakeBTC) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
+	return nil, common.ErrNotYetImplemented
 }
 
 // GetTicker returns the current ticker from lakeBTC

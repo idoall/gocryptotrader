@@ -11,6 +11,7 @@ import (
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/account"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
@@ -372,10 +373,10 @@ func (b *Bitmex) UpdateOrderbook(p currency.Pair, assetType asset.Item) (*orderb
 	return o, err
 }
 
-// GetAccountInfo retrieves balances for all enabled currencies for the
+// UpdateAccountInfo retrieves balances for all enabled currencies for the
 // Bitmex exchange
-func (b *Bitmex) GetAccountInfo() (exchange.AccountInfo, error) {
-	var info exchange.AccountInfo
+func (b *Bitmex) UpdateAccountInfo() (account.Holdings, error) {
+	var info account.Holdings
 
 	bal, err := b.GetAllUserMargin()
 	if err != nil {
@@ -383,20 +384,35 @@ func (b *Bitmex) GetAccountInfo() (exchange.AccountInfo, error) {
 	}
 
 	// Need to update to add Margin/Liquidity availibilty
-	var balances []exchange.AccountCurrencyInfo
+	var balances []account.Balance
 	for i := range bal {
-		balances = append(balances, exchange.AccountCurrencyInfo{
+		balances = append(balances, account.Balance{
 			CurrencyName: currency.NewCode(bal[i].Currency),
 			TotalValue:   float64(bal[i].WalletBalance),
 		})
 	}
 
 	info.Exchange = b.Name
-	info.Accounts = append(info.Accounts, exchange.Account{
+	info.Accounts = append(info.Accounts, account.SubAccount{
 		Currencies: balances,
 	})
 
+	err = account.Process(&info)
+	if err != nil {
+		return account.Holdings{}, err
+	}
+
 	return info, nil
+}
+
+// FetchAccountInfo retrieves balances for all enabled currencies
+func (b *Bitmex) FetchAccountInfo() (account.Holdings, error) {
+	acc, err := account.GetHoldings(b.Name)
+	if err != nil {
+		return b.UpdateAccountInfo()
+	}
+
+	return acc, nil
 }
 
 // GetFundingHistory returns funding history, deposits and
@@ -661,4 +677,11 @@ func (b *Bitmex) GetSubscriptions() ([]wshandler.WebsocketChannelSubscription, e
 // AuthenticateWebsocket sends an authentication message to the websocket
 func (b *Bitmex) AuthenticateWebsocket() error {
 	return b.websocketSendAuth()
+}
+
+// ValidateCredentials validates current credentials used for wrapper
+// functionality
+func (b *Bitmex) ValidateCredentials() error {
+	_, err := b.UpdateAccountInfo()
+	return b.CheckTransientError(err)
 }

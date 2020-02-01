@@ -413,6 +413,9 @@ func (e *ExchangeCurrencyPairSyncer) worker() {
 									} else {
 										result, err = Bot.Exchanges[x].UpdateTicker(c.Pair, c.AssetType)
 									}
+									if result == nil && err == nil {
+										err = errors.New("result is nil")
+									}
 									printTickerSummary(result, c.Pair, c.AssetType, exchangeName, "REST", err)
 									if err == nil {
 										//nolint:gocritic Bot.CommsRelayer.StageTickerData(exchangeName, c.AssetType, result)

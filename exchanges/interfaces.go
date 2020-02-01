@@ -5,13 +5,14 @@ import (
 
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/currency"
+	"github.com/idoall/gocryptotrader/exchanges/account"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
-	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	"github.com/idoall/gocryptotrader/exchanges/withdraw"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 )
 
 // IBotExchange enforces standard functions for all exchanges supported in
@@ -23,6 +24,7 @@ type IBotExchange interface {
 	GetName() string
 	IsEnabled() bool
 	SetEnabled(bool)
+	ValidateCredentials() error
 	FetchTicker(currency currency.Pair, assetType asset.Item) (*ticker.Price, error)
 	UpdateTicker(currency currency.Pair, assetType asset.Item) (*ticker.Price, error)
 	FetchOrderbook(currency currency.Pair, assetType asset.Item) (*orderbook.Base, error)
@@ -31,7 +33,8 @@ type IBotExchange interface {
 	UpdateTradablePairs(forceUpdate bool) error
 	GetEnabledPairs(assetType asset.Item) currency.Pairs
 	GetAvailablePairs(assetType asset.Item) currency.Pairs
-	GetAccountInfo() (AccountInfo, error)
+	FetchAccountInfo() (account.Holdings, error)
+	UpdateAccountInfo() (account.Holdings, error)
 	GetAuthenticatedAPISupport(endpoint uint8) bool
 	SetPairs(pairs currency.Pairs, assetType asset.Item, enabled bool) error
 	GetAssetTypes() asset.Items
@@ -69,6 +72,7 @@ type IBotExchange interface {
 	GetDefaultConfig() (*config.ExchangeConfig, error)
 	GetBase() *Base
 	SupportsAsset(assetType asset.Item) bool
+	GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]Candle, error)
 	// GetKlines 自定义获取 K 线
 	GetKlines(arg interface{}) ([]*kline.Kline, error)
 }

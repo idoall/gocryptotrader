@@ -24,6 +24,7 @@ import (
 	"github.com/idoall/gocryptotrader/currency/forexprovider/base"
 	"github.com/idoall/gocryptotrader/database"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	gctscript "github.com/idoall/gocryptotrader/gctscript/vm"
 	log "github.com/idoall/gocryptotrader/logger"
 )
 
@@ -1187,10 +1188,8 @@ func (c *Config) CheckLoggerConfig() error {
 		c.Logging = log.GenDefaultSettings()
 	}
 
-	f := func(f bool) *bool { return &f }(false)
-
 	if c.Logging.AdvancedSettings.ShowLogSystemName == nil {
-		c.Logging.AdvancedSettings.ShowLogSystemName = f
+		c.Logging.AdvancedSettings.ShowLogSystemName = convert.BoolPtr(false)
 	}
 
 	if c.Logging.LoggerFileConfig != nil {
@@ -1198,10 +1197,11 @@ func (c *Config) CheckLoggerConfig() error {
 			c.Logging.LoggerFileConfig.FileName = "log.txt"
 		}
 		if c.Logging.LoggerFileConfig.Rotate == nil {
-			c.Logging.LoggerFileConfig.Rotate = f
+			c.Logging.LoggerFileConfig.Rotate = convert.BoolPtr(false)
 		}
-		if c.Logging.LoggerFileConfig.MaxSize < 0 {
-			c.Logging.LoggerFileConfig.MaxSize = 100
+		if c.Logging.LoggerFileConfig.MaxSize <= 0 {
+			log.Warnf(log.Global, "Logger rotation size invalid, defaulting to %v", log.DefaultMaxFileSize)
+			c.Logging.LoggerFileConfig.MaxSize = log.DefaultMaxFileSize
 		}
 		log.FileLoggingConfiguredCorrectly = true
 	}
@@ -1214,6 +1214,30 @@ func (c *Config) CheckLoggerConfig() error {
 		return err
 	}
 	log.LogPath = logPath
+
+	return nil
+}
+
+func (c *Config) checkGCTScriptConfig() error {
+	m.Lock()
+	defer m.Unlock()
+
+	if c.GCTScript.ScriptTimeout <= 0 {
+		c.GCTScript.ScriptTimeout = gctscript.DefaultTimeoutValue
+	}
+
+	if c.GCTScript.MaxVirtualMachines == 0 {
+		c.GCTScript.MaxVirtualMachines = gctscript.DefaultMaxVirtualMachines
+	}
+
+	scriptPath := filepath.Join(common.GetDefaultDataDir(runtime.GOOS), "scripts")
+	err := common.CreateDir(scriptPath)
+	if err != nil {
+		return err
+	}
+
+	gctscript.ScriptPath = scriptPath
+	gctscript.GCTScriptConfig = &c.GCTScript
 
 	return nil
 }
@@ -1328,8 +1352,34 @@ func (c *Config) CheckConnectionMonitorConfig() {
 	}
 }
 
+// DefaultFilePath returns the default config file path
+// MacOS/Linux: $HOME/.gocryptotrader/config.json or config.dat
+// Windows: %APPDATA%\GoCryptoTrader\config.json or config.dat
+// Helpful for printing application usage
+func DefaultFilePath() string {
+	f := filepath.Join(common.GetDefaultDataDir(runtime.GOOS), File)
+	_, err := os.Stat(f)
+	if os.IsNotExist(err) {
+		encFile := filepath.Join(common.GetDefaultDataDir(runtime.GOOS), EncryptedFile)
+		_, err = os.Stat(encFile)
+		if !os.IsNotExist(err) {
+			return encFile
+		}
+	}
+	return f
+}
+
 // GetFilePath returns the desired config file or the default config file name
-// based on if the application is being run under test or normal mode.
+// based on if the application is being run under test or normal mode. It will
+// also move/rename the config file under the following conditions:
+// 1) If a config file is found in the executable path directory and no explicit
+//    config path is set, plus no config is found in the GCT data dir, it will
+//    move it to the GCT data dir. If a config already exists in the GCT data
+//    dir, it will warn the user and load the config found in the GCT data dir
+// 2) If a config file in the GCT data dir has the file extension .dat but
+//    contains json data, it will rename to the file to config.json
+// 3) If a config file in the GCT data dir has the file extension .json but
+//    contains encrypted data, it will rename the file to config.dat
 func GetFilePath(configfile string) (string, error) {
 	if configfile != "" {
 		return configfile, nil
@@ -1595,6 +1645,11 @@ func (c *Config) CheckConfig() error {
 	err = c.CheckExchangeConfigValues()
 	if err != nil {
 		return fmt.Errorf(ErrCheckingConfigValues, err)
+	}
+
+	err = c.checkGCTScriptConfig()
+	if err != nil {
+		log.Errorf(log.Global, "Failed to configure gctscript, feature has been disabled: %s\n", err)
 	}
 
 	c.CheckConnectionMonitorConfig()

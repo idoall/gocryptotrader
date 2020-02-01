@@ -12,6 +12,7 @@ import (
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/account"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
@@ -296,19 +297,19 @@ func (b *BTSE) UpdateOrderbook(p currency.Pair, assetType asset.Item) (*orderboo
 	return orderbook.Get(b.Name, p, assetType)
 }
 
-// GetAccountInfo retrieves balances for all enabled currencies for the
+// UpdateAccountInfo retrieves balances for all enabled currencies for the
 // BTSE exchange
-func (b *BTSE) GetAccountInfo() (exchange.AccountInfo, error) {
-	var a exchange.AccountInfo
+func (b *BTSE) UpdateAccountInfo() (account.Holdings, error) {
+	var a account.Holdings
 	balance, err := b.GetAccountBalance()
 	if err != nil {
 		return a, err
 	}
 
-	var currencies []exchange.AccountCurrencyInfo
+	var currencies []account.Balance
 	for b := range balance {
 		currencies = append(currencies,
-			exchange.AccountCurrencyInfo{
+			account.Balance{
 				CurrencyName: currency.NewCode(balance[b].Currency),
 				TotalValue:   balance[b].Total,
 				Hold:         balance[b].Available,
@@ -316,12 +317,28 @@ func (b *BTSE) GetAccountInfo() (exchange.AccountInfo, error) {
 		)
 	}
 	a.Exchange = b.Name
-	a.Accounts = []exchange.Account{
+	a.Accounts = []account.SubAccount{
 		{
 			Currencies: currencies,
 		},
 	}
+
+	err = account.Process(&a)
+	if err != nil {
+		return account.Holdings{}, err
+	}
+
 	return a, nil
+}
+
+// FetchAccountInfo retrieves balances for all enabled currencies
+func (b *BTSE) FetchAccountInfo() (account.Holdings, error) {
+	acc, err := account.GetHoldings(b.Name)
+	if err != nil {
+		return b.UpdateAccountInfo()
+	}
+
+	return acc, nil
 }
 
 // GetFundingHistory returns funding history, deposits and
@@ -625,4 +642,11 @@ func (b *BTSE) GetSubscriptions() ([]wshandler.WebsocketChannelSubscription, err
 // AuthenticateWebsocket sends an authentication message to the websocket
 func (b *BTSE) AuthenticateWebsocket() error {
 	return common.ErrFunctionNotSupported
+}
+
+// ValidateCredentials validates current credentials used for wrapper
+// functionality
+func (b *BTSE) ValidateCredentials() error {
+	_, err := b.UpdateAccountInfo()
+	return b.CheckTransientError(err)
 }
