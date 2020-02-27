@@ -5,7 +5,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/idoall/gocryptotrader/gctscript/wrappers/validator"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 // New returns a new instance of VM

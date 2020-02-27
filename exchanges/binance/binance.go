@@ -17,8 +17,9 @@ import (
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 const (
@@ -56,11 +57,6 @@ const (
 	dustLog           = "/wapi/v3/userAssetDribbletLog.html"
 	tradeFee          = "/wapi/v3/tradeFee.html"
 	assetDetail       = "/wapi/v3/assetDetail.html"
-
-	// binance authenticated and unauthenticated limit rates
-	// to-do
-	binanceAuthRate   = 0
-	binanceUnauthRate = 0
 )
 
 // Binance is the overarching type across the Bithumb package
@@ -348,7 +344,7 @@ func (b *Binance) NewOrder(o *NewOrderRequest) (NewOrderResponse, error) {
 		params.Set("newOrderRespType", o.NewOrderRespType)
 	}
 
-	if err := b.SendAuthHTTPRequest(http.MethodPost, path, params, &resp); err != nil {
+	if err := b.SendAuthHTTPRequest(http.MethodPost, path, params, request.Auth, &resp); err != nil {
 		return resp, err
 	}
 
@@ -376,7 +372,7 @@ func (b *Binance) CancelExistingOrder(symbol string, orderID int64, origClientOr
 		params.Set("origClientOrderId", origClientOrderID)
 	}
 
-	return resp, b.SendAuthHTTPRequest(http.MethodDelete, path, params, &resp)
+	return resp, b.SendAuthHTTPRequest(http.MethodDelete, path, params, request.Auth, &resp)
 }
 
 // OpenOrders Current open orders. Get all open orders on a symbol.
@@ -393,7 +389,7 @@ func (b *Binance) OpenOrders(symbol string) ([]QueryOrderData, error) {
 		params.Set("symbol", strings.ToUpper(symbol))
 	}
 
-	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, &resp); err != nil {
+	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, request.Auth, &resp); err != nil {
 		return resp, err
 	}
 
@@ -416,7 +412,7 @@ func (b *Binance) AllOrders(symbol, orderId, limit string) ([]QueryOrderData, er
 	if limit != "" {
 		params.Set("limit", limit)
 	}
-	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, &resp); err != nil {
+	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, request.Auth, &resp); err != nil {
 		return resp, err
 	}
 
@@ -438,7 +434,7 @@ func (b *Binance) QueryOrder(symbol, origClientOrderID string, orderID int64) (Q
 		params.Set("orderId", strconv.FormatInt(orderID, 10))
 	}
 
-	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, &resp); err != nil {
+	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, request.Auth, &resp); err != nil {
 		return resp, err
 	}
 
@@ -492,7 +488,7 @@ func (b *Binance) GetAccount() (*Account, error) {
 	path := b.API.Endpoints.URL + accountInfo
 	params := url.Values{}
 
-	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, &resp); err != nil {
+	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, request.Unset, &resp); err != nil {
 		return &resp.Account, err
 	}
 
@@ -505,16 +501,13 @@ func (b *Binance) GetAccount() (*Account, error) {
 
 // SendHTTPRequest sends an unauthenticated request
 func (b *Binance) SendHTTPRequest(path string, result interface{}) error {
-	return b.SendPayload(http.MethodGet,
-		path,
-		nil,
-		nil,
-		result,
-		false,
-		false,
-		b.Verbose,
-		b.HTTPDebugging,
-		b.HTTPRecording)
+	return b.SendPayload(&request.Item{
+		Method:        http.MethodGet,
+		Path:          path,
+		Result:        result,
+		Verbose:       b.Verbose,
+		HTTPDebugging: b.HTTPDebugging,
+		HTTPRecording: b.HTTPRecording})
 }
 
 // SendUserDataStreamAuthHTTPRequest sends an authenticated HTTP request
@@ -548,7 +541,7 @@ func (b *Binance) SendHTTPRequest(path string, result interface{}) error {
 // }
 
 // SendAuthHTTPRequest sends an authenticated HTTP request
-func (b *Binance) SendAuthHTTPRequest(method, path string, params url.Values, result interface{}) error {
+func (b *Binance) SendAuthHTTPRequest(method, path string, params url.Values, f request.EndpointLimit, result interface{}) error {
 	if !b.AllowAuthenticatedRequest() {
 		return fmt.Errorf(exchange.WarningAuthenticatedRequestWithoutCredentialsSet, b.Name)
 	}
@@ -580,16 +573,17 @@ func (b *Binance) SendAuthHTTPRequest(method, path string, params url.Values, re
 		Message string `json:"msg"`
 	}{}
 
-	err := b.SendPayload(method,
-		path,
-		headers,
-		bytes.NewBuffer(nil),
-		&interim,
-		true,
-		false,
-		b.Verbose,
-		b.HTTPDebugging,
-		b.HTTPRecording)
+	err := b.SendPayload(&request.Item{
+		Method:        method,
+		Path:          path,
+		Headers:       headers,
+		Body:          bytes.NewBuffer(nil),
+		Result:        &interim,
+		AuthRequest:   true,
+		Verbose:       b.Verbose,
+		HTTPDebugging: b.HTTPDebugging,
+		HTTPRecording: b.HTTPRecording,
+		Endpoint:      f})
 	if err != nil {
 		return err
 	}
@@ -724,7 +718,7 @@ func (b *Binance) WithdrawCrypto(asset, address, addressTag, name, amount string
 		params.Set("addressTag", addressTag)
 	}
 
-	if err := b.SendAuthHTTPRequest(http.MethodPost, path, params, &resp); err != nil {
+	if err := b.SendAuthHTTPRequest(http.MethodPost, path, params, request.Unset, &resp); err != nil {
 		return "", err
 	}
 
@@ -750,5 +744,5 @@ func (b *Binance) GetDepositAddressForCurrency(currency string) (string, error) 
 	params.Set("status", "true")
 
 	return resp.Address,
-		b.SendAuthHTTPRequest(http.MethodGet, path, params, &resp)
+		b.SendAuthHTTPRequest(http.MethodGet, path, params, request.Unset, &resp)
 }

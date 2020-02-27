@@ -14,12 +14,11 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/currency/forexprovider/base"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 // Setup sets appropriate values for fixer object
@@ -38,9 +37,8 @@ func (f *Fixer) Setup(config base.Settings) error {
 	f.Verbose = config.Verbose
 	f.PrimaryProvider = config.PrimaryProvider
 	f.Requester = request.New(f.Name,
-		request.NewRateLimit(time.Second*10, authRate),
-		request.NewRateLimit(time.Second*10, unAuthRate),
-		common.NewHTTPClientWithTimeout(base.DefaultTimeOut))
+		common.NewHTTPClientWithTimeout(base.DefaultTimeOut),
+		nil)
 	return nil
 }
 
@@ -233,14 +231,10 @@ func (f *Fixer) SendOpenHTTPRequest(endpoint string, v url.Values, result interf
 		auth = true
 	}
 
-	return f.Requester.SendPayload(http.MethodGet,
-		path,
-		nil,
-		nil,
-		result,
-		auth,
-		false,
-		f.Verbose,
-		false,
-		false)
+	return f.Requester.SendPayload(&request.Item{
+		Method:      http.MethodGet,
+		Path:        path,
+		Result:      &result,
+		AuthRequest: auth,
+		Verbose:     f.Verbose})
 }

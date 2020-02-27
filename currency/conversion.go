@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 // ConversionRates defines protected conversion rate map for concurrent updating

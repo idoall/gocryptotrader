@@ -1,4 +1,4 @@
-package logger
+package log
 
 import (
 	"fmt"
@@ -149,6 +149,7 @@ func init() {
 	EventMgr = registerNewSubLogger("EVENT")
 	DispatchMgr = registerNewSubLogger("DISPATCH")
 
+	RequestSys = registerNewSubLogger("REQUESTER")
 	ExchangeSys = registerNewSubLogger("EXCHANGE")
 	GRPCSys = registerNewSubLogger("GRPC")
 	RESTSys = registerNewSubLogger("REST")

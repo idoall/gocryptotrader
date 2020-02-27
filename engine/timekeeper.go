@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 	ntpclient "github.com/idoall/gocryptotrader/ntpclient"
 )
 

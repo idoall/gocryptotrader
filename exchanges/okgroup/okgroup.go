@@ -16,8 +16,9 @@ import (
 	"github.com/idoall/gocryptotrader/common/crypto"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 const (
@@ -603,15 +604,17 @@ func (o *OKGroup) SendHTTPRequest(httpMethod, requestType, requestPath string, d
 
 	errCap := errCapFormat{}
 	errCap.Result = true
-	err = o.SendPayload(strings.ToUpper(httpMethod),
-		path, headers,
-		bytes.NewBuffer(payload),
-		&intermediary,
-		authenticated,
-		false,
-		o.Verbose,
-		o.HTTPDebugging,
-		o.HTTPRecording)
+	err = o.SendPayload(&request.Item{
+		Method:        strings.ToUpper(httpMethod),
+		Path:          path,
+		Headers:       headers,
+		Body:          bytes.NewBuffer(payload),
+		Result:        &intermediary,
+		AuthRequest:   authenticated,
+		Verbose:       o.Verbose,
+		HTTPDebugging: o.HTTPDebugging,
+		HTTPRecording: o.HTTPRecording,
+	})
 	if err != nil {
 		return err
 	}

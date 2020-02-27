@@ -6,7 +6,7 @@ import (
 
 	"github.com/idoall/gocryptotrader/communications"
 	"github.com/idoall/gocryptotrader/communications/base"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 // commsManager starts the NTP manager

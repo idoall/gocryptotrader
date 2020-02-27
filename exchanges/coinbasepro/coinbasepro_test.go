@@ -10,12 +10,14 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/idoall/gocryptotrader/config"
+	"github.com/idoall/gocryptotrader/core"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/sharedtestvalues"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
+	"github.com/idoall/gocryptotrader/portfolio/banking"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 var c CoinbasePro
@@ -31,8 +33,6 @@ const (
 
 func TestMain(m *testing.M) {
 	c.SetDefaults()
-	c.Requester.SetRateLimit(false, time.Second, 1)
-
 	cfg := config.GetConfig()
 	err := cfg.LoadConfig("../../testdata/configtest.json", true)
 	if err != nil {
@@ -493,7 +493,7 @@ func TestCancelExchangeOrder(t *testing.T) {
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = &order.Cancel{
 		OrderID:       "1",
-		WalletAddress: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
+		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
 		CurrencyPair:  currencyPair,
 	}
@@ -515,7 +515,7 @@ func TestCancelAllExchangeOrders(t *testing.T) {
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = &order.Cancel{
 		OrderID:       "1",
-		WalletAddress: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
+		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
 		CurrencyPair:  currencyPair,
 	}
@@ -545,13 +545,13 @@ func TestModifyOrder(t *testing.T) {
 }
 
 func TestWithdraw(t *testing.T) {
-	withdrawCryptoRequest := withdraw.CryptoRequest{
-		GenericInfo: withdraw.GenericInfo{
-			Amount:      -1,
-			Currency:    currency.BTC,
-			Description: "WITHDRAW IT ALL",
+	withdrawCryptoRequest := withdraw.Request{
+		Amount:      -1,
+		Currency:    currency.BTC,
+		Description: "WITHDRAW IT ALL",
+		Crypto: &withdraw.CryptoRequest{
+			Address: core.BitcoinDonationAddress,
 		},
-		Address: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
 	}
 
 	if areTestAPIKeysSet() && !canManipulateRealOrders {
@@ -572,12 +572,14 @@ func TestWithdrawFiat(t *testing.T) {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
 
-	var withdrawFiatRequest = withdraw.FiatRequest{
-		GenericInfo: withdraw.GenericInfo{
-			Amount:   100,
-			Currency: currency.USD,
+	var withdrawFiatRequest = withdraw.Request{
+		Amount:   100,
+		Currency: currency.USD,
+		Fiat: &withdraw.FiatRequest{
+			Bank: &banking.Account{
+				BankName: "Federal Reserve Bank",
+			},
 		},
-		BankName: "Federal Reserve Bank",
 	}
 
 	_, err := c.WithdrawFiatFunds(&withdrawFiatRequest)
@@ -594,12 +596,14 @@ func TestWithdrawInternationalBank(t *testing.T) {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
 
-	var withdrawFiatRequest = withdraw.FiatRequest{
-		GenericInfo: withdraw.GenericInfo{
-			Amount:   100,
-			Currency: currency.USD,
+	var withdrawFiatRequest = withdraw.Request{
+		Amount:   100,
+		Currency: currency.USD,
+		Fiat: &withdraw.FiatRequest{
+			Bank: &banking.Account{
+				BankName: "Federal Reserve Bank",
+			},
 		},
-		BankName: "Federal Reserve Bank",
 	}
 
 	_, err := c.WithdrawFiatFundsToInternationalBank(&withdrawFiatRequest)

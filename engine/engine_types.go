@@ -17,6 +17,7 @@ type Settings struct {
 	EnableAllPairs              bool
 	EnableCoinmarketcapAnalysis bool
 	EnablePortfolioManager      bool
+	PortfolioManagerDelay       time.Duration
 	EnableGRPC                  bool
 	EnableGRPCProxy             bool
 	EnableWebsocketRPC          bool
@@ -77,6 +78,9 @@ type Settings struct {
 
 	// GCTscript settings
 	MaxVirtualMachines uint
+
+	// Withdraw settings
+	WithdrawCacheSize uint64
 }
 
 const (

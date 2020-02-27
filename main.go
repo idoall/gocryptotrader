@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"runtime"
 	"time"
@@ -15,7 +16,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/gctscript"
 	gctscriptVM "github.com/idoall/gocryptotrader/gctscript/vm"
-	log "github.com/idoall/gocryptotrader/logger"
+	gctlog "github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 	"github.com/idoall/gocryptotrader/signaler"
 )
 
@@ -32,6 +34,7 @@ func main() {
 	flag.BoolVar(&settings.EnableAllExchanges, "enableallexchanges", false, "enables all exchanges")
 	flag.BoolVar(&settings.EnableAllPairs, "enableallpairs", false, "enables all pairs for enabled exchanges")
 	flag.BoolVar(&settings.EnablePortfolioManager, "portfoliomanager", true, "enables the portfolio manager")
+	flag.DurationVar(&settings.PortfolioManagerDelay, "portfoliomanagerdelay", time.Duration(0), "sets the portfolio managers sleep delay between updates")
 	flag.BoolVar(&settings.EnableGRPC, "grpc", true, "enables the grpc server")
 	flag.BoolVar(&settings.EnableGRPCProxy, "grpcproxy", false, "enables the grpc proxy server")
 	flag.BoolVar(&settings.EnableWebsocketRPC, "websocketrpc", true, "enables the websocket RPC server")
@@ -76,7 +79,7 @@ func main() {
 	flag.BoolVar(&settings.EnableExchangeVerbose, "exchangeverbose", false, "increases exchange logging verbosity")
 	flag.BoolVar(&settings.ExchangePurgeCredentials, "exchangepurgecredentials", false, "purges the stored exchange API credentials")
 	flag.BoolVar(&settings.EnableExchangeHTTPRateLimiter, "ratelimiter", true, "enables the rate limiter for HTTP requests")
-	flag.IntVar(&settings.MaxHTTPRequestJobsLimit, "requestjobslimit", request.DefaultMaxRequestJobs, "sets the max amount of jobs the HTTP request package stores")
+	flag.IntVar(&settings.MaxHTTPRequestJobsLimit, "requestjobslimit", int(request.DefaultMaxRequestJobs), "sets the max amount of jobs the HTTP request package stores")
 	flag.IntVar(&settings.RequestTimeoutRetryAttempts, "exchangehttptimeoutretryattempts", request.DefaultTimeoutRetryAttempts, "sets the amount of retry attempts after a HTTP request times out")
 	flag.DurationVar(&settings.ExchangeHTTPTimeout, "exchangehttptimeout", time.Duration(0), "sets the exchangs HTTP timeout value for HTTP requests")
 	flag.StringVar(&settings.ExchangeHTTPUserAgent, "exchangehttpuseragent", "", "sets the exchanges HTTP user agent")
@@ -90,6 +93,9 @@ func main() {
 
 	// GCTScript tuning settings
 	flag.UintVar(&settings.MaxVirtualMachines, "maxvirtualmachines", uint(gctscriptVM.DefaultMaxVirtualMachines), "set max virtual machines that can load")
+
+	// Withdraw Cache tuning settings
+	flag.Uint64Var(&settings.WithdrawCacheSize, "withdrawcachesize", withdraw.CacheSize, "set cache size for withdrawal requests")
 
 	flag.Parse()
 
@@ -105,20 +111,19 @@ func main() {
 	settings.CheckParamInteraction = true
 	engine.Bot, err = engine.NewFromSettings(&settings)
 	if engine.Bot == nil || err != nil {
-		log.Errorf(log.Global, "Unable to initialise bot engine. Error: %s\n", err)
-		os.Exit(1)
+		log.Fatalf("Unable to initialise bot engine. Error: %s\n", err)
 	}
 
 	gctscript.Setup()
 
 	engine.PrintSettings(&engine.Bot.Settings)
 	if err = engine.Bot.Start(); err != nil {
-		log.Errorf(log.Global, "Unable to start bot engine. Error: %s\n", err)
+		gctlog.Errorf(gctlog.Global, "Unable to start bot engine. Error: %s\n", err)
 		os.Exit(1)
 	}
 
 	interrupt := signaler.WaitForInterrupt()
-	log.Infof(log.Global, "Captured %v, shutdown requested.\n", interrupt)
+	gctlog.Infof(gctlog.Global, "Captured %v, shutdown requested.\n", interrupt)
 	engine.Bot.Stop()
-	log.Infoln(log.Global, "Exiting.")
+	gctlog.Infoln(gctlog.Global, "Exiting.")
 }

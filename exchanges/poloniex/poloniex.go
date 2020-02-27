@@ -15,6 +15,7 @@ import (
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
+	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 )
 
@@ -47,9 +48,6 @@ const (
 	poloniexActiveLoans          = "returnActiveLoans"
 	poloniexLendingHistory       = "returnLendingHistory"
 	poloniexAutoRenew            = "toggleAutoRenew"
-
-	poloniexAuthRate   = 6
-	poloniexUnauthRate = 6
 
 	poloniexDateLayout = "2006-01-02 15:04:05"
 )
@@ -501,8 +499,8 @@ func (p *Poloniex) MoveOrder(orderID int64, rate, amount float64, postOnly, imme
 }
 
 // Withdraw withdraws a currency to a specific delegated address
-func (p *Poloniex) Withdraw(currency, address string, amount float64) (bool, error) {
-	result := Withdraw{}
+func (p *Poloniex) Withdraw(currency, address string, amount float64) (*Withdraw, error) {
+	result := &Withdraw{}
 	values := url.Values{}
 
 	values.Set("currency", currency)
@@ -511,14 +509,14 @@ func (p *Poloniex) Withdraw(currency, address string, amount float64) (bool, err
 
 	err := p.SendAuthenticatedHTTPRequest(http.MethodPost, poloniexWithdraw, values, &result)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 
 	if result.Error != "" {
-		return false, errors.New(result.Error)
+		return nil, errors.New(result.Error)
 	}
 
-	return true, nil
+	return result, nil
 }
 
 // GetFeeInfo returns fee information
@@ -759,16 +757,14 @@ func (p *Poloniex) ToggleAutoRenew(orderNumber int64) (bool, error) {
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (p *Poloniex) SendHTTPRequest(path string, result interface{}) error {
-	return p.SendPayload(http.MethodGet,
-		path,
-		nil,
-		nil,
-		result,
-		false,
-		false,
-		p.Verbose,
-		p.HTTPDebugging,
-		p.HTTPRecording)
+	return p.SendPayload(&request.Item{
+		Method:        http.MethodGet,
+		Path:          path,
+		Result:        result,
+		Verbose:       p.Verbose,
+		HTTPDebugging: p.HTTPDebugging,
+		HTTPRecording: p.HTTPRecording,
+	})
 }
 
 // SendAuthenticatedHTTPRequest sends an authenticated HTTP request
@@ -792,16 +788,18 @@ func (p *Poloniex) SendAuthenticatedHTTPRequest(method, endpoint string, values 
 
 	path := fmt.Sprintf("%s/%s", p.API.Endpoints.URL, poloniexAPITradingEndpoint)
 
-	return p.SendPayload(method,
-		path,
-		headers,
-		bytes.NewBufferString(values.Encode()),
-		result,
-		true,
-		true,
-		p.Verbose,
-		p.HTTPDebugging,
-		p.HTTPRecording)
+	return p.SendPayload(&request.Item{
+		Method:        method,
+		Path:          path,
+		Headers:       headers,
+		Body:          bytes.NewBufferString(values.Encode()),
+		Result:        result,
+		AuthRequest:   true,
+		NonceEnabled:  true,
+		Verbose:       p.Verbose,
+		HTTPDebugging: p.HTTPDebugging,
+		HTTPRecording: p.HTTPRecording,
+	})
 }
 
 // GetFee returns an estimate of fee based on type of transaction

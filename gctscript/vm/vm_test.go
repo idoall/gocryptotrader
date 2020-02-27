@@ -10,7 +10,7 @@ import (
 
 	"github.com/gofrs/uuid"
 	"github.com/idoall/gocryptotrader/common/convert"
-	"github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 const (
@@ -30,9 +30,9 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	c := logger.GenDefaultSettings()
+	c := log.GenDefaultSettings()
 	c.Enabled = convert.BoolPtr(false)
-	logger.GlobalLogConfig = &c
+	log.GlobalLogConfig = &c
 	GCTScriptConfig = configHelper(true, true, maxTestVirtualMachines)
 	os.Exit(m.Run())
 }

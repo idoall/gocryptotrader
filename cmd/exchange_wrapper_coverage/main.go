@@ -12,7 +12,7 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/order"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 const (
@@ -46,11 +46,12 @@ func main() {
 	log.Printf("Testing exchange wrappers..")
 	results := make(map[string][]string)
 	wg = sync.WaitGroup{}
-	for x := range engine.Bot.Exchanges {
+	exchanges := engine.GetExchanges()
+	for x := range exchanges {
 		wg.Add(1)
 		go func(num int) {
-			name := engine.Bot.Exchanges[num].GetName()
-			results[name] = testWrappers(engine.Bot.Exchanges[num])
+			name := exchanges[num].GetName()
+			results[name] = testWrappers(exchanges[num])
 			wg.Done()
 		}(x)
 	}
@@ -174,16 +175,16 @@ func testWrappers(e exchange.IBotExchange) []string {
 		funcs = append(funcs, "GetDepositAddress")
 	}
 
-	_, err = e.WithdrawCryptocurrencyFunds(&withdraw.CryptoRequest{})
+	_, err = e.WithdrawCryptocurrencyFunds(&withdraw.Request{})
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "WithdrawCryptocurrencyFunds")
 	}
 
-	_, err = e.WithdrawFiatFunds(&withdraw.FiatRequest{})
+	_, err = e.WithdrawFiatFunds(&withdraw.Request{})
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "WithdrawFiatFunds")
 	}
-	_, err = e.WithdrawFiatFundsToInternationalBank(&withdraw.FiatRequest{})
+	_, err = e.WithdrawFiatFundsToInternationalBank(&withdraw.Request{})
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "WithdrawFiatFundsToInternationalBank")
 	}

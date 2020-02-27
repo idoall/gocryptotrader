@@ -18,8 +18,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // GetDefaultConfig returns a default exchange config
@@ -117,9 +117,8 @@ func (c *Coinbene) SetDefaults() {
 		},
 	}
 	c.Requester = request.New(c.Name,
-		request.NewRateLimit(time.Minute, authRateLimit),
-		request.NewRateLimit(time.Second, unauthRateLimit),
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		SetRateLimit())
 
 	c.API.Endpoints.URLDefault = coinbeneAPIURL
 	c.API.Endpoints.URL = c.API.Endpoints.URLDefault
@@ -561,20 +560,20 @@ func (c *Coinbene) GetDepositAddress(cryptocurrency currency.Code, accountID str
 
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (c *Coinbene) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.CryptoRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (c *Coinbene) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (c *Coinbene) WithdrawFiatFunds(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (c *Coinbene) WithdrawFiatFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a withdrawal is
 // submitted
-func (c *Coinbene) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (c *Coinbene) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // GetWebsocket returns a pointer to the exchange websocket

@@ -23,7 +23,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
+	"github.com/idoall/gocryptotrader/portfolio/banking"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 func main() {
@@ -88,8 +89,9 @@ func main() {
 	log.Println("Testing exchange wrappers..")
 	var exchangeResponses []ExchangeResponses
 
-	for x := range engine.Bot.Exchanges {
-		base := engine.Bot.Exchanges[x].GetBase()
+	exchs := engine.GetExchanges()
+	for x := range exchs {
+		base := exchs[x].GetBase()
 		if !base.Config.Enabled {
 			log.Printf("Exchange %v not enabled, skipping", base.GetName())
 			continue
@@ -101,13 +103,13 @@ func main() {
 		wg.Add(1)
 
 		go func(num int) {
-			name := engine.Bot.Exchanges[num].GetName()
+			name := exchs[num].GetName()
 			authenticated := setExchangeAPIKeys(name, wrapperConfig.Exchanges, base)
 			wrapperResult := ExchangeResponses{
 				ID:                 fmt.Sprintf("Exchange%v", num),
 				ExchangeName:       name,
 				APIKeysSet:         authenticated,
-				AssetPairResponses: testWrappers(engine.Bot.Exchanges[num], base, &wrapperConfig),
+				AssetPairResponses: testWrappers(exchs[num], base, &wrapperConfig),
 			}
 			for i := range wrapperResult.AssetPairResponses {
 				wrapperResult.ErrorCount += wrapperResult.AssetPairResponses[i].ErrorCount
@@ -621,15 +623,14 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			Response:   jsonifyInterface([]interface{}{r19}),
 		})
 
-		genericWithdrawRequest := withdraw.GenericInfo{
-			Amount:   config.OrderSubmission.Amount,
+		withdrawRequest := withdraw.Request{
 			Currency: p.Quote,
+			Crypto: &withdraw.CryptoRequest{
+				Address: withdrawAddressOverride,
+			},
+			Amount: config.OrderSubmission.Amount,
 		}
-		withdrawRequest := withdraw.CryptoRequest{
-			GenericInfo: genericWithdrawRequest,
-			Address:     withdrawAddressOverride,
-		}
-		var r20 string
+		var r20 *withdraw.ExchangeResponse
 		r20, err = e.WithdrawCryptocurrencyFunds(&withdrawRequest)
 		msg = ""
 		if err != nil {
@@ -665,53 +666,59 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			Response:   jsonifyInterface([]interface{}{r21}),
 		})
 
-		fiatWithdrawRequest := withdraw.FiatRequest{
-			GenericInfo:                   genericWithdrawRequest,
-			BankAccountName:               config.BankDetails.BankAccountName,
-			BankAccountNumber:             config.BankDetails.BankAccountNumber,
-			SwiftCode:                     config.BankDetails.SwiftCode,
-			IBAN:                          config.BankDetails.Iban,
-			BankCity:                      config.BankDetails.BankCity,
-			BankName:                      config.BankDetails.BankName,
-			BankAddress:                   config.BankDetails.BankAddress,
-			BankCountry:                   config.BankDetails.BankCountry,
-			BankPostalCode:                config.BankDetails.BankPostalCode,
-			BankCode:                      config.BankDetails.BankCode,
-			IsExpressWire:                 config.BankDetails.IsExpressWire,
-			RequiresIntermediaryBank:      config.BankDetails.RequiresIntermediaryBank,
-			IntermediaryBankName:          config.BankDetails.IntermediaryBankName,
-			IntermediaryBankAccountNumber: config.BankDetails.IntermediaryBankAccountNumber,
-			IntermediarySwiftCode:         config.BankDetails.IntermediarySwiftCode,
-			IntermediaryIBAN:              config.BankDetails.IntermediaryIban,
-			IntermediaryBankCity:          config.BankDetails.IntermediaryBankCity,
-			IntermediaryBankAddress:       config.BankDetails.IntermediaryBankAddress,
-			IntermediaryBankCountry:       config.BankDetails.IntermediaryBankCountry,
-			IntermediaryBankPostalCode:    config.BankDetails.IntermediaryBankPostalCode,
-			IntermediaryBankCode:          config.BankDetails.IntermediaryBankCode,
+		withdrawRequestFiat := withdraw.Request{
+			Currency: p.Quote,
+			Amount:   config.OrderSubmission.Amount,
+			Fiat: &withdraw.FiatRequest{
+				Bank: &banking.Account{
+					AccountName:    config.BankDetails.BankAccountName,
+					AccountNumber:  config.BankDetails.BankAccountNumber,
+					SWIFTCode:      config.BankDetails.SwiftCode,
+					IBAN:           config.BankDetails.Iban,
+					BankPostalCity: config.BankDetails.BankCity,
+					BankName:       config.BankDetails.BankName,
+					BankAddress:    config.BankDetails.BankAddress,
+					BankCountry:    config.BankDetails.BankCountry,
+					BankPostalCode: config.BankDetails.BankPostalCode,
+					BankCode:       config.BankDetails.BankCode,
+				},
+
+				IsExpressWire:                 config.BankDetails.IsExpressWire,
+				RequiresIntermediaryBank:      config.BankDetails.RequiresIntermediaryBank,
+				IntermediaryBankName:          config.BankDetails.IntermediaryBankName,
+				IntermediaryBankAccountNumber: config.BankDetails.IntermediaryBankAccountNumber,
+				IntermediarySwiftCode:         config.BankDetails.IntermediarySwiftCode,
+				IntermediaryIBAN:              config.BankDetails.IntermediaryIban,
+				IntermediaryBankCity:          config.BankDetails.IntermediaryBankCity,
+				IntermediaryBankAddress:       config.BankDetails.IntermediaryBankAddress,
+				IntermediaryBankCountry:       config.BankDetails.IntermediaryBankCountry,
+				IntermediaryBankPostalCode:    config.BankDetails.IntermediaryBankPostalCode,
+				IntermediaryBankCode:          config.BankDetails.IntermediaryBankCode,
+			},
 		}
-		var r22 string
-		r22, err = e.WithdrawFiatFunds(&fiatWithdrawRequest)
+		var r22 *withdraw.ExchangeResponse
+		r22, err = e.WithdrawFiatFunds(&withdrawRequestFiat)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
 			responseContainer.ErrorCount++
 		}
 		responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
-			SentParams: jsonifyInterface([]interface{}{fiatWithdrawRequest}),
+			SentParams: jsonifyInterface([]interface{}{withdrawRequestFiat}),
 			Function:   "WithdrawFiatFunds",
 			Error:      msg,
 			Response:   r22,
 		})
 
-		var r23 string
-		r23, err = e.WithdrawFiatFundsToInternationalBank(&fiatWithdrawRequest)
+		var r23 *withdraw.ExchangeResponse
+		r23, err = e.WithdrawFiatFundsToInternationalBank(&withdrawRequestFiat)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
 			responseContainer.ErrorCount++
 		}
 		responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
-			SentParams: jsonifyInterface([]interface{}{fiatWithdrawRequest}),
+			SentParams: jsonifyInterface([]interface{}{withdrawRequestFiat}),
 			Function:   "WithdrawFiatFundsToInternationalBank",
 			Error:      msg,
 			Response:   r23,

@@ -9,7 +9,7 @@ import (
 	modelPSQL "github.com/idoall/gocryptotrader/database/models/postgres"
 	modelSQLite "github.com/idoall/gocryptotrader/database/models/sqlite3"
 	"github.com/idoall/gocryptotrader/database/repository"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 	"github.com/thrasher-corp/sqlboiler/boil"
 	"github.com/volatiletech/null"
 )

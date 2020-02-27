@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/idoall/gocryptotrader/common"
+	"github.com/idoall/gocryptotrader/core"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/order"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // Please supply your own keys here for due diligence testing
@@ -30,6 +31,14 @@ func setFeeBuilder() *exchange.FeeBuilder {
 		FeeType:       exchange.CryptocurrencyTradeFee,
 		Pair:          currency.NewPair(currency.BTC, currency.LTC),
 		PurchasePrice: 1,
+	}
+}
+
+func TestGetExchangeInfo(t *testing.T) {
+	t.Parallel()
+	_, err := b.GetExchangeInfo()
+	if err != nil {
+		t.Error(err)
 	}
 }
 
@@ -384,7 +393,7 @@ func TestCancelExchangeOrder(t *testing.T) {
 	}
 	var orderCancellation = &order.Cancel{
 		OrderID:       "1",
-		WalletAddress: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
+		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
 		CurrencyPair:  currency.NewPair(currency.LTC, currency.BTC),
 	}
@@ -408,7 +417,7 @@ func TestCancelAllExchangeOrders(t *testing.T) {
 	}
 	var orderCancellation = &order.Cancel{
 		OrderID:       "1",
-		WalletAddress: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
+		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
 		CurrencyPair:  currency.NewPair(currency.LTC, currency.BTC),
 	}
@@ -454,13 +463,13 @@ func TestWithdraw(t *testing.T) {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
 
-	withdrawCryptoRequest := withdraw.CryptoRequest{
-		GenericInfo: withdraw.GenericInfo{
-			Amount:      0,
-			Currency:    currency.BTC,
-			Description: "WITHDRAW IT ALL",
+	withdrawCryptoRequest := withdraw.Request{
+		Amount:      0,
+		Currency:    currency.BTC,
+		Description: "WITHDRAW IT ALL",
+		Crypto: &withdraw.CryptoRequest{
+			Address: core.BitcoinDonationAddress,
 		},
-		Address: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
 	}
 
 	_, err := b.WithdrawCryptocurrencyFunds(&withdrawCryptoRequest)
@@ -477,8 +486,7 @@ func TestWithdraw(t *testing.T) {
 func TestWithdrawFiat(t *testing.T) {
 	t.Parallel()
 
-	var withdrawFiatRequest withdraw.FiatRequest
-	_, err := b.WithdrawFiatFunds(&withdrawFiatRequest)
+	_, err := b.WithdrawFiatFunds(&withdraw.Request{})
 	if err != common.ErrFunctionNotSupported {
 		t.Errorf("Expected '%v', received: '%v'", common.ErrFunctionNotSupported, err)
 	}
@@ -487,8 +495,7 @@ func TestWithdrawFiat(t *testing.T) {
 func TestWithdrawInternationalBank(t *testing.T) {
 	t.Parallel()
 
-	var withdrawFiatRequest withdraw.FiatRequest
-	_, err := b.WithdrawFiatFundsToInternationalBank(&withdrawFiatRequest)
+	_, err := b.WithdrawFiatFundsToInternationalBank(&withdraw.Request{})
 	if err != common.ErrFunctionNotSupported {
 		t.Errorf("Expected '%v', received: '%v'", common.ErrFunctionNotSupported, err)
 	}

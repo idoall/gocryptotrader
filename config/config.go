@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -21,11 +20,11 @@ import (
 	"github.com/idoall/gocryptotrader/connchecker"
 	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/currency/forexprovider"
-	"github.com/idoall/gocryptotrader/currency/forexprovider/base"
 	"github.com/idoall/gocryptotrader/database"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	gctscript "github.com/idoall/gocryptotrader/gctscript/vm"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/banking"
 )
 
 // GetCurrencyConfig returns currency configurations
@@ -35,28 +34,31 @@ func (c *Config) GetCurrencyConfig() CurrencyConfig {
 
 // GetExchangeBankAccounts returns banking details associated with an exchange
 // for depositing funds
-func (c *Config) GetExchangeBankAccounts(exchangeName, depositingCurrency string) (BankAccount, error) {
+func (c *Config) GetExchangeBankAccounts(exchangeName, id, depositingCurrency string) (*banking.Account, error) {
 	m.Lock()
 	defer m.Unlock()
 
 	for x := range c.Exchanges {
 		if strings.EqualFold(c.Exchanges[x].Name, exchangeName) {
 			for y := range c.Exchanges[x].BankAccounts {
-				if strings.Contains(c.Exchanges[x].BankAccounts[y].SupportedCurrencies,
-					depositingCurrency) {
-					return c.Exchanges[x].BankAccounts[y], nil
+				if strings.EqualFold(c.Exchanges[x].BankAccounts[y].ID, id) {
+					if common.StringDataCompareInsensitive(
+						strings.Split(c.Exchanges[x].BankAccounts[y].SupportedCurrencies, ","),
+						depositingCurrency) {
+						return &c.Exchanges[x].BankAccounts[y], nil
+					}
 				}
 			}
 		}
 	}
-	return BankAccount{}, fmt.Errorf("exchange %s bank details not found for %s",
+	return nil, fmt.Errorf("exchange %s bank details not found for %s",
 		exchangeName,
 		depositingCurrency)
 }
 
 // UpdateExchangeBankAccounts updates the configuration for the associated
 // exchange bank
-func (c *Config) UpdateExchangeBankAccounts(exchangeName string, bankCfg []BankAccount) error {
+func (c *Config) UpdateExchangeBankAccounts(exchangeName string, bankCfg []banking.Account) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -72,7 +74,7 @@ func (c *Config) UpdateExchangeBankAccounts(exchangeName string, bankCfg []BankA
 
 // GetClientBankAccounts returns banking details used for a given exchange
 // and currency
-func (c *Config) GetClientBankAccounts(exchangeName, targetCurrency string) (BankAccount, error) {
+func (c *Config) GetClientBankAccounts(exchangeName, targetCurrency string) (*banking.Account, error) {
 	m.Lock()
 	defer m.Unlock()
 
@@ -80,16 +82,16 @@ func (c *Config) GetClientBankAccounts(exchangeName, targetCurrency string) (Ban
 		if (strings.Contains(c.BankAccounts[x].SupportedExchanges, exchangeName) ||
 			c.BankAccounts[x].SupportedExchanges == "ALL") &&
 			strings.Contains(c.BankAccounts[x].SupportedCurrencies, targetCurrency) {
-			return c.BankAccounts[x], nil
+			return &c.BankAccounts[x], nil
 		}
 	}
-	return BankAccount{}, fmt.Errorf("client banking details not found for %s and currency %s",
+	return nil, fmt.Errorf("client banking details not found for %s and currency %s",
 		exchangeName,
 		targetCurrency)
 }
 
 // UpdateClientBankAccounts updates the configuration for a bank
-func (c *Config) UpdateClientBankAccounts(bankCfg *BankAccount) error {
+func (c *Config) UpdateClientBankAccounts(bankCfg *banking.Account) error {
 	m.Lock()
 	defer m.Unlock()
 
@@ -110,7 +112,7 @@ func (c *Config) CheckClientBankAccounts() {
 
 	if len(c.BankAccounts) == 0 {
 		c.BankAccounts = append(c.BankAccounts,
-			BankAccount{
+			banking.Account{
 				ID:                  "test-bank-01",
 				BankName:            "Test Bank",
 				BankAddress:         "42 Bank Street",
@@ -137,19 +139,6 @@ func (c *Config) CheckClientBankAccounts() {
 			}
 		}
 	}
-}
-
-// GetBankAccountByID Returns a bank account based on its ID
-func (c *Config) GetBankAccountByID(id string) (*BankAccount, error) {
-	m.Lock()
-	defer m.Unlock()
-
-	for x := range c.BankAccounts {
-		if strings.EqualFold(c.BankAccounts[x].ID, id) {
-			return &c.BankAccounts[x], nil
-		}
-	}
-	return nil, fmt.Errorf(ErrBankAccountNotFound, id)
 }
 
 // PurgeExchangeAPICredentials purges the stored API credentials
@@ -704,8 +693,8 @@ func (c *Config) GetExchangeConfig(name string) (*ExchangeConfig, error) {
 	return nil, fmt.Errorf(ErrExchangeNotFound, name)
 }
 
-// GetForexProviderConfig returns a forex provider configuration by its name
-func (c *Config) GetForexProviderConfig(name string) (base.Settings, error) {
+// GetForexProvider returns a forex provider configuration by its name
+func (c *Config) GetForexProvider(name string) (currency.FXSettings, error) {
 	m.Lock()
 	defer m.Unlock()
 	for i := range c.Currency.ForexProviders {
@@ -713,11 +702,11 @@ func (c *Config) GetForexProviderConfig(name string) (base.Settings, error) {
 			return c.Currency.ForexProviders[i], nil
 		}
 	}
-	return base.Settings{}, errors.New("provider not found")
+	return currency.FXSettings{}, errors.New("provider not found")
 }
 
-// GetForexProvidersConfig returns a list of available forex providers
-func (c *Config) GetForexProvidersConfig() []base.Settings {
+// GetForexProviders returns a list of available forex providers
+func (c *Config) GetForexProviders() []currency.FXSettings {
 	m.Lock()
 	defer m.Unlock()
 	return c.Currency.ForexProviders
@@ -924,28 +913,6 @@ func (c *Config) CheckExchangeConfigValues() error {
 				c.Exchanges[i].HTTPTimeout = defaultHTTPTimeout
 			}
 
-			if c.Exchanges[i].HTTPRateLimiter != nil {
-				if c.Exchanges[i].HTTPRateLimiter.Authenticated.Duration < 0 {
-					log.Warnf(log.ExchangeSys, "Exchange %s HTTP Rate Limiter authenticated duration set to negative value, defaulting to 0\n", c.Exchanges[i].Name)
-					c.Exchanges[i].HTTPRateLimiter.Authenticated.Duration = 0
-				}
-
-				if c.Exchanges[i].HTTPRateLimiter.Authenticated.Rate < 0 {
-					log.Warnf(log.ExchangeSys, "Exchange %s HTTP Rate Limiter authenticated rate set to negative value, defaulting to 0\n", c.Exchanges[i].Name)
-					c.Exchanges[i].HTTPRateLimiter.Authenticated.Rate = 0
-				}
-
-				if c.Exchanges[i].HTTPRateLimiter.Unauthenticated.Duration < 0 {
-					log.Warnf(log.ExchangeSys, "Exchange %s HTTP Rate Limiter unauthenticated duration set to negative value, defaulting to 0\n", c.Exchanges[i].Name)
-					c.Exchanges[i].HTTPRateLimiter.Unauthenticated.Duration = 0
-				}
-
-				if c.Exchanges[i].HTTPRateLimiter.Unauthenticated.Rate < 0 {
-					log.Warnf(log.ExchangeSys, "Exchange %s HTTP Rate Limiter unauthenticated rate set to negative value, defaulting to 0\n", c.Exchanges[i].Name)
-					c.Exchanges[i].HTTPRateLimiter.Unauthenticated.Rate = 0
-				}
-			}
-
 			if c.Exchanges[i].WebsocketResponseCheckTimeout <= 0 {
 				log.Warnf(log.ExchangeSys, "Exchange %s Websocket response check timeout value not set, defaulting to %v.",
 					c.Exchanges[i].Name, defaultWebsocketResponseCheckTimeout)
@@ -976,16 +943,6 @@ func (c *Config) CheckExchangeConfigValues() error {
 
 			c.CheckExchangeAssetsConsistency(c.Exchanges[i].Name)
 
-			for x := range c.Exchanges[i].BankAccounts {
-				if !c.Exchanges[i].BankAccounts[x].Enabled {
-					continue
-				}
-				err := c.Exchanges[i].BankAccounts[x].Validate()
-				if err != nil {
-					c.Exchanges[i].BankAccounts[x].Enabled = false
-					log.Warn(log.ConfigMgr, err.Error())
-				}
-			}
 			exchanges++
 		}
 	}
@@ -995,16 +952,30 @@ func (c *Config) CheckExchangeConfigValues() error {
 	return nil
 }
 
+// CheckBankAccountConfig checks all bank accounts to see if they are valid
+func (c *Config) CheckBankAccountConfig() {
+	for x := range c.BankAccounts {
+		if c.BankAccounts[x].Enabled {
+			err := c.BankAccounts[x].Validate()
+			if err != nil {
+				c.BankAccounts[x].Enabled = false
+				log.Warn(log.ConfigMgr, err.Error())
+			}
+		}
+	}
+	banking.Accounts = c.BankAccounts
+}
+
 // CheckCurrencyConfigValues checks to see if the currency config values are correct or not
 func (c *Config) CheckCurrencyConfigValues() error {
 	fxProviders := forexprovider.GetSupportedForexProviders()
 
 	if len(fxProviders) != len(c.Currency.ForexProviders) {
 		for x := range fxProviders {
-			_, err := c.GetForexProviderConfig(fxProviders[x])
+			_, err := c.GetForexProvider(fxProviders[x])
 			if err != nil {
 				log.Warnf(log.Global, "%s forex provider not found, adding to config..\n", fxProviders[x])
-				c.Currency.ForexProviders = append(c.Currency.ForexProviders, base.Settings{
+				c.Currency.ForexProviders = append(c.Currency.ForexProviders, currency.FXSettings{
 					Name:             fxProviders[x],
 					RESTPollingDelay: 600,
 					APIKey:           DefaultUnsetAPIKey,
@@ -1358,11 +1329,9 @@ func (c *Config) CheckConnectionMonitorConfig() {
 // Helpful for printing application usage
 func DefaultFilePath() string {
 	f := filepath.Join(common.GetDefaultDataDir(runtime.GOOS), File)
-	_, err := os.Stat(f)
-	if os.IsNotExist(err) {
+	if !file.Exists(f) {
 		encFile := filepath.Join(common.GetDefaultDataDir(runtime.GOOS), EncryptedFile)
-		_, err = os.Stat(encFile)
-		if !os.IsNotExist(err) {
+		if file.Exists(encFile) {
 			return encFile
 		}
 	}
@@ -1412,12 +1381,10 @@ func GetFilePath(configfile string) (string, error) {
 	// First upgrade the old dir config file if it exists to the corresponding
 	// new one
 	for x := range oldDirs {
-		_, err := os.Stat(oldDirs[x])
-		if os.IsNotExist(err) {
+		if !file.Exists(oldDirs[x]) {
 			continue
 		}
-		_, err = os.Stat(newDirs[x])
-		if !os.IsNotExist(err) {
+		if file.Exists(newDirs[x]) {
 			log.Warnf(log.ConfigMgr,
 				"config.json file found in root dir and gct dir; cannot overwrite, defaulting to gct dir config.json at %s",
 				newDirs[x])
@@ -1446,8 +1413,7 @@ func GetFilePath(configfile string) (string, error) {
 
 	// Secondly check to see if the new config file extension is correct or not
 	for x := range newDirs {
-		_, err := os.Stat(newDirs[x])
-		if os.IsNotExist(err) {
+		if !file.Exists(newDirs[x]) {
 			continue
 		}
 
@@ -1655,6 +1621,7 @@ func (c *Config) CheckConfig() error {
 	c.CheckConnectionMonitorConfig()
 	c.CheckCommunicationsConfig()
 	c.CheckClientBankAccounts()
+	c.CheckBankAccountConfig()
 	c.CheckRemoteControlConfig()
 
 	err = c.CheckCurrencyConfigValues()

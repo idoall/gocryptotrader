@@ -19,8 +19,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // GetDefaultConfig returns a default exchange config
@@ -111,9 +111,8 @@ func (p *Poloniex) SetDefaults() {
 	}
 
 	p.Requester = request.New(p.Name,
-		request.NewRateLimit(time.Second, poloniexAuthRate),
-		request.NewRateLimit(time.Second, poloniexUnauthRate),
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		SetRateLimit())
 
 	p.API.Endpoints.URLDefault = poloniexAPIURL
 	p.API.Endpoints.URL = p.API.Endpoints.URLDefault
@@ -479,21 +478,26 @@ func (p *Poloniex) GetDepositAddress(cryptocurrency currency.Code, _ string) (st
 
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (p *Poloniex) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.CryptoRequest) (string, error) {
-	_, err := p.Withdraw(withdrawRequest.Currency.String(), withdrawRequest.Address, withdrawRequest.Amount)
-	return "", err
+func (p *Poloniex) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	v, err := p.Withdraw(withdrawRequest.Currency.String(), withdrawRequest.Crypto.Address, withdrawRequest.Amount)
+	if err != nil {
+		return nil, err
+	}
+	return &withdraw.ExchangeResponse{
+		Status: v.Response,
+	}, err
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a
 // withdrawal is submitted
-func (p *Poloniex) WithdrawFiatFunds(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (p *Poloniex) WithdrawFiatFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a
 // withdrawal is submitted
-func (p *Poloniex) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (p *Poloniex) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // GetWebsocket returns a pointer to the exchange websocket

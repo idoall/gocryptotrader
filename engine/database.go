@@ -9,7 +9,7 @@ import (
 	"github.com/idoall/gocryptotrader/database"
 	dbpsql "github.com/idoall/gocryptotrader/database/drivers/postgres"
 	dbsqlite3 "github.com/idoall/gocryptotrader/database/drivers/sqlite3"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 	"github.com/thrasher-corp/sqlboiler/boil"
 )
 

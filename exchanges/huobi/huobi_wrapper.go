@@ -20,8 +20,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // GetDefaultConfig returns a default exchange config
@@ -87,6 +87,7 @@ func (h *HUOBI) SetDefaults() {
 				CancelOrders:      true,
 				CancelOrder:       true,
 				SubmitOrder:       true,
+				CryptoDeposit:     true,
 				CryptoWithdrawal:  true,
 				TradeFee:          true,
 			},
@@ -111,9 +112,8 @@ func (h *HUOBI) SetDefaults() {
 	}
 
 	h.Requester = request.New(h.Name,
-		request.NewRateLimit(time.Second*10, huobiAuthRate),
-		request.NewRateLimit(time.Second*10, huobiUnauthRate),
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		SetRateLimit())
 
 	h.API.Endpoints.URLDefault = huobiAPIURL
 	h.API.Endpoints.URL = h.API.Endpoints.URLDefault
@@ -135,9 +135,6 @@ func (h *HUOBI) Setup(exch *config.ExchangeConfig) error {
 	if err != nil {
 		return err
 	}
-
-	h.API.PEMKeySupport = exch.API.PEMKeySupport
-	h.API.Credentials.PEMKey = exch.API.Credentials.PEMKey
 
 	err = h.Websocket.Setup(
 		&wshandler.WebsocketSetup{
@@ -652,26 +649,32 @@ func (h *HUOBI) GetOrderInfo(orderID string) (order.Detail, error) {
 
 // GetDepositAddress returns a deposit address for a specified currency
 func (h *HUOBI) GetDepositAddress(cryptocurrency currency.Code, accountID string) (string, error) {
-	return "", common.ErrFunctionNotSupported
+	resp, err := h.QueryDepositAddress(cryptocurrency.Lower().String())
+	return resp.Address, err
 }
 
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (h *HUOBI) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.CryptoRequest) (string, error) {
-	resp, err := h.Withdraw(withdrawRequest.Currency, withdrawRequest.Address, withdrawRequest.AddressTag, withdrawRequest.Amount, withdrawRequest.FeeAmount)
-	return strconv.FormatInt(resp, 10), err
+func (h *HUOBI) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	resp, err := h.Withdraw(withdrawRequest.Currency, withdrawRequest.Crypto.Address, withdrawRequest.Crypto.AddressTag, withdrawRequest.Amount, withdrawRequest.Crypto.FeeAmount)
+	if err != nil {
+		return nil, err
+	}
+	return &withdraw.ExchangeResponse{
+		ID: strconv.FormatInt(resp, 10),
+	}, err
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a
 // withdrawal is submitted
-func (h *HUOBI) WithdrawFiatFunds(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (h *HUOBI) WithdrawFiatFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a
 // withdrawal is submitted
-func (h *HUOBI) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (h *HUOBI) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // GetWebsocket returns a pointer to the exchange websocket

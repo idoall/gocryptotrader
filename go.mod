@@ -1,16 +1,16 @@
 module github.com/idoall/gocryptotrader
 
-go 1.12
+go 1.13
 
 require (
-	github.com/d5/tengo/v2 v2.0.2
+	github.com/d5/tengo/v2 v2.0.5
 	github.com/gofrs/uuid v3.2.0+incompatible
 	github.com/golang/protobuf v1.3.3
 	github.com/google/go-querystring v1.0.0
-	github.com/gorilla/mux v1.7.3
+	github.com/gorilla/mux v1.7.4
 	github.com/gorilla/websocket v1.4.1
-	github.com/grpc-ecosystem/go-grpc-middleware v1.1.0
-	github.com/grpc-ecosystem/grpc-gateway v1.12.2
+	github.com/grpc-ecosystem/go-grpc-middleware v1.2.0
+	github.com/grpc-ecosystem/grpc-gateway v1.13.0
 	github.com/kat-co/vala v0.0.0-20170210184112-42e1d8b61f12
 	github.com/lib/pq v1.3.0
 	github.com/mattn/go-sqlite3 v1.13.0
@@ -23,6 +23,8 @@ require (
 	github.com/urfave/cli v1.22.2
 	github.com/volatiletech/null v8.0.0+incompatible
 	golang.org/x/crypto v0.0.0-20190605123033-f99c8df09eb5
+	golang.org/x/sys v0.0.0-20191003212358-c178f38b412c // indirect
+	golang.org/x/time v0.0.0-20190308202827-9d24e82272b4
 	google.golang.org/genproto v0.0.0-20191002211648-c459b9ce5143
-	google.golang.org/grpc v1.27.0
+	google.golang.org/grpc v1.27.1
 )

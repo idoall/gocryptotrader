@@ -20,8 +20,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // GetDefaultConfig returns a default exchange config
@@ -97,9 +97,8 @@ func (i *ItBit) SetDefaults() {
 	}
 
 	i.Requester = request.New(i.Name,
-		request.NewRateLimit(time.Second, itbitAuthRate),
-		request.NewRateLimit(time.Second, itbitUnauthRate),
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		nil)
 
 	i.API.Endpoints.URLDefault = itbitAPIURL
 	i.API.Endpoints.URL = i.API.Endpoints.URLDefault
@@ -409,20 +408,20 @@ func (i *ItBit) GetDepositAddress(cryptocurrency currency.Code, accountID string
 
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (i *ItBit) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.CryptoRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (i *ItBit) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a
 // withdrawal is submitted
-func (i *ItBit) WithdrawFiatFunds(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (i *ItBit) WithdrawFiatFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a
 // withdrawal is submitted
-func (i *ItBit) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (i *ItBit) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // GetWebsocket returns a pointer to the exchange websocket

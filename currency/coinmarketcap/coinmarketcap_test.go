@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 var c Coinmarketcap

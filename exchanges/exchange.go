@@ -15,7 +15,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/protocol"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/banking"
 )
 
 const (
@@ -35,9 +36,8 @@ const (
 func (e *Base) checkAndInitRequester() {
 	if e.Requester == nil {
 		e.Requester = request.New(e.Name,
-			request.NewRateLimit(time.Second, 0),
-			request.NewRateLimit(time.Second, 0),
-			new(http.Client))
+			new(http.Client),
+			nil)
 	}
 }
 
@@ -174,27 +174,6 @@ func (e *Base) SetAPICredentialDefaults() {
 	}
 }
 
-// SetHTTPRateLimiter sets the exchanges default HTTP rate limiter and updates the exchange's config
-// to default settings if it doesn't exist
-func (e *Base) SetHTTPRateLimiter() {
-	e.checkAndInitRequester()
-
-	if e.RequiresRateLimiter() {
-		if e.Config.HTTPRateLimiter == nil {
-			e.Config.HTTPRateLimiter = new(config.HTTPRateLimitConfig)
-			e.Config.HTTPRateLimiter.Authenticated.Duration = e.GetRateLimit(true).Duration
-			e.Config.HTTPRateLimiter.Authenticated.Rate = e.GetRateLimit(true).Rate
-			e.Config.HTTPRateLimiter.Unauthenticated.Duration = e.GetRateLimit(false).Duration
-			e.Config.HTTPRateLimiter.Unauthenticated.Rate = e.GetRateLimit(false).Rate
-		} else {
-			e.SetRateLimit(true, e.Config.HTTPRateLimiter.Authenticated.Duration,
-				e.Config.HTTPRateLimiter.Authenticated.Rate)
-			e.SetRateLimit(false, e.Config.HTTPRateLimiter.Unauthenticated.Duration,
-				e.Config.HTTPRateLimiter.Unauthenticated.Rate)
-		}
-	}
-}
-
 // SupportsRESTTickerBatchUpdates returns whether or not the
 // exhange supports REST batch ticker fetching
 func (e *Base) SupportsRESTTickerBatchUpdates() bool {
@@ -244,16 +223,16 @@ func (e *Base) GetPairAssetType(c currency.Pair) (asset.Item, error) {
 
 // GetClientBankAccounts returns banking details associated with
 // a client for withdrawal purposes
-func (e *Base) GetClientBankAccounts(exchangeName, withdrawalCurrency string) (config.BankAccount, error) {
+func (e *Base) GetClientBankAccounts(exchangeName, withdrawalCurrency string) (*banking.Account, error) {
 	cfg := config.GetConfig()
 	return cfg.GetClientBankAccounts(exchangeName, withdrawalCurrency)
 }
 
 // GetExchangeBankAccounts returns banking details associated with an
 // exchange for funding purposes
-func (e *Base) GetExchangeBankAccounts(exchangeName, depositCurrency string) (config.BankAccount, error) {
+func (e *Base) GetExchangeBankAccounts(id, depositCurrency string) (*banking.Account, error) {
 	cfg := config.GetConfig()
-	return cfg.GetExchangeBankAccounts(exchangeName, depositCurrency)
+	return cfg.GetExchangeBankAccounts(e.Name, id, depositCurrency)
 }
 
 // SetCurrencyPairFormat checks the exchange request and config currency pair
@@ -463,7 +442,6 @@ func (e *Base) SetupDefaults(exch *config.ExchangeConfig) error {
 
 	e.HTTPDebugging = exch.HTTPDebugging
 	e.SetHTTPClientUserAgent(exch.HTTPUserAgent)
-	e.SetHTTPRateLimiter()
 	e.SetAssetTypes()
 	e.SetCurrencyPairFormat()
 	e.SetConfigPairs()
@@ -471,8 +449,6 @@ func (e *Base) SetupDefaults(exch *config.ExchangeConfig) error {
 	e.SetAPIURL()
 	e.SetAPICredentialDefaults()
 	e.SetClientProxyAddress(exch.ProxyAddress)
-	e.SetHTTPRateLimiter()
-
 	e.BaseCurrencies = exch.BaseCurrencies
 
 	if e.Features.Supports.Websocket {
@@ -794,4 +770,14 @@ func (e *Base) CheckTransientError(err error) error {
 		return nil
 	}
 	return err
+}
+
+// DisableRateLimiter disables the rate limiting system for the exchange
+func (e *Base) DisableRateLimiter() error {
+	return e.Requester.DisableRateLimiter()
+}
+
+// EnableRateLimiter enables the rate limiting system for the exchange
+func (e *Base) EnableRateLimiter() error {
+	return e.Requester.EnableRateLimiter()
 }

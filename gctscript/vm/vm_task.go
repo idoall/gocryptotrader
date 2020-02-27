@@ -3,7 +3,7 @@ package vm
 import (
 	"time"
 
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 func (vm *VM) runner() {

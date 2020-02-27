@@ -2,14 +2,13 @@ package audit
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/idoall/gocryptotrader/database"
 	modelPSQL "github.com/idoall/gocryptotrader/database/models/postgres"
 	modelSQLite "github.com/idoall/gocryptotrader/database/models/sqlite3"
 	"github.com/idoall/gocryptotrader/database/repository"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 	"github.com/thrasher-corp/sqlboiler/boil"
 	"github.com/thrasher-corp/sqlboiler/queries/qm"
 )
@@ -71,7 +70,7 @@ func Event(id, msgtype, message string) {
 // GetEvent () returns list of order events matching query
 func GetEvent(startTime, endTime time.Time, order string, limit int) (interface{}, error) {
 	if database.DB.SQL == nil {
-		return nil, errors.New("database is nil")
+		return nil, database.ErrDatabaseSupportDisabled
 	}
 
 	query := qm.Where("created_at BETWEEN ? AND ?", startTime, endTime)

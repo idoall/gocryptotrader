@@ -9,14 +9,16 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
+	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 const (
@@ -51,9 +53,6 @@ const (
 	coinbaseproWithdrawalCrypto        = "withdrawals/crypto"
 	coinbaseproCoinbaseAccounts        = "coinbase-accounts"
 	coinbaseproTrailingVolume          = "users/self/trailing-volume"
-
-	coinbaseproAuthRate   = 5
-	coinbaseproUnauthRate = 3
 )
 
 // CoinbasePro is the overarching type across the coinbasepro package
@@ -721,19 +720,17 @@ func (c *CoinbasePro) GetTrailingVolume() ([]Volume, error) {
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (c *CoinbasePro) SendHTTPRequest(path string, result interface{}) error {
-	return c.SendPayload(http.MethodGet,
-		path,
-		nil,
-		nil,
-		result,
-		false,
-		false,
-		c.Verbose,
-		c.HTTPDebugging,
-		c.HTTPRecording)
+	return c.SendPayload(&request.Item{
+		Method:        http.MethodGet,
+		Path:          path,
+		Result:        result,
+		Verbose:       c.Verbose,
+		HTTPDebugging: c.HTTPDebugging,
+		HTTPRecording: c.HTTPRecording,
+	})
 }
 
-// SendAuthenticatedHTTPRequest sends an authenticated HTTP reque
+// SendAuthenticatedHTTPRequest sends an authenticated HTTP request
 func (c *CoinbasePro) SendAuthenticatedHTTPRequest(method, path string, params map[string]interface{}, result interface{}) (err error) {
 	if !c.AllowAuthenticatedRequest() {
 		return fmt.Errorf(exchange.WarningAuthenticatedRequestWithoutCredentialsSet,
@@ -753,7 +750,7 @@ func (c *CoinbasePro) SendAuthenticatedHTTPRequest(method, path string, params m
 		}
 	}
 
-	n := c.Requester.GetNonce(false).String()
+	n := strconv.FormatInt(time.Now().Unix(), 10)
 	message := n + method + "/" + path + string(payload)
 	hmac := crypto.GetHMAC(crypto.HashSHA256, []byte(message), []byte(c.API.Credentials.Secret))
 	headers := make(map[string]string)
@@ -763,16 +760,17 @@ func (c *CoinbasePro) SendAuthenticatedHTTPRequest(method, path string, params m
 	headers["CB-ACCESS-PASSPHRASE"] = c.API.Credentials.ClientID
 	headers["Content-Type"] = "application/json"
 
-	return c.SendPayload(method,
-		c.API.Endpoints.URL+path,
-		headers,
-		bytes.NewBuffer(payload),
-		result,
-		true,
-		true,
-		c.Verbose,
-		c.HTTPDebugging,
-		c.HTTPRecording)
+	return c.SendPayload(&request.Item{
+		Method:        method,
+		Path:          c.API.Endpoints.URL + path,
+		Headers:       headers,
+		Body:          bytes.NewBuffer(payload),
+		Result:        result,
+		AuthRequest:   true,
+		Verbose:       c.Verbose,
+		HTTPDebugging: c.HTTPDebugging,
+		HTTPRecording: c.HTTPRecording,
+	})
 }
 
 // GetFee returns an estimate of fee based on type of transaction

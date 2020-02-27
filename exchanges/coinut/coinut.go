@@ -15,8 +15,9 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/order"
+	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 const (
@@ -37,9 +38,6 @@ const (
 	coinutOptionChain     = "option_chain"
 	coinutPositionHistory = "position_history"
 	coinutPositionOpen    = "user_open_positions"
-
-	coinutAuthRate   = 0
-	coinutUnauthRate = 0
 
 	coinutStatusOK = "OK"
 )
@@ -297,16 +295,18 @@ func (c *COINUT) SendHTTPRequest(apiRequest string, params map[string]interface{
 	headers["Content-Type"] = "application/json"
 
 	var rawMsg json.RawMessage
-	err = c.SendPayload(http.MethodPost,
-		c.API.Endpoints.URL,
-		headers,
-		bytes.NewBuffer(payload),
-		&rawMsg,
-		authenticated,
-		true,
-		c.Verbose,
-		c.HTTPDebugging,
-		c.HTTPRecording)
+	err = c.SendPayload(&request.Item{
+		Method:        http.MethodPost,
+		Path:          c.API.Endpoints.URL,
+		Headers:       headers,
+		Body:          bytes.NewBuffer(payload),
+		Result:        &rawMsg,
+		AuthRequest:   authenticated,
+		NonceEnabled:  true,
+		Verbose:       c.Verbose,
+		HTTPDebugging: c.HTTPDebugging,
+		HTTPRecording: c.HTTPRecording,
+	})
 	if err != nil {
 		return err
 	}

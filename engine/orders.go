@@ -10,7 +10,7 @@ import (
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/communications/base"
 	"github.com/idoall/gocryptotrader/exchanges/order"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 // vars for the fund manager package

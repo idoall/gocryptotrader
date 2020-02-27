@@ -21,8 +21,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // GetDefaultConfig returns a default exchange config
@@ -97,9 +97,8 @@ func (l *LocalBitcoins) SetDefaults() {
 	}
 
 	l.Requester = request.New(l.Name,
-		request.NewRateLimit(time.Second*0, localbitcoinsAuthRate),
-		request.NewRateLimit(time.Second*0, localbitcoinsUnauthRate),
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		nil)
 
 	l.API.Endpoints.URLDefault = localbitcoinsAPIURL
 	l.API.Endpoints.URL = l.API.Endpoints.URLDefault
@@ -411,23 +410,26 @@ func (l *LocalBitcoins) GetDepositAddress(cryptocurrency currency.Code, _ string
 
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (l *LocalBitcoins) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.CryptoRequest) (string, error) {
-	return "",
-		l.WalletSend(withdrawRequest.Address,
-			withdrawRequest.Amount,
-			withdrawRequest.PIN)
+func (l *LocalBitcoins) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	err := l.WalletSend(withdrawRequest.Crypto.Address,
+		withdrawRequest.Amount,
+		withdrawRequest.PIN)
+	if err != nil {
+		return nil, err
+	}
+	return &withdraw.ExchangeResponse{}, nil
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a
 // withdrawal is submitted
-func (l *LocalBitcoins) WithdrawFiatFunds(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (l *LocalBitcoins) WithdrawFiatFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a
 // withdrawal is submitted
-func (l *LocalBitcoins) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (l *LocalBitcoins) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // GetWebsocket returns a pointer to the exchange websocket

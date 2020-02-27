@@ -19,8 +19,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // GetDefaultConfig returns a default exchange config
@@ -111,9 +111,8 @@ func (b *BTCMarkets) SetDefaults() {
 	}
 
 	b.Requester = request.New(b.Name,
-		request.NewRateLimit(time.Second*10, btcmarketsAuthLimit),
-		request.NewRateLimit(time.Second*10, btcmarketsUnauthLimit),
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		SetRateLimit())
 
 	b.API.Endpoints.WebsocketURL = btcMarketsWSURL
 	b.Websocket = wshandler.New()
@@ -501,43 +500,49 @@ func (b *BTCMarkets) GetDepositAddress(cryptocurrency currency.Code, accountID s
 }
 
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is submitted
-func (b *BTCMarkets) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.CryptoRequest) (string, error) {
+func (b *BTCMarkets) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
 	a, err := b.RequestWithdraw(withdrawRequest.Currency.String(),
 		withdrawRequest.Amount,
-		withdrawRequest.Address,
+		withdrawRequest.Crypto.Address,
 		"",
 		"",
 		"",
 		"")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return a.Status, nil
+	return &withdraw.ExchangeResponse{
+		ID:     a.ID,
+		Status: a.Status,
+	}, nil
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a
 // withdrawal is submitted
-func (b *BTCMarkets) WithdrawFiatFunds(withdrawRequest *withdraw.FiatRequest) (string, error) {
+func (b *BTCMarkets) WithdrawFiatFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
 	if withdrawRequest.Currency != currency.AUD {
-		return "", errors.New("only aud is supported for withdrawals")
+		return nil, errors.New("only aud is supported for withdrawals")
 	}
-	a, err := b.RequestWithdraw(withdrawRequest.GenericInfo.Currency.String(),
-		withdrawRequest.GenericInfo.Amount,
+	a, err := b.RequestWithdraw(withdrawRequest.Currency.String(),
+		withdrawRequest.Amount,
 		"",
-		withdrawRequest.BankAccountName,
-		withdrawRequest.BankAccountNumber,
-		withdrawRequest.BSB,
-		withdrawRequest.BankName)
+		withdrawRequest.Fiat.Bank.AccountName,
+		withdrawRequest.Fiat.Bank.AccountNumber,
+		withdrawRequest.Fiat.Bank.BSBNumber,
+		withdrawRequest.Fiat.Bank.BankName)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return a.Status, nil
+	return &withdraw.ExchangeResponse{
+		ID:     a.ID,
+		Status: a.Status,
+	}, nil
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a
 // withdrawal is submitted
-func (b *BTCMarkets) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (b *BTCMarkets) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // GetWebsocket returns a pointer to the exchange websocket

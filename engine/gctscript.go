@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 
 	"github.com/idoall/gocryptotrader/gctscript/vm"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 const gctscriptManagerName = "GCTScript"

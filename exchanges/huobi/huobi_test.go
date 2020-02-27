@@ -1,27 +1,21 @@
 package huobi
 
 import (
-	"crypto/ecdsa"
-	"crypto/rand"
-	"crypto/x509"
-	"encoding/pem"
-	"io/ioutil"
 	"log"
 	"os"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/gorilla/websocket"
 	"github.com/idoall/gocryptotrader/common"
-	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/config"
+	"github.com/idoall/gocryptotrader/core"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/sharedtestvalues"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // Please supply you own test keys here for due diligence testing.
@@ -311,31 +305,6 @@ func TestCancelWithdraw(t *testing.T) {
 	}
 }
 
-func TestPEMLoadAndSign(t *testing.T) {
-	t.Parallel()
-	pemKey := strings.NewReader(h.API.Credentials.PEMKey)
-	pemBytes, err := ioutil.ReadAll(pemKey)
-	if err != nil {
-		t.Fatalf("TestPEMLoadAndSign Unable to ioutil.ReadAll PEM key: %s", err)
-	}
-
-	block, _ := pem.Decode(pemBytes)
-	if block == nil {
-		t.Fatalf("TestPEMLoadAndSign Block is nil")
-	}
-
-	x509Encoded := block.Bytes
-	privKey, err := x509.ParseECPrivateKey(x509Encoded)
-	if err != nil {
-		t.Fatalf("TestPEMLoadAndSign Unable to ParseECPrivKey: %s", err)
-	}
-
-	_, _, err = ecdsa.Sign(rand.Reader, privKey, crypto.GetSHA256([]byte("test")))
-	if err != nil {
-		t.Fatalf("TestPEMLoadAndSign Unable to sign: %s", err)
-	}
-}
-
 func setFeeBuilder() *exchange.FeeBuilder {
 	return &exchange.FeeBuilder{
 		Amount:  1,
@@ -521,7 +490,7 @@ func TestCancelExchangeOrder(t *testing.T) {
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = &order.Cancel{
 		OrderID:       "1",
-		WalletAddress: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
+		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
 		CurrencyPair:  currencyPair,
 	}
@@ -544,7 +513,7 @@ func TestCancelAllExchangeOrders(t *testing.T) {
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = order.Cancel{
 		OrderID:       "1",
-		WalletAddress: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
+		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
 		CurrencyPair:  currencyPair,
 	}
@@ -588,13 +557,13 @@ func TestModifyOrder(t *testing.T) {
 }
 
 func TestWithdraw(t *testing.T) {
-	withdrawCryptoRequest := withdraw.CryptoRequest{
-		GenericInfo: withdraw.GenericInfo{
-			Amount:      -1,
-			Currency:    currency.BTC,
-			Description: "WITHDRAW IT ALL",
+	withdrawCryptoRequest := withdraw.Request{
+		Amount:      -1,
+		Currency:    currency.BTC,
+		Description: "WITHDRAW IT ALL",
+		Crypto: &withdraw.CryptoRequest{
+			Address: core.BitcoinDonationAddress,
 		},
-		Address: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
 	}
 
 	if areTestAPIKeysSet() && !canManipulateRealOrders {
@@ -615,7 +584,7 @@ func TestWithdrawFiat(t *testing.T) {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
 
-	var withdrawFiatRequest = withdraw.FiatRequest{}
+	var withdrawFiatRequest = withdraw.Request{}
 	_, err := h.WithdrawFiatFunds(&withdrawFiatRequest)
 	if err != common.ErrFunctionNotSupported {
 		t.Errorf("Expected '%v', received: '%v'", common.ErrFunctionNotSupported, err)
@@ -627,17 +596,30 @@ func TestWithdrawInternationalBank(t *testing.T) {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
 
-	var withdrawFiatRequest = withdraw.FiatRequest{}
+	var withdrawFiatRequest = withdraw.Request{}
 	_, err := h.WithdrawFiatFundsToInternationalBank(&withdrawFiatRequest)
 	if err != common.ErrFunctionNotSupported {
 		t.Errorf("Expected '%v', received: '%v'", common.ErrFunctionNotSupported, err)
 	}
 }
 
-func TestGetDepositAddress(t *testing.T) {
-	_, err := h.GetDepositAddress(currency.BTC, "")
-	if err == nil {
-		t.Error("GetDepositAddress() error cannot be nil")
+func TestQueryDepositAddress(t *testing.T) {
+	_, err := h.QueryDepositAddress(currency.BTC.Lower().String())
+	if !areTestAPIKeysSet() && err == nil {
+		t.Error("Expecting an error when no keys are set")
+	}
+	if areTestAPIKeysSet() && err != nil {
+		t.Error(err)
+	}
+}
+
+func TestQueryWithdrawQuota(t *testing.T) {
+	_, err := h.QueryWithdrawQuotas(currency.BTC.Lower().String())
+	if !areTestAPIKeysSet() && err == nil {
+		t.Error("Expecting an error when no keys are set")
+	}
+	if areTestAPIKeysSet() && err != nil {
+		t.Error(err)
 	}
 }
 

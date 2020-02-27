@@ -16,7 +16,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/idoall/gocryptotrader/config"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 // New initialises the websocket struct

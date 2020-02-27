@@ -11,7 +11,7 @@ import (
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 // Const vars for websocket

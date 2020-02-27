@@ -13,7 +13,9 @@ import (
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 const (
@@ -35,9 +37,6 @@ const (
 	gateioTicker          = "ticker"
 	gateioTickers         = "tickers"
 	gateioOrderbook       = "orderBook"
-
-	gateioAuthRate   = 100
-	gateioUnauthRate = 100
 
 	gateioGenerateAddress = "New address is being generated for you, please wait a moment and refresh this page. "
 )
@@ -311,16 +310,14 @@ func (g *Gateio) CancelExistingOrder(orderID int64, symbol string) (bool, error)
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (g *Gateio) SendHTTPRequest(path string, result interface{}) error {
-	return g.SendPayload(http.MethodGet,
-		path,
-		nil,
-		nil,
-		result,
-		false,
-		false,
-		g.Verbose,
-		g.HTTPDebugging,
-		g.HTTPRecording)
+	return g.SendPayload(&request.Item{
+		Method:        http.MethodGet,
+		Path:          path,
+		Result:        result,
+		Verbose:       g.Verbose,
+		HTTPDebugging: g.HTTPDebugging,
+		HTTPRecording: g.HTTPRecording,
+	})
 }
 
 // CancelAllExistingOrders all orders for a given symbol and side
@@ -412,17 +409,17 @@ func (g *Gateio) SendAuthenticatedHTTPRequest(method, endpoint, param string, re
 	urlPath := fmt.Sprintf("%s/%s/%s", g.API.Endpoints.URL, gateioAPIVersion, endpoint)
 
 	var intermidiary json.RawMessage
-
-	err := g.SendPayload(method,
-		urlPath,
-		headers,
-		strings.NewReader(param),
-		&intermidiary,
-		true,
-		false,
-		g.Verbose,
-		g.HTTPDebugging,
-		g.HTTPRecording)
+	err := g.SendPayload(&request.Item{
+		Method:        method,
+		Path:          urlPath,
+		Headers:       headers,
+		Body:          strings.NewReader(param),
+		Result:        &intermidiary,
+		AuthRequest:   true,
+		Verbose:       g.Verbose,
+		HTTPDebugging: g.HTTPDebugging,
+		HTTPRecording: g.HTTPRecording,
+	})
 	if err != nil {
 		return err
 	}
@@ -501,7 +498,7 @@ func getCryptocurrencyWithdrawalFee(c currency.Code) float64 {
 }
 
 // WithdrawCrypto withdraws cryptocurrency to your selected wallet
-func (g *Gateio) WithdrawCrypto(currency, address string, amount float64) (string, error) {
+func (g *Gateio) WithdrawCrypto(currency, address string, amount float64) (*withdraw.ExchangeResponse, error) {
 	type response struct {
 		Result  bool   `json:"result"`
 		Message string `json:"message"`
@@ -516,13 +513,15 @@ func (g *Gateio) WithdrawCrypto(currency, address string, amount float64) (strin
 	)
 	err := g.SendAuthenticatedHTTPRequest(http.MethodPost, gateioWithdraw, params, &result)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	if !result.Result {
-		return "", fmt.Errorf("code:%d message:%s", result.Code, result.Message)
+		return nil, fmt.Errorf("code:%d message:%s", result.Code, result.Message)
 	}
 
-	return result.Message, nil
+	return &withdraw.ExchangeResponse{
+		Status: result.Message,
+	}, nil
 }
 
 // GetCryptoDepositAddress returns a deposit address for a cryptocurrency

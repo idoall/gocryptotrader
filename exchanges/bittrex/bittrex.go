@@ -13,6 +13,7 @@ import (
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/request"
 )
 
 const (
@@ -53,9 +54,9 @@ const (
 	bittrexAPIGetWithdrawalHistory = "account/getwithdrawalhistory"
 	bittrexAPIGetDepositHistory    = "account/getdeposithistory"
 
-	bittrexAuthRate   = 0
-	bittrexUnauthRate = 0
-	bittrexTimeLayout = "2006-01-02T15:04:05"
+	bittrexRateInterval = time.Minute
+	bittrexRequestRate  = 60
+	bittrexTimeLayout   = "2006-01-02T15:04:05"
 )
 
 // Bittrex is the overaching type across the bittrex methods
@@ -435,16 +436,14 @@ func (b *Bittrex) GetDepositHistory(currency string) (DepositHistory, error) {
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (b *Bittrex) SendHTTPRequest(path string, result interface{}) error {
-	return b.SendPayload(http.MethodGet,
-		path,
-		nil,
-		nil,
-		result,
-		false,
-		false,
-		b.Verbose,
-		b.HTTPDebugging,
-		b.HTTPRecording)
+	return b.SendPayload(&request.Item{
+		Method:        http.MethodGet,
+		Path:          path,
+		Result:        result,
+		Verbose:       b.Verbose,
+		HTTPDebugging: b.HTTPDebugging,
+		HTTPRecording: b.HTTPRecording,
+	})
 }
 
 // SendAuthenticatedHTTPRequest sends an authenticated http request to a desired
@@ -465,16 +464,17 @@ func (b *Bittrex) SendAuthenticatedHTTPRequest(path string, values url.Values, r
 	headers := make(map[string]string)
 	headers["apisign"] = crypto.HexEncodeToString(hmac)
 
-	return b.SendPayload(http.MethodGet,
-		rawQuery,
-		headers,
-		nil,
-		result,
-		true,
-		true,
-		b.Verbose,
-		b.HTTPDebugging,
-		b.HTTPRecording)
+	return b.SendPayload(&request.Item{
+		Method:        http.MethodGet,
+		Path:          rawQuery,
+		Headers:       headers,
+		Result:        result,
+		AuthRequest:   true,
+		NonceEnabled:  true,
+		Verbose:       b.Verbose,
+		HTTPDebugging: b.HTTPDebugging,
+		HTTPRecording: b.HTTPRecording,
+	})
 }
 
 // GetFee returns an estimate of fee based on type of transaction

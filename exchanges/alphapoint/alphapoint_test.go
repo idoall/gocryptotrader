@@ -7,10 +7,11 @@ import (
 	"testing"
 
 	"github.com/idoall/gocryptotrader/common"
+	"github.com/idoall/gocryptotrader/core"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 const (
@@ -507,7 +508,7 @@ func TestCancelExchangeOrder(t *testing.T) {
 	currencyPair := currency.NewPair(currency.BTC, currency.LTC)
 	var orderCancellation = &order.Cancel{
 		OrderID:       "1",
-		WalletAddress: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
+		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
 		CurrencyPair:  currencyPair,
 	}
@@ -530,7 +531,7 @@ func TestCancelAllExchangeOrders(t *testing.T) {
 	currencyPair := currency.NewPair(currency.BTC, currency.LTC)
 	var orderCancellation = &order.Cancel{
 		OrderID:       "1",
-		WalletAddress: "1F5zVDgNjorJ51oGebSvNCrSAHpwGkUdDB",
+		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
 		CurrencyPair:  currencyPair,
 	}
@@ -561,8 +562,7 @@ func TestModifyOrder(t *testing.T) {
 
 func TestWithdraw(t *testing.T) {
 	t.Parallel()
-	var withdrawCryptoRequest = withdraw.CryptoRequest{}
-	_, err := a.WithdrawCryptocurrencyFunds(&withdrawCryptoRequest)
+	_, err := a.WithdrawCryptocurrencyFunds(&withdraw.Request{})
 	if err != common.ErrNotYetImplemented {
 		t.Errorf("Expected 'Not implemented', received %v", err)
 	}
@@ -574,8 +574,7 @@ func TestWithdrawFiat(t *testing.T) {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
 
-	var withdrawFiatRequest = withdraw.FiatRequest{}
-	_, err := a.WithdrawFiatFunds(&withdrawFiatRequest)
+	_, err := a.WithdrawFiatFunds(&withdraw.Request{})
 	if err != common.ErrNotYetImplemented {
 		t.Errorf("Expected '%v', received: '%v'", common.ErrNotYetImplemented, err)
 	}
@@ -587,8 +586,7 @@ func TestWithdrawInternationalBank(t *testing.T) {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
 
-	var withdrawFiatRequest = withdraw.FiatRequest{}
-	_, err := a.WithdrawFiatFundsToInternationalBank(&withdrawFiatRequest)
+	_, err := a.WithdrawFiatFundsToInternationalBank(&withdraw.Request{})
 	if err != common.ErrNotYetImplemented {
 		t.Errorf("Expected '%v', received: '%v'", common.ErrNotYetImplemented, err)
 	}

@@ -19,8 +19,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // GetDefaultConfig returns a default exchange config
@@ -116,9 +116,8 @@ func (c *CoinbasePro) SetDefaults() {
 	}
 
 	c.Requester = request.New(c.Name,
-		request.NewRateLimit(time.Second, coinbaseproAuthRate),
-		request.NewRateLimit(time.Second, coinbaseproUnauthRate),
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		SetRateLimit())
 
 	c.API.Endpoints.URLDefault = coinbaseproAPIURL
 	c.API.Endpoints.URL = c.API.Endpoints.URLDefault
@@ -402,14 +401,14 @@ func (c *CoinbasePro) SubmitOrder(s *order.Submit) (order.SubmitResponse, error)
 		response, err = c.PlaceMarketOrder("",
 			s.Amount,
 			s.Amount,
-			s.OrderSide.String(),
+			s.OrderSide.Lower(),
 			c.FormatExchangeCurrency(s.Pair, asset.Spot).String(),
 			"")
 	case order.Limit:
 		response, err = c.PlaceLimitOrder("",
 			s.Price,
 			s.Amount,
-			s.OrderSide.String(),
+			s.OrderSide.Lower(),
 			"",
 			"",
 			c.FormatExchangeCurrency(s.Pair, asset.Spot).String(),
@@ -464,42 +463,56 @@ func (c *CoinbasePro) GetDepositAddress(cryptocurrency currency.Code, accountID 
 
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (c *CoinbasePro) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.CryptoRequest) (string, error) {
-	resp, err := c.WithdrawCrypto(withdrawRequest.Amount, withdrawRequest.Currency.String(), withdrawRequest.Address)
-	return resp.ID, err
+func (c *CoinbasePro) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	resp, err := c.WithdrawCrypto(withdrawRequest.Amount, withdrawRequest.Currency.String(), withdrawRequest.Crypto.Address)
+	if err != nil {
+		return nil, err
+	}
+	return &withdraw.ExchangeResponse{
+		ID: resp.ID,
+	}, err
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (c *CoinbasePro) WithdrawFiatFunds(withdrawRequest *withdraw.FiatRequest) (string, error) {
+func (c *CoinbasePro) WithdrawFiatFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
 	paymentMethods, err := c.GetPayMethods()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	selectedWithdrawalMethod := PaymentMethod{}
 	for i := range paymentMethods {
-		if withdrawRequest.BankName == paymentMethods[i].Name {
+		if withdrawRequest.Fiat.Bank.BankName == paymentMethods[i].Name {
 			selectedWithdrawalMethod = paymentMethods[i]
 			break
 		}
 	}
 	if selectedWithdrawalMethod.ID == "" {
-		return "", fmt.Errorf("could not find payment method '%v'. Check the name via the website and try again", withdrawRequest.BankName)
+		return nil, fmt.Errorf("could not find payment method '%v'. Check the name via the website and try again", withdrawRequest.Fiat.Bank.BankName)
 	}
 
 	resp, err := c.WithdrawViaPaymentMethod(withdrawRequest.Amount, withdrawRequest.Currency.String(), selectedWithdrawalMethod.ID)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return resp.ID, nil
+	return &withdraw.ExchangeResponse{
+		Status: resp.ID,
+	}, nil
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a
 // withdrawal is submitted
-func (c *CoinbasePro) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return c.WithdrawFiatFunds(withdrawRequest)
+func (c *CoinbasePro) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	v, err := c.WithdrawFiatFunds(withdrawRequest)
+	if err != nil {
+		return nil, err
+	}
+	return &withdraw.ExchangeResponse{
+		ID:     v.ID,
+		Status: v.Status,
+	}, nil
 }
 
 // GetWebsocket returns a pointer to the exchange websocket

@@ -12,7 +12,8 @@ import (
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/exchanges/request"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 const (
@@ -30,9 +31,6 @@ const (
 	lakeBTCGetTrades           = "getTrades"
 	lakeBTCGetExternalAccounts = "getExternalAccounts"
 	lakeBTCCreateWithdraw      = "createWithdraw"
-
-	lakeBTCAuthRate = 0
-	lakeBTCUnauth   = 0
 )
 
 // LakeBTC is the overarching type across the LakeBTC package
@@ -276,16 +274,14 @@ func (l *LakeBTC) CreateWithdraw(amount float64, accountID string) (Withdraw, er
 
 // SendHTTPRequest sends an unauthenticated http request
 func (l *LakeBTC) SendHTTPRequest(path string, result interface{}) error {
-	return l.SendPayload(http.MethodGet,
-		path,
-		nil,
-		nil,
-		result,
-		false,
-		false,
-		l.Verbose,
-		l.HTTPDebugging,
-		l.HTTPRecording)
+	return l.SendPayload(&request.Item{
+		Method:        http.MethodGet,
+		Path:          path,
+		Result:        result,
+		Verbose:       l.Verbose,
+		HTTPDebugging: l.HTTPDebugging,
+		HTTPRecording: l.HTTPRecording,
+	})
 }
 
 // SendAuthenticatedHTTPRequest sends an autheticated HTTP request to a LakeBTC
@@ -318,16 +314,18 @@ func (l *LakeBTC) SendAuthenticatedHTTPRequest(method, params string, result int
 	headers["Authorization"] = "Basic " + crypto.Base64Encode([]byte(l.API.Credentials.Key+":"+crypto.HexEncodeToString(hmac)))
 	headers["Content-Type"] = "application/json-rpc"
 
-	return l.SendPayload(http.MethodPost,
-		l.API.Endpoints.URL,
-		headers,
-		strings.NewReader(string(data)),
-		result,
-		true,
-		true,
-		l.Verbose,
-		l.HTTPDebugging,
-		l.HTTPRecording)
+	return l.SendPayload(&request.Item{
+		Method:        http.MethodPost,
+		Path:          l.API.Endpoints.URL,
+		Headers:       headers,
+		Body:          strings.NewReader(string(data)),
+		Result:        result,
+		AuthRequest:   true,
+		NonceEnabled:  true,
+		Verbose:       l.Verbose,
+		HTTPDebugging: l.HTTPDebugging,
+		HTTPRecording: l.HTTPRecording,
+	})
 }
 
 // GetFee returns an estimate of fee based on type of transaction

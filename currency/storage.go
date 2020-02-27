@@ -12,7 +12,7 @@ import (
 	"github.com/idoall/gocryptotrader/currency/coinmarketcap"
 	"github.com/idoall/gocryptotrader/currency/forexprovider"
 	"github.com/idoall/gocryptotrader/currency/forexprovider/base"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 func init() {

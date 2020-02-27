@@ -6,13 +6,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/protocol"
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
+	"github.com/idoall/gocryptotrader/portfolio/banking"
 )
 
 const (
@@ -66,9 +66,8 @@ func TestHTTPClient(t *testing.T) {
 
 	b := Base{Name: "RAWR"}
 	b.Requester = request.New(b.Name,
-		request.NewRateLimit(time.Second, 1),
-		request.NewRateLimit(time.Second, 1),
-		new(http.Client))
+		new(http.Client),
+		nil)
 
 	b.SetHTTPClientTimeout(time.Second * 5)
 	if b.GetHTTPClient().Timeout != time.Second*5 {
@@ -93,9 +92,8 @@ func TestSetClientProxyAddress(t *testing.T) {
 	t.Parallel()
 
 	requester := request.New("rawr",
-		&request.RateLimit{},
-		&request.RateLimit{},
-		&http.Client{})
+		&http.Client{},
+		nil)
 
 	newBase := Base{
 		Name:      "rawr",
@@ -195,43 +193,6 @@ func TestSetAPICredentialDefaults(t *testing.T) {
 	}
 }
 
-func TestSetHTTPRateLimiter(t *testing.T) {
-	t.Parallel()
-
-	b := Base{
-		Config: &config.ExchangeConfig{},
-		Requester: request.New("asdf",
-			request.NewRateLimit(time.Second*5, 10),
-			request.NewRateLimit(time.Second*10, 15),
-			common.NewHTTPClientWithTimeout(DefaultHTTPTimeout)),
-	}
-	b.SetHTTPRateLimiter()
-	if b.Requester.GetRateLimit(true).Duration.String() != "5s" &&
-		b.Requester.GetRateLimit(true).Rate != 10 &&
-		b.Requester.GetRateLimit(false).Duration.String() != "10s" &&
-		b.Requester.GetRateLimit(false).Rate != 15 {
-		t.Error("rate limiter not set properly")
-	}
-
-	b.Config.HTTPRateLimiter = &config.HTTPRateLimitConfig{
-		Unauthenticated: config.HTTPRateConfig{
-			Duration: time.Second * 100,
-			Rate:     100,
-		},
-		Authenticated: config.HTTPRateConfig{
-			Duration: time.Second * 110,
-			Rate:     150,
-		},
-	}
-	b.SetHTTPRateLimiter()
-	if b.Requester.GetRateLimit(true).Duration.String() != "1m50s" &&
-		b.Requester.GetRateLimit(true).Rate != 150 &&
-		b.Requester.GetRateLimit(false).Duration.String() != "1m40s" &&
-		b.Requester.GetRateLimit(false).Rate != 100 {
-		t.Error("rate limiter not set properly")
-	}
-}
-
 func TestSetAutoPairDefaults(t *testing.T) {
 	cfg := config.GetConfig()
 	err := cfg.LoadConfig(config.TestFile, true)
@@ -253,7 +214,6 @@ func TestSetAutoPairDefaults(t *testing.T) {
 	}
 
 	exch.Features.Supports.RESTCapabilities.AutoPairUpdates = false
-	cfg.UpdateExchangeConfig(exch)
 
 	exch, err = cfg.GetExchangeConfig("Bitstamp")
 	if err != nil {
@@ -352,7 +312,7 @@ func TestGetClientBankAccounts(t *testing.T) {
 	}
 
 	var b Base
-	var r config.BankAccount
+	var r *banking.Account
 	r, err = b.GetClientBankAccounts("Kraken", "USD")
 	if err != nil {
 		t.Error(err)
@@ -362,31 +322,7 @@ func TestGetClientBankAccounts(t *testing.T) {
 		t.Error("incorrect bank name")
 	}
 
-	r, err = b.GetClientBankAccounts("MEOW", "USD")
-	if err == nil {
-		t.Error("an error should have been thrown for a non-existent exchange")
-	}
-}
-
-func TestGetExchangeBankAccounts(t *testing.T) {
-	cfg := config.GetConfig()
-	err := cfg.LoadConfig(config.TestFile, true)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	var b Base
-	var r config.BankAccount
-	r, err = b.GetExchangeBankAccounts("Bitfinex", "USD")
-	if err != nil {
-		t.Error(err)
-	}
-
-	if r.BankName != "Deutsche Bank Privat Und Geschaeftskunden AG" {
-		t.Error("incorrect bank name")
-	}
-
-	_, err = b.GetExchangeBankAccounts("MEOW", "USD")
+	_, err = b.GetClientBankAccounts("MEOW", "USD")
 	if err == nil {
 		t.Error("an error should have been thrown for a non-existent exchange")
 	}

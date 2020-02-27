@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/config"
@@ -16,7 +15,7 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 const (
@@ -148,9 +147,9 @@ func (o *OKEX) SetDefaults() {
 	}
 
 	o.Requester = request.New(o.Name,
-		request.NewRateLimit(time.Second, okExAuthRate),
-		request.NewRateLimit(time.Second, okExUnauthRate),
 		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		// TODO: Specify each individual endpoint rate limits as per docs
+		request.NewBasicRateLimit(okExRateInterval, okExRequestRate),
 	)
 
 	o.API.Endpoints.URLDefault = okExAPIURL

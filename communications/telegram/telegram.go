@@ -15,7 +15,7 @@ import (
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/communications/base"
 	"github.com/idoall/gocryptotrader/config"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 )
 
 const (

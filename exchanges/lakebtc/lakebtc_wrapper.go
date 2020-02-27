@@ -20,8 +20,8 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // GetDefaultConfig returns a default exchange config
@@ -104,9 +104,8 @@ func (l *LakeBTC) SetDefaults() {
 	}
 
 	l.Requester = request.New(l.Name,
-		request.NewRateLimit(time.Second, lakeBTCAuthRate),
-		request.NewRateLimit(time.Second, lakeBTCUnauth),
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
+		nil)
 
 	l.API.Endpoints.URLDefault = lakeBTCAPIURL
 	l.API.Endpoints.URL = l.API.Endpoints.URLDefault
@@ -421,29 +420,31 @@ func (l *LakeBTC) GetDepositAddress(cryptocurrency currency.Code, _ string) (str
 
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is
 // submitted
-func (l *LakeBTC) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.CryptoRequest) (string, error) {
+func (l *LakeBTC) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
 	if withdrawRequest.Currency != currency.BTC {
-		return "", errors.New("only BTC supported for withdrawals")
+		return nil, errors.New("only BTC supported for withdrawals")
 	}
 
 	resp, err := l.CreateWithdraw(withdrawRequest.Amount, withdrawRequest.Description)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return strconv.FormatInt(resp.ID, 10), nil
+	return &withdraw.ExchangeResponse{
+		ID: strconv.FormatInt(resp.ID, 10),
+	}, nil
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a
 // withdrawal is submitted
-func (l *LakeBTC) WithdrawFiatFunds(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (l *LakeBTC) WithdrawFiatFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // WithdrawFiatFundsToInternationalBank returns a withdrawal ID when a
 // withdrawal is submitted
-func (l *LakeBTC) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.FiatRequest) (string, error) {
-	return "", common.ErrFunctionNotSupported
+func (l *LakeBTC) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // GetWebsocket returns a pointer to the exchange websocket

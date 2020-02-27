@@ -11,8 +11,7 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
 	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/withdraw"
-	"github.com/idoall/gocryptotrader/exchanges/kline"
+	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
 // IBotExchange enforces standard functions for all exchanges supported in
@@ -55,9 +54,9 @@ type IBotExchange interface {
 	GetDepositAddress(cryptocurrency currency.Code, accountID string) (string, error)
 	GetOrderHistory(getOrdersRequest *order.GetOrdersRequest) ([]order.Detail, error)
 	GetActiveOrders(getOrdersRequest *order.GetOrdersRequest) ([]order.Detail, error)
-	WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.CryptoRequest) (string, error)
-	WithdrawFiatFunds(withdrawRequest *withdraw.FiatRequest) (string, error)
-	WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.FiatRequest) (string, error)
+	WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error)
+	WithdrawFiatFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error)
+	WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error)
 	SetHTTPClientUserAgent(ua string)
 	GetHTTPClientUserAgent() string
 	SetClientProxyAddress(addr string) error
@@ -73,6 +72,8 @@ type IBotExchange interface {
 	GetBase() *Base
 	SupportsAsset(assetType asset.Item) bool
 	GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]Candle, error)
+	DisableRateLimiter() error
+	EnableRateLimiter() error
 	// GetKlines 自定义获取 K 线
 	GetKlines(arg interface{}) ([]*kline.Kline, error)
 }

@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	log "github.com/idoall/gocryptotrader/logger"
+	"github.com/idoall/gocryptotrader/log"
 	"github.com/idoall/gocryptotrader/portfolio"
 )
 

@@ -1,4 +1,4 @@
-package logger
+package log
 
 //nolint
 var (
@@ -18,6 +18,7 @@ var (
 	EventMgr         *subLogger
 	DispatchMgr      *subLogger
 
+	RequestSys  *subLogger
 	ExchangeSys *subLogger
 	GRPCSys     *subLogger
 	RESTSys     *subLogger
