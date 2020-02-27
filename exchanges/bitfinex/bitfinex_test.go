@@ -1,7 +1,6 @@
 package bitfinex
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -166,11 +165,6 @@ func TestGetAccountFees(t *testing.T) {
 	_, err := b.UpdateAccountInfo()
 	if err != nil {
 		t.Error("GetAccountInfo error", err)
-	}
-
-	for k, v := range list {
-		// b, _ := json.Marshal(v)
-		fmt.Printf("%s:%v \n", k, v)
 	}
 }
 

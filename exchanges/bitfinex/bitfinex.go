@@ -113,23 +113,9 @@ func (b *Bitfinex) GetPlatformStatus() (int, error) {
 	return -1, fmt.Errorf("unexpected platform status value %d", response[0])
 }
 
-<<<<<<< HEAD
-// GetLatestSpotPrice returns latest spot price of symbol
-//
-// symbol: string of currency pair
-// 获取最新价格
-func (b *Bitfinex) GetLatestSpotPrice(symbol string) (float64, error) {
-	res, err := b.GetTicker(symbol)
-	if err != nil {
-		return 0, err
-	}
-	return res.Mid, nil
-}
-=======
 // GetTickerBatch returns all supported ticker information
 func (b *Bitfinex) GetTickerBatch() (map[string]Ticker, error) {
 	var response [][]interface{}
->>>>>>> upstrem/master
 
 	path := b.API.Endpoints.URL +
 		bitfinexAPIVersion2 +

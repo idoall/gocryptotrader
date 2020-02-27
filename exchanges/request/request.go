@@ -41,32 +41,6 @@ func (r *Requester) SendPayload(i *Item) error {
 		return err
 	}
 
-<<<<<<< HEAD
-// IncrementRequests increments the ratelimiter request counter for either auth or unauth
-// requests 增量计数器
-func (r *Requester) IncrementRequests(auth bool) {
-	if auth {
-		reqs := r.AuthLimit.GetRequests()
-		reqs++
-		r.AuthLimit.SetRequests(reqs)
-		return
-	}
-
-	reqs := r.UnauthLimit.GetRequests()
-	reqs++
-	r.UnauthLimit.SetRequests(reqs)
-}
-
-// DecrementRequests decrements the ratelimiter request counter for either auth or unauth
-// requests 减量计数器
-func (r *Requester) DecrementRequests(auth bool) {
-	if auth {
-
-		reqs := r.AuthLimit.GetRequests()
-		reqs--
-		r.AuthLimit.SetRequests(reqs)
-		return
-=======
 	if i.HTTPDebugging {
 		// Err not evaluated due to validation check above
 		dump, _ := httputil.DumpRequestOut(req, true)
@@ -76,7 +50,6 @@ func (r *Requester) DecrementRequests(auth bool) {
 	if atomic.LoadInt32(&r.jobs) >= MaxRequestJobs {
 		r.timedLock.UnlockIfLocked()
 		return errors.New("max request jobs reached")
->>>>>>> upstrem/master
 	}
 
 	atomic.AddInt32(&r.jobs, 1)

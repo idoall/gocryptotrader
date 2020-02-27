@@ -173,7 +173,6 @@ func (h *HUOBI) GetTrades(symbol string) ([]Trade, error) {
 // GetLatestSpotPrice returns latest spot price of symbol
 //
 // symbol: string of currency pair
-// 获取最新价格
 func (h *HUOBI) GetLatestSpotPrice(symbol string) (float64, error) {
 	list, err := h.GetTradeHistory(symbol, "1")
 
@@ -346,24 +345,6 @@ func (h *HUOBI) SpotNewOrder(arg SpotNewOrderRequestParams) (int64, error) {
 
 	result := struct {
 		OrderID int64 `json:"data,string"`
-<<<<<<< HEAD
-	}
-
-	//API 中指出对于POST请求，每个方法自带的参数不进行签名认证，即POST请求中需要进行签名运算的只有AccessKeyId、SignatureMethod、SignatureVersion、Timestamp四个参数，其它参数放在body中。
-	//所以对 Post 参数重新进行编码
-	// bytesParams, _ := json.Marshal(vals)
-	// postBodyParams := string(bytesParams)
-	// if h.Verbose {
-	// 	fmt.Println("Post params:", postBodyParams)
-	// }
-
-	var result response
-	err := h.SendAuthenticatedHTTPRequest(http.MethodPost, huobiOrderPlace, nil, data, &result)
-
-	if result.ErrorMessage != "" {
-		return 0, errors.New(result.ErrorMessage)
-	}
-=======
 	}{}
 	err := h.SendAuthenticatedHTTPRequest(
 		http.MethodPost,
@@ -373,7 +354,6 @@ func (h *HUOBI) SpotNewOrder(arg SpotNewOrderRequestParams) (int64, error) {
 		&result,
 		false,
 	)
->>>>>>> upstrem/master
 	return result.OrderID, err
 }
 
@@ -744,38 +724,6 @@ func (h *HUOBI) SendHTTPRequest(path string, result interface{}) error {
 		HTTPRecording: h.HTTPRecording,
 	})
 }
-
-// SendAuthenticatedHTTPPostRequest sends authenticated requests to the HUOBI API
-// 原有的Post方法和Get传参不一样，进行重写
-// func (h *HUOBI) SendAuthenticatedHTTPPostRequest(method, endpoint, postBodyValues string, result interface{}) error {
-// 	if !h.AuthenticatedAPISupport {
-// 		return fmt.Errorf(exchange.WarningAuthenticatedRequestWithoutCredentialsSet, h.Name)
-// 	}
-
-// 	signatureParams := url.Values{}
-// 	signatureParams.Set("AccessKeyId", h.APIKey)
-// 	signatureParams.Set("SignatureMethod", "HmacSHA256")
-// 	signatureParams.Set("SignatureVersion", "2")
-// 	signatureParams.Set("Timestamp", time.Now().UTC().Format("2006-01-02T15:04:05"))
-
-// 	endpoint = fmt.Sprintf("/v%s/%s", huobiAPIVersion, endpoint)
-// 	payload := fmt.Sprintf("%s\napi.huobi.pro\n%s\n%s",
-// 		method, endpoint, signatureParams.Encode())
-
-// 	headers := make(map[string]string)
-// 	headers["User-Agent"] = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.71 Safari/537.36"
-// 	headers["Content-Type"] = "application/json"
-// 	headers["Accept-Language"] = "zh-cn"
-
-// 	hmac := common.GetHMAC(common.HashSHA256, []byte(payload), []byte(h.APISecret))
-// 	signatureParams.Set("Signature", common.Base64Encode(hmac))
-
-// 	// fmt.Println("signatureParams", signatureParams)
-// 	url := fmt.Sprintf("%s%s", huobiAPIURL, endpoint)
-// 	url = common.EncodeURLValues(url, signatureParams)
-
-// 	return h.SendPayload(method, url, headers, bytes.NewBufferString(postBodyValues), result, true, h.Verbose)
-// }
 
 // SendAuthenticatedHTTPRequest sends authenticated requests to the HUOBI API
 func (h *HUOBI) SendAuthenticatedHTTPRequest(method, endpoint string, values url.Values, data, result interface{}, isVersion2API bool) error {
