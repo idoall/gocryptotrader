@@ -6,8 +6,6 @@ import (
 	"time"
 
 	"github.com/idoall/gocryptotrader/common"
-	"github.com/idoall/gocryptotrader/currency"
-	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/okgroup"
 )
 
@@ -49,9 +47,9 @@ type OKEX struct {
 }
 
 // GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (o *OKEX) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrFunctionNotSupported
-}
+// func (o *OKEX) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
+// 	return nil, common.ErrFunctionNotSupported
+// }
 
 // GetFuturesPostions Get the information of all holding positions in futures trading.
 // Due to high energy consumption, you are advised to capture data with the "Futures Account of a Currency" API instead.

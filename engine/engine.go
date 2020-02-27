@@ -365,6 +365,24 @@ func (e *Engine) Start() error {
 		return errors.New("no exchanges are loaded")
 	}
 
+	{
+		exch := GetExchangeByName("okex")
+		pair := currency.NewPairFromStrings("btc", "usdt")
+		pair.Delimiter = "-"
+		granularity := 60 * 5
+		list, err := exch.GetHistoricCandles(pair, 1000, int64(granularity))
+		if err != nil {
+			panic(err)
+		} else {
+			for _, v := range list {
+				fmt.Println("v", time.Unix(v.Time, 0).Format("2006-01-02 15:04:05"), v)
+			}
+			fmt.Println("list.len", len(list))
+		}
+		return nil
+	}
+	//--------------
+
 	if e.Settings.EnableCommsRelayer {
 		if err := e.CommsManager.Start(); err != nil {
 			gctlog.Errorf(gctlog.Global, "Communications manager unable to start: %v\n", err)
