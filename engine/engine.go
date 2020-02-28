@@ -365,57 +365,85 @@ func (e *Engine) Start() error {
 		return errors.New("no exchanges are loaded")
 	}
 
-	// {
-	// 	_timeFormat_ok := "2006-01-02T15:04:05.999Z"
-	// 	_timeFormat_local := "2006-01-02 15:04:05"
+	{
+		// 	_timeFormat_ok := "2006-01-02T15:04:05.999Z"
+		// _timeFormat_local := "2006-01-02 15:04:05"
 
-	// 	var okExch okex.OKEX
-	// 	okExch.SetDefaults()
-	// 	//获取交易所
-	// 	okexCfg, _ := e.Config.GetExchangeConfig("OKEX")
-	// 	okexCfg.API.AuthenticatedSupport = true
-	// 	okexCfg.API.AuthenticatedWebsocketSupport = true
-	// 	okExch.Setup(okexCfg)
-	// 	okExch.SkipAuthCheck = true
+		// var huobiExch huobi.HUOBI
+		// huobiExch.SetDefaults()
+		// //获取交易所
+		// exchCfg, _ := e.Config.GetExchangeConfig("Huobi")
+		// exchCfg.API.AuthenticatedSupport = true
+		// exchCfg.API.AuthenticatedWebsocketSupport = true
+		// huobiExch.Setup(exchCfg)
+		// huobiExch.SkipAuthCheck = true
 
-	// 	//设置交易对--最新季度合约 -- 开始
-	// 	pair := currency.NewPairFromStrings("btc", "usd")
-	// 	pair.Delimiter = "-"
-	// 	// 获取 BTC-USD 季度合约
-	// 	var pairList currency.Pairs
-	// 	for _, v := range okExch.GetAvailablePairs(asset.Futures) {
-	// 		if strings.EqualFold(v.Base.String(), pair.String()) {
-	// 			pairList = append(pairList, v)
-	// 		}
-	// 	}
-	// 	pair = pairList[len(pairList)-1]
-	// 	pair.Delimiter = "-"
-	// 	//设置交易对--最新季度合约 -- 结束
+		//获取火币季度合约名称
+		// req := huobi.ContractInfoRequest{
+		// 	Symbol:       "BTC",
+		// 	ContractType: "quarter",
+		// }
+		// contractInfo, err := huobiExch.GetContractInfo(req)
+		// if err != nil {
+		// 	panic(err)
+		// } else {
+		// 	fmt.Println("contractInfo", contractInfo)
+		// }
 
-	// 	// 查询 Kline 列表
-	// 	//endTime,_:= time.ParseInLocation(_timeFormat_local, "2020-02-27 18:00:00", time.Local)
-	// 	endTime := time.Now()
-	// 	r := okgroup.GetSpotMarketDataRequest{
-	// 		InstrumentID: pair.Upper().String(),
-	// 		Start:        "",
-	// 		End:          endTime.Add(-time.Hour * 8).Format(_timeFormat_ok),
-	// 		Granularity:  int64(60 * 5 * 12), //1小时
-	// 	}
+		// 获取火币季度合约K线
+		// req := huobi.KlinesRequestParams{
+		// 	Symbol: "BTC_CQ",
+		// 	Period: huobi.TimeIntervalFiveMinutes,
+		// 	Size:   10,
+		// }
+		// list, err := huobiExch.GetContractKline(req)
+		// if err != nil {
+		// 	panic(err)
+		// } else {
+		// 	for _, v := range list {
+		// 		fmt.Println("Close:", v.Close, convert.UnixTimestampToTime(v.ID).Format(_timeFormat_local), v)
+		// 	}
+		// 	fmt.Println("list.len", len(list))
+		// }
 
-	// 	list, err := getOKEXKline(r, okExch, 300)
-	// 	if err != nil {
-	// 		panic(err)
-	// 	} else {
-	// 		for k, v := range list {
-	// 			if k > 10 {
-	// 				break
-	// 			}
-	// 			fmt.Println("v", v.OpenTime.Format(_timeFormat_local), "Close:", v.Close, v)
-	// 		}
-	// 		fmt.Println("list.len", len(list))
-	// 	}
-	// 	return nil
-	// }
+		// 	//设置交易对--最新季度合约 -- 开始
+		// 	pair := currency.NewPairFromStrings("btc", "usd")
+		// 	pair.Delimiter = "-"
+		// 	// 获取 BTC-USD 季度合约
+		// 	var pairList currency.Pairs
+		// 	for _, v := range okExch.GetAvailablePairs(asset.Futures) {
+		// 		if strings.EqualFold(v.Base.String(), pair.String()) {
+		// 			pairList = append(pairList, v)
+		// 		}
+		// 	}
+		// 	pair = pairList[len(pairList)-1]
+		// 	pair.Delimiter = "-"
+		// 	//设置交易对--最新季度合约 -- 结束
+
+		// 	// 查询 Kline 列表
+		// 	//endTime,_:= time.ParseInLocation(_timeFormat_local, "2020-02-27 18:00:00", time.Local)
+		// 	endTime := time.Now()
+		// 	r := okgroup.GetSpotMarketDataRequest{
+		// 		InstrumentID: pair.Upper().String(),
+		// 		Start:        "",
+		// 		End:          endTime.Add(-time.Hour * 8).Format(_timeFormat_ok),
+		// 		Granularity:  int64(60 * 5 * 12), //1小时
+		// 	}
+
+		// 	list, err := getOKEXKline(r, okExch, 300)
+		// 	if err != nil {
+		// 		panic(err)
+		// 	} else {
+		// 		for k, v := range list {
+		// 			if k > 10 {
+		// 				break
+		// 			}
+		// 			fmt.Println("v", v.OpenTime.Format(_timeFormat_local), "Close:", v.Close, v)
+		// 		}
+		// 		fmt.Println("list.len", len(list))
+		// 	}
+		// return nil
+	}
 	//--------------
 
 	if e.Settings.EnableCommsRelayer {
