@@ -377,6 +377,19 @@ func (e *Engine) Start() error {
 		// exchCfg.API.AuthenticatedWebsocketSupport = true
 		// huobiExch.Setup(exchCfg)
 		// huobiExch.SkipAuthCheck = true
+		// huobiExch.API.Endpoints.URL = huobi.HuobiContractAPIURL
+		// huobiExch.API.Endpoints.URLDefault = huobi.HuobiContractAPIURL
+
+		// //查看帐户信息
+		// accountInfo, err := huobiExch.GetContractAccountInfo(huobi.ContractAccountInfoRequest{})
+		// if err != nil {
+		// 	panic(err)
+		// } else {
+		// 	for _, v := range accountInfo {
+		// 		fmt.Println(v)
+		// 	}
+		// }
+		// return nil
 
 		//获取火币季度合约名称
 		// req := huobi.ContractInfoRequest{
