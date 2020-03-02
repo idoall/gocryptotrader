@@ -19,10 +19,34 @@ import (
 const (
 	HuobiContractAPIURL = "https://api.btcgateway.pro"
 
-	huobiContractInfo         = "contract_contract_info"
-	huobiContractAccountInfo  = "contract_account_info"
-	huobiGetContractKlineList = "/market/history/kline"
+	huobiContractInfo                = "contract_contract_info"
+	huobiContractAccountInfo         = "contract_account_info"
+	huobiGetContractKlineList        = "/market/history/kline"
+	huobiContractHisorders           = "contract_hisorders"             //获取历史委托
+	huobiContractAccountPositionInfo = "contract_account_position_info" // 查询用户帐号和持仓信息
 )
+
+// GetContractAccountPositionInfo 查询用户帐号和持仓信息
+func (h *HUOBI) GetContractAccountPositionInfo(req SymbolBaseType) ([]ContractAccountPositionInfoResponse, error) {
+	type response struct {
+		Response
+		Data []ContractAccountPositionInfoResponse `json:"data"`
+	}
+	var result response
+	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractAccountPositionInfo, nil, req, &result, false)
+	return result.Data, err
+}
+
+// GetContractHisorders 获取历史历史委托
+func (h *HUOBI) GetContractHisorders(req ContractHisordersRequest) (ContractHisordersData, error) {
+	type response struct {
+		Response
+		Data ContractHisordersData `json:"data"`
+	}
+	var result response
+	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractHisorders, nil, req, &result, false)
+	return result.Data, err
+}
 
 // GetContractAccountInfo 获取用户帐户信息
 func (h *HUOBI) GetContractAccountInfo(req ContractAccountInfoRequest) ([]ContractAccountInfoResponseDataItem, error) {
