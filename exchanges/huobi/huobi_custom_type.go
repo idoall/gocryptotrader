@@ -37,7 +37,7 @@ type ContractAccountInfoResponseDataItem struct {
 
 //-----------合约新订单
 
-// ContractNewOrderRequest 新订单请求信息
+// ContractNewOrderRequest 新订单 - 请求信息
 type ContractNewOrderRequest struct {
 	SymbolBaseType
 	ContractBaseType
@@ -50,7 +50,7 @@ type ContractNewOrderRequest struct {
 	OrderPriceType ContractOrderPriceType `json:"order_price_type"` //订单报价类型 "limit":限价 "opponent":对手价 "post_only":只做maker单,post only下单只受用户持仓数量限制,optimal_5：最优5档、optimal_10：最优10档、optimal_20：最优20档，ioc:IOC订单，fok：FOK订单, "opponent_ioc"： 对手价-IOC下单，"optimal_5_ioc"：最优5档-IOC下单，"optimal_10_ioc"：最优10档-IOC下单，"optimal_20_ioc"：最优20档-IOC下单,"opponent_fok"： 对手价-FOK下单，"optimal_5_fok"：最优5档-FOK下单，"optimal_10_fok"：最优10档-FOK下单，"optimal_20_fok"：最优20档-FOK下单
 }
 
-// ContractNewOrderResponse 新订单请求信息返回信息
+// ContractNewOrderResponse 新订单请求信息 - 返回信息
 type ContractNewOrderResponse struct {
 	Response
 	OrderID       int64  `json:"order_id"`        //订单ID
@@ -58,19 +58,38 @@ type ContractNewOrderResponse struct {
 	ClientOrderID int64  `json:"client_order_id"` //客户订单ID
 }
 
-// LeverRae 杠杆倍数
-type LeverRae int
+// ContractNewTriggerOrderRequest 合约计划委托下单 - 请求信息
+type ContractNewTriggerOrderRequest struct {
+	SymbolBaseType
+	ContractBaseType
+	TriggerType    ContractTriggerType    `json:"trigger_type"`     //触发类型： ge大于等于(触发价比最新价大)；le小于(触发价比最新价小)
+	TriggerPrice   float64                `json:"trigger_price"`    // 触发价，精度超过最小变动单位会报错
+	OrderPrice     float64                `json:"order_price"`      //委托价，精度超过最小变动单位会报错
+	OrderPriceType ContractOrderPriceType `json:"order_price_type"` // 委托类型： 不填默认为limit; 限价：limit ，最优5档：optimal_5，最优10档：optimal_10，最优20档：optimal_20
+	Direction      ContractOrderDirection `json:"direction"`        //交易方向	"buy":买 "sell":卖
+	Offset         ContractOrderOffset    `json:"offset"`           //"open":开 "close":平
+	Volume         int                    `json:"volume"`           //委托数量(张)
+	LeverRae       LeverRae               `json:"lever_rate"`       // 杠杆倍数[开仓若有10倍多单，就不能再下20倍多单]
+}
+
+// ContractTriggerType 合约下单 触发类型
+type ContractTriggerType string
 
 var (
-	// LeverRae1 1
-	LeverRae1 = LeverRae(1)
-	// LeverRae5 5
-	LeverRae5 = LeverRae(5)
-	// LeverRae10 10
-	LeverRae10 = LeverRae(10)
-	// LeverRae20 20
-	LeverRae20 = LeverRae(20)
+	// ContractTriggerTypeGE ge大于等于(触发价比最新价大)
+	ContractTriggerTypeGE = ContractTriggerType("ge")
+	// ContractTriggerTypeLE 小于(触发价比最新价小)
+	ContractTriggerTypeLE = ContractTriggerType("le")
 )
+
+// ContractNewTriggerOrderResponse 合约计划委托下单 - 返回信息
+type ContractNewTriggerOrderResponse struct {
+	Response
+	Data struct {
+		OrderID    int64  `json:"order_id"`     //订单ID
+		OrderIDStr string `json:"order_id_str"` //String订单ID
+	} `json:"data"` //客户订单ID
+}
 
 //-----------合约订单信息
 
@@ -322,6 +341,20 @@ type ContractHisordersRequest struct {
 	OrderType    ContractOrderType    `json:"order_type"`
 }
 
+// LeverRae 杠杆倍数
+type LeverRae int
+
+var (
+	// LeverRae1 1
+	LeverRae1 = LeverRae(1)
+	// LeverRae5 5
+	LeverRae5 = LeverRae(5)
+	// LeverRae10 10
+	LeverRae10 = LeverRae(10)
+	// LeverRae20 20
+	LeverRae20 = LeverRae(20)
+)
+
 // ContractOrderPriceType 订单报价类型
 type ContractOrderPriceType string
 
@@ -330,7 +363,7 @@ var (
 	ContractOrderPriceTypeLimit = ContractOrderPriceType("limit")
 	// ContractOrderPriceTypeOpponent 对手价
 	ContractOrderPriceTypeOpponent = ContractOrderPriceType("opponent")
-	// ContractOrderPriceTypePostOnly 只做maker单,post only下单只受用户持仓数量限制
+	// ContractOrderPriceTypePostOnly 只做maker单,post only下单只受用户持仓数量限制 默认是“只做Maker（Post only）”，不会立刻在市场成交，保证用户始终为Maker；如果委托会立即与已有委托成交，那么该委托会被取消。
 	ContractOrderPriceTypePostOnly = ContractOrderPriceType("post_only")
 	// ContractOrderPriceTypeOptimal5 最优5档
 	ContractOrderPriceTypeOptimal5 = ContractOrderPriceType("optimal_5")
@@ -338,9 +371,9 @@ var (
 	ContractOrderPriceTypeOptimal10 = ContractOrderPriceType("optimal_10")
 	// ContractOrderPriceTypeOptimal20 最优20档
 	ContractOrderPriceTypeOptimal20 = ContractOrderPriceType("optimal_20")
-	// ContractOrderPriceTypeIOC IOC下单
+	// ContractOrderPriceTypeIOC IOC下单 市价单会在一个最佳可成交价执行尽量多的交易量,此单据可能被部份执行,剩余的部份将会自动删除。
 	ContractOrderPriceTypeIOC = ContractOrderPriceType("ioc")
-	// ContractOrderPriceTypeFOK FOK订单
+	// ContractOrderPriceTypeFOK FOK订单 市价单要么在一个最佳可成交价上全部成交，要么就会直接删除，即不会分多次成交，也不会部份成交。
 	ContractOrderPriceTypeFOK = ContractOrderPriceType("fok")
 	// ContractOrderPriceTypeOpponentIOC  对手价-IOC下
 	ContractOrderPriceTypeOpponentIOC = ContractOrderPriceType("opponent_ioc")

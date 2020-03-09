@@ -21,7 +21,7 @@ func init() {
 }
 
 // WaitForInterrupt waits until a os.Signal is
-// received and returns the result
+// received and returns the aresult
 func WaitForInterrupt() os.Signal {
 	return <-s
 }

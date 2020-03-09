@@ -26,6 +26,7 @@ const (
 	huobiContractMatchResults        = "contract_matchresults"          //获取历史成交记录
 	huobiContractOpenOrders          = "contract_openorders"            //获取当前未成效委托
 	huobiContractNewOrder            = "contract_order"                 //合约下单
+	huobiContractNewTriggerOrder     = "contract_trigger_orders"        //合约计划委托下单
 	huobiContractAccountPositionInfo = "contract_account_position_info" // 查询用户帐号和持仓信息
 )
 
@@ -51,11 +52,19 @@ func (h *HUOBI) GetContractHisorders(req ContractHisordersRequest) (ContractHiso
 	return result.Data, err
 }
 
-// GetContractNewOrder 获取历史成交记录
-func (h *HUOBI) GetContractNewOrder(req ContractNewOrderRequest) (ContractNewOrderResponse, error) {
+// ContractNewOrder 合约下单
+func (h *HUOBI) ContractNewOrder(req ContractNewOrderRequest) (ContractNewOrderResponse, error) {
 
 	var result ContractNewOrderResponse
 	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractNewOrder, nil, req, &result, false)
+	return result, err
+}
+
+// ContractNewTriggerOrder 合约计划委托下单
+func (h *HUOBI) ContractNewTriggerOrder(req ContractNewTriggerOrderRequest) (ContractNewTriggerOrderResponse, error) {
+
+	var result ContractNewTriggerOrderResponse
+	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractNewTriggerOrder, nil, req, &result, false)
 	return result, err
 }
 
