@@ -23,6 +23,9 @@ const (
 	huobiContractAccountInfo         = "contract_account_info"
 	huobiGetContractKlineList        = "/market/history/kline"
 	huobiContractHisorders           = "contract_hisorders"             //获取历史委托
+	huobiContractMatchResults        = "contract_matchresults"          //获取历史成交记录
+	huobiContractOpenOrders          = "contract_openorders"            //获取当前未成效委托
+	huobiContractNewOrder            = "contract_order"                 //合约下单
 	huobiContractAccountPositionInfo = "contract_account_position_info" // 查询用户帐号和持仓信息
 )
 
@@ -37,7 +40,7 @@ func (h *HUOBI) GetContractAccountPositionInfo(req SymbolBaseType) ([]ContractAc
 	return result.Data, err
 }
 
-// GetContractHisorders 获取历史历史委托
+// GetContractHisorders 获取历史委托
 func (h *HUOBI) GetContractHisorders(req ContractHisordersRequest) (ContractHisordersData, error) {
 	type response struct {
 		Response
@@ -45,6 +48,47 @@ func (h *HUOBI) GetContractHisorders(req ContractHisordersRequest) (ContractHiso
 	}
 	var result response
 	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractHisorders, nil, req, &result, false)
+	return result.Data, err
+}
+
+// GetContractNewOrder 获取历史成交记录
+func (h *HUOBI) GetContractNewOrder(req ContractNewOrderRequest) (ContractNewOrderResponse, error) {
+
+	var result ContractNewOrderResponse
+	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractNewOrder, nil, req, &result, false)
+	return result, err
+}
+
+// GetContractMatchResults 获取历史成交记录
+func (h *HUOBI) GetContractMatchResults(req ContractMatchResultsRequest) (ContractMatchResultData, error) {
+	type response struct {
+		Response
+		Data ContractMatchResultData `json:"data"`
+	}
+	var result response
+	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractMatchResults, nil, req, &result, false)
+	return result.Data, err
+}
+
+// GetContractOpenOrders 获取火币合约 当前未成交委托
+func (h *HUOBI) GetContractOpenOrders(symbol string, pageIndex, pageSize int) (ContractOpenOrderData, error) {
+	vals := url.Values{}
+	vals.Set("symbol", symbol)
+	if pageIndex != 0 {
+		vals.Set("pageIndex", strconv.Itoa(pageIndex))
+	}
+
+	if pageSize != 0 {
+		vals.Set("size", strconv.Itoa(pageSize))
+	}
+
+	type response struct {
+		Response
+		Data ContractOpenOrderData `json:"data"`
+	}
+
+	var result response
+	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractOpenOrders, nil, vals, &result, false)
 	return result.Data, err
 }
 
@@ -145,7 +189,7 @@ func (h *HUOBI) SendContractAuthenticatedHTTPRequest(method, endpoint string, va
 
 	hmac := crypto.GetHMAC(crypto.HashSHA256, []byte(payload), []byte(h.API.Credentials.Secret))
 	values.Set("Signature", crypto.Base64Encode(hmac))
-	urlPath := h.API.Endpoints.URL + common.EncodeURLValues(endpoint, values)
+	urlPath := HuobiContractAPIURL + common.EncodeURLValues(endpoint, values)
 
 	var body []byte
 	if data != nil {
@@ -155,7 +199,6 @@ func (h *HUOBI) SendContractAuthenticatedHTTPRequest(method, endpoint string, va
 		}
 		body = encoded
 	}
-
 	interim := json.RawMessage{}
 	err := h.SendPayload(&request.Item{
 		Method:        method,
