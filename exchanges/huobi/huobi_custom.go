@@ -54,7 +54,6 @@ func (h *HUOBI) GetContractHisorders(req ContractHisordersRequest) (ContractHiso
 
 // ContractNewOrder 合约下单
 func (h *HUOBI) ContractNewOrder(req ContractNewOrderRequest) (ContractNewOrderResponse, error) {
-
 	var result ContractNewOrderResponse
 	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractNewOrder, nil, req, &result, false)
 	return result, err
@@ -62,7 +61,6 @@ func (h *HUOBI) ContractNewOrder(req ContractNewOrderRequest) (ContractNewOrderR
 
 // ContractNewTriggerOrder 合约计划委托下单
 func (h *HUOBI) ContractNewTriggerOrder(req ContractNewTriggerOrderRequest) (ContractNewTriggerOrderResponse, error) {
-
 	var result ContractNewTriggerOrderResponse
 	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractNewTriggerOrder, nil, req, &result, false)
 	return result, err
