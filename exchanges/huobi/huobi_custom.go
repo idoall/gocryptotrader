@@ -25,6 +25,7 @@ const (
 	huobiContractHisorders           = "contract_hisorders"             //获取历史委托
 	huobiContractMatchResults        = "contract_matchresults"          //获取历史成交记录
 	huobiContractOpenOrders          = "contract_openorders"            //获取当前未成效委托
+	huobiContractTriggerOpenOrders   = "contract_trigger_openorders"    //获取计划委托当前委托
 	huobiContractNewOrder            = "contract_order"                 //合约下单
 	huobiContractNewTriggerOrder     = "contract_trigger_orders"        //合约计划委托下单
 	huobiContractAccountPositionInfo = "contract_account_position_info" // 查询用户帐号和持仓信息
@@ -95,7 +96,32 @@ func (h *HUOBI) GetContractOpenOrders(symbol string, pageIndex, pageSize int) (C
 	}
 
 	var result response
+	fmt.Println(vals)
 	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractOpenOrders, nil, vals, &result, false)
+	return result.Data, err
+}
+
+// GetContractTriggerOpenOrders 获取火币合约 获取计划委托当前委托
+func (h *HUOBI) GetContractTriggerOpenOrders(symbol string, pageIndex, pageSize int) (ContractOpenOrderData, error) {
+	vals := url.Values{}
+	vals.Set("symbol", symbol)
+
+	if pageIndex != 0 {
+		vals.Set("pageIndex", strconv.Itoa(pageIndex))
+	}
+
+	if pageSize != 0 {
+		vals.Set("size", strconv.Itoa(pageSize))
+	}
+
+	type response struct {
+		Response
+		Data ContractOpenOrderData `json:"data"`
+	}
+
+	var result response
+	fmt.Println(vals)
+	err := h.SendContractAuthenticatedHTTPRequest(http.MethodPost, huobiContractTriggerOpenOrders, nil, vals, &result, false)
 	return result.Data, err
 }
 

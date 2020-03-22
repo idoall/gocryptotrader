@@ -141,23 +141,54 @@ func main() {
 	// 	// 	fmt.Println("res", res)
 	// 	// }
 
-	// 	//-----下新订单
-	// 	req := huobi.ContractNewOrderRequest{}
-	// 	req.Symbol = "BTC"
-	// 	req.ContractType = huobi.ContractTypeQuarter // 季度合约
-	// 	req.OrderPriceType = huobi.ContractOrderPriceTypePostOnly
-	// 	req.Direction = huobi.ContractOrderDirectionBuy
-	// 	req.Offset = huobi.ContractOrderOffsetOpen
-	// 	req.ClientOrderID = time.Now().Unix()
-	// 	req.LeverRae = huobi.LeverRae1
-	// 	req.Volume = 1
-	// 	req.Price = 7500.00
+	// 	// ----获取获取计划委托当前委托
+	// 	// if res, err := huobiExch.GetContractTriggerOpenOrders("BTC", 1, 20); err != nil {
+	// 	// 	panic(err)
+	// 	// } else {
+	// 	// 	fmt.Println("res", res)
+	// 	// }
 
-	// 	if res, err := huobiExch.ContractNewOrder(req); err != nil {
-	// 		panic(err)
-	// 	} else {
-	// 		fmt.Println(res)
-	// 	}
+	// 	//-----下新订单
+	// 	// req := huobi.ContractNewOrderRequest{}
+	// 	// req.Symbol = "BTC"
+	// 	// req.ContractType = huobi.ContractTypeQuarter                  // 季度合约
+	// 	// req.OrderPriceType = huobi.ContractOrderPriceTypeOptimal20FOK //必须直接成交，最优5档
+	// 	// // 买入开多
+	// 	// // req.Direction = huobi.ContractOrderDirectionBuy
+	// 	// // req.Offset = huobi.ContractOrderOffsetOpen
+	// 	// // 卖出开空
+	// 	// req.Direction = huobi.ContractOrderDirectionSell
+	// 	// req.Offset = huobi.ContractOrderOffsetOpen
+	// 	// req.ClientOrderID = time.Now().Unix()
+	// 	// req.LeverRae = huobi.LeverRae1
+	// 	// req.Volume = 1
+	// 	// // req.Price = 7500.00
+	// 	// if res, err := huobiExch.ContractNewOrder(req); err != nil {
+	// 	// 	panic(err)
+	// 	// } else {
+	// 	// 	fmt.Println(res)
+	// 	// }
+
+	// 	//-----合约计划委托下单--访问页面404
+	// 	// req := huobi.ContractNewTriggerOrderRequest{}
+	// 	// req.Symbol = "BTC"
+	// 	// req.ContractType = huobi.ContractTypeQuarter                  // 季度合约
+	// 	// req.OrderPriceType = huobi.ContractOrderPriceTypeOptimal20FOK //必须直接成交，最优5档
+	// 	// // 买入开多
+	// 	// // req.Direction = huobi.ContractOrderDirectionBuy
+	// 	// // req.Offset = huobi.ContractOrderOffsetOpen
+	// 	// // 卖出开空
+	// 	// req.Direction = huobi.ContractOrderDirectionSell
+	// 	// req.Offset = huobi.ContractOrderOffsetClose //平
+	// 	// req.LeverRae = huobi.LeverRae1
+	// 	// req.Volume = 1
+	// 	// req.TriggerType = huobi.ContractTriggerTypeGE // 大于
+	// 	// req.TriggerPrice = 4963.00
+	// 	// if res, err := huobiExch.ContractNewTriggerOrder(req); err != nil {
+	// 	// 	panic(err)
+	// 	// } else {
+	// 	// 	fmt.Println(res)
+	// 	// }
 
 	// 	//------历史成交记录
 	// 	// _timeFormat_local := "2006-01-02 15:04:05"
