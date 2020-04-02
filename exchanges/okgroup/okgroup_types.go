@@ -558,6 +558,7 @@ type PlaceFuturesOrderRequest struct {
 	ClientOid    string  `json:"client_oid,omitempty"`         // [optional] 	the order ID customized by yourself
 	InstrumentID string  `json:"instrument_id"`                // [required]   	Contract ID,e.g. "TC-USD-180213"
 	Type         int64   `json:"type,string"`                  //  [required] 	1:open long 2:open short 3:close long 4:close short
+	OrderType   int64   `json:"order_type,string,omitempty"` // [optional] 0：普通委托（order type不填或填0都是普通委托） 1：只做Maker（Post only） 2：全部成交或立即取消（FOK） 3：立即成交并取消剩余（IOC） 4：市价委托
 	Price        float64 `json:"price,string"`                 //  [required] 	Price of each contract
 	Size         int64   `json:"size,string"`                  //  [required] The buying or selling quantity
 	MatchPrice   int64   `json:"match_price,string,omitempty"` // [optional] 	Order at best counter party price? (0:no 1:yes) the parameter is defaulted as 0. If it is set as 1, the price parameter will be ignored
@@ -897,6 +898,7 @@ type PlaceSwapOrderRequest struct {
 	ClientOID    string  `json:"client_oid,omitempty"`         // [optional] the order ID customized by yourself. 1-32 with digits and letter，The type of client_oid should be comprised of alphabets + numbers or only alphabets within 1 – 32 characters,Both uppercase and lowercase letters are supported
 	Size         float64 `json:"size,string"`                  // [required] The buying or selling quantity
 	Type         int64   `json:"type,string"`                  // [required] 1:open long 2:open short 3:close long 4:close short
+	OrderType   int64   `json:"order_type,string,omitempty"` // [optional] 0：普通委托（order_type不填或填0都是普通委托） 1：只做Maker（Post only） 2：全部成交或立即取消（FOK） 3：立即成交并取消剩余（IOC） 4：市价委托
 	MatchPrice   int64   `json:"match_price,string,omitempty"` // [optional] Order at best counter party price? (0:no 1:yes)
 	Price        float64 `json:"price,string"`                 // [required] Price of each contract
 	InstrumentID string  `json:"instrument_id"`                // [required] Contract ID, e.g. BTC-USD-SWAP
