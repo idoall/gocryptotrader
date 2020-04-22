@@ -638,7 +638,7 @@ type GetFuturesOrderDetailsResponseData struct {
 	Fee          float64   `json:"fee,string"`
 	FilledQty    float64   `json:"filled_qty,string"`
 	InstrumentID string    `json:"instrument_id"`
-	Leverage     int64     `json:"leverage,string"` //  	Leverage value:10\20 default:10
+	Leverage     float64   `json:"leverage,string"` //  	Leverage value:10\20 default:10
 	OrderID      int64     `json:"order_id,string"`
 	Price        float64   `json:"price,string"`
 	PriceAvg     float64   `json:"price_avg,string"`
@@ -996,7 +996,7 @@ type GetSwapOrderListResponseData struct {
 	Fee          float64   `json:"fee,string"`
 	FilledQty    float64   `json:"filled_qty,string"`
 	InstrumentID string    `json:"instrument_id"`
-	Leverage     int64     `json:"leverage,string"` //  	Leverage value:10\20 default:10
+	Leverage     float64   `json:"leverage,string"` //  	Leverage value:10\20 default:10
 	OrderID      int64     `json:"order_id,string"`
 	Price        float64   `json:"price,string"`
 	PriceAvg     float64   `json:"price_avg,string"`
