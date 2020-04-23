@@ -176,7 +176,10 @@ var defaultSwapSubscribedChannels = []string{okGroupWsSwapDepth,
 	// okGroupWsSwapTicker,
 	// okGroupWsSwapTrade,
 	// okGroupWsSwapFundingRate,
-	okGroupWsSwapMarkPrice}
+	okGroupWsSwapMarkPrice,
+	okGroupWsSwapPosition,
+	okGroupWsSwapOrder,
+}
 
 // WsConnect initiates a websocket connection
 func (o *OKGroup) WsConnect() error {
@@ -295,6 +298,9 @@ func (o *OKGroup) WsLogin() error {
 		o.Websocket.SetCanUseAuthenticatedEndpoints(false)
 		return err
 	}
+
+	log.Debug(log.ExchangeSys, "WsLogin登录成功......")
+
 	return nil
 }
 
@@ -387,6 +393,10 @@ func (o *OKGroup) WsHandleDataResponse(response *WebsocketDataResponse) {
 		o.wsProcessTrades(response)
 	case okGroupWsMarkPrice:
 		o.wsProcessMarkPrice(response)
+	case okGroupWsPosition:
+		fmt.Println("用户持仓频道", response)
+	case okGroupWsOrder:
+		fmt.Println("用户交易频道", response)
 	default:
 		logDataResponse(response, o.Name)
 	}
@@ -417,15 +427,13 @@ func (o *OKGroup) wsProcessMarkPrice(response *WebsocketDataResponse) {
 			f := strings.Split(response.Data[i].InstrumentID, delimiterDash)
 			c = currency.NewPairWithDelimiter(f[0], f[1], delimiterDash)
 		}
-		mp := wshandler.MarkPrice{
+		o.Websocket.DataHandler <- wshandler.MarkPrice{
 			ExchangeName: o.Name,
 			AssetType:    o.GetAssetTypeFromTableName(response.Table),
 			Pair:         c,
 			Price:        response.Data[i].MarkPrice,
 			Timestamp:    response.Data[i].Timestamp,
 		}
-		fmt.Printf("%+v\n", mp)
-		o.Websocket.DataHandler <- mp
 	}
 }
 
@@ -769,16 +777,16 @@ func (o *OKGroup) GenerateDefaultSubscriptions() {
 			}
 
 			if o.GetAuthenticatedAPISupport(exchange.WebsocketAuthentication) {
-				subscriptions = append(subscriptions,
-					wshandler.WebsocketChannelSubscription{
-						Channel: okGroupWsSpotMarginAccount,
-					},
-					wshandler.WebsocketChannelSubscription{
-						Channel: okGroupWsSpotAccount,
-					},
-					wshandler.WebsocketChannelSubscription{
-						Channel: okGroupWsSpotOrder,
-					})
+				// subscriptions = append(subscriptions,
+				// 	wshandler.WebsocketChannelSubscription{
+				// 		Channel: okGroupWsSpotMarginAccount,
+				// 	},
+				// 	wshandler.WebsocketChannelSubscription{
+				// 		Channel: okGroupWsSpotAccount,
+				// 	},
+				// 	wshandler.WebsocketChannelSubscription{
+				// 		Channel: okGroupWsSpotOrder,
+				// 	})
 			}
 		case asset.Futures:
 			for i := range enabledCurrencies {
@@ -793,16 +801,17 @@ func (o *OKGroup) GenerateDefaultSubscriptions() {
 			}
 
 			if o.GetAuthenticatedAPISupport(exchange.WebsocketAuthentication) {
-				subscriptions = append(subscriptions,
-					wshandler.WebsocketChannelSubscription{
-						Channel: okGroupWsFuturesAccount,
-					},
-					wshandler.WebsocketChannelSubscription{
-						Channel: okGroupWsFuturesPosition,
-					},
-					wshandler.WebsocketChannelSubscription{
-						Channel: okGroupWsFuturesOrder,
-					})
+				// subscriptions = append(subscriptions,
+				// 	wshandler.WebsocketChannelSubscription{
+				// 		Channel: okGroupWsFuturesAccount,
+				// 	},
+				// 	wshandler.WebsocketChannelSubscription{
+				// 		Channel: okGroupWsFuturesPosition,
+				// 	},
+				// 	wshandler.WebsocketChannelSubscription{
+				// 		Channel: okGroupWsFuturesOrder,
+				// 	},
+				// )
 			}
 		case asset.PerpetualSwap:
 			for i := range enabledCurrencies {
@@ -817,16 +826,17 @@ func (o *OKGroup) GenerateDefaultSubscriptions() {
 			}
 
 			if o.GetAuthenticatedAPISupport(exchange.WebsocketAuthentication) {
-				subscriptions = append(subscriptions,
-					wshandler.WebsocketChannelSubscription{
-						Channel: okGroupWsSwapAccount,
-					},
-					wshandler.WebsocketChannelSubscription{
-						Channel: okGroupWsSwapPosition,
-					},
-					wshandler.WebsocketChannelSubscription{
-						Channel: okGroupWsSwapOrder,
-					})
+				// subscriptions = append(subscriptions,
+				// 	// wshandler.WebsocketChannelSubscription{
+				// 	// 	Channel: okGroupWsSwapAccount,
+				// 	// },
+				// 	// // wshandler.WebsocketChannelSubscription{
+				// 	// // 	Channel: okGroupWsSwapPosition,
+				// 	// // },
+				// 	// wshandler.WebsocketChannelSubscription{
+				// 	// 	Channel: okGroupWsSwapOrder,
+				// 	// },
+				// )
 			}
 		case asset.Index:
 			for i := range enabledCurrencies {
@@ -858,6 +868,9 @@ func (o *OKGroup) Subscribe(channelToSubscribe wshandler.WebsocketChannelSubscri
 			delimiterColon +
 			channelToSubscribe.Currency.Base.String()}
 	}
+
+	// b, _ := json.Marshal(request)
+	// fmt.Println(string(b))
 
 	return o.WebsocketConn.SendJSONMessage(request)
 }

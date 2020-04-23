@@ -314,7 +314,7 @@ func WebsocketDataHandler(ws *wshandler.Websocket) {
 				}
 			case wshandler.MarkPrice:
 				//if Bot.Settings.Verbose {
-				log.Infof(log.WebsocketMgr, "%s websocket %s %s MarkPrice updated %+v\n",
+				log.Infof(log.WebsocketMgr, "%s websocket %s %s MarkPrice %+v\n",
 					ws.GetName(),
 					FormatCurrency(d.Pair),
 					d.AssetType,
