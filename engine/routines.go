@@ -312,6 +312,14 @@ func WebsocketDataHandler(ws *wshandler.Websocket) {
 						d.AssetType,
 						d)
 				}
+			case wshandler.MarkPrice:
+				//if Bot.Settings.Verbose {
+				log.Infof(log.WebsocketMgr, "%s websocket %s %s MarkPrice updated %+v\n",
+					ws.GetName(),
+					FormatCurrency(d.Pair),
+					d.AssetType,
+					d)
+				// }
 			case wshandler.FundingData:
 				// Websocket Funding Data
 				if Bot.Settings.Verbose {
@@ -360,12 +368,12 @@ func WebsocketDataHandler(ws *wshandler.Websocket) {
 						d.Asset)
 				}
 			default:
-				if Bot.Settings.Verbose {
-					log.Warnf(log.WebsocketMgr,
-						"%s websocket Unknown type: %+v\n",
-						ws.GetName(),
-						d)
-				}
+				// if Bot.Settings.Verbose {
+				log.Warnf(log.WebsocketMgr,
+					"%s websocket Unknown type: %+v\n",
+					ws.GetName(),
+					d)
+				// }
 			}
 		}
 	}

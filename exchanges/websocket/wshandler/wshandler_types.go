@@ -139,6 +139,15 @@ type KlineData struct {
 	Volume     float64
 }
 
+// MarkPrice defines
+type MarkPrice struct {
+	Timestamp    time.Time
+	Pair         currency.Pair
+	AssetType    asset.Item
+	ExchangeName string
+	Price        float64
+}
+
 // WebsocketPositionUpdated reflects a change in orders/contracts on an exchange
 type WebsocketPositionUpdated struct {
 	Timestamp time.Time

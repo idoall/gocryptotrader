@@ -392,24 +392,24 @@ func (e *Engine) Start() error {
 		gctlog.Errorf(gctlog.Global, "Currency updater system failed to start %v", err)
 	}
 
-	if e.Settings.EnableGRPC {
-		go StartRPCServer()
-	}
+	// if e.Settings.EnableGRPC {
+	// 	go StartRPCServer()
+	// }
 
-	if e.Settings.EnableDeprecatedRPC {
-		go StartRESTServer()
-	}
+	// if e.Settings.EnableDeprecatedRPC {
+	// 	go StartRESTServer()
+	// }
 
-	if e.Settings.EnableWebsocketRPC {
-		go StartWebsocketServer()
-		StartWebsocketHandler()
-	}
+	// if e.Settings.EnableWebsocketRPC {
+	// 	go StartWebsocketServer()
+	// 	StartWebsocketHandler()
+	// }
 
-	if e.Settings.EnablePortfolioManager {
-		if err = e.PortfolioManager.Start(); err != nil {
-			gctlog.Errorf(gctlog.Global, "Fund manager unable to start: %v", err)
-		}
-	}
+	// if e.Settings.EnablePortfolioManager {
+	// 	if err = e.PortfolioManager.Start(); err != nil {
+	// 		gctlog.Errorf(gctlog.Global, "Fund manager unable to start: %v", err)
+	// 	}
+	// }
 
 	if e.Settings.EnableDepositAddressManager {
 		e.DepositAddressManager = new(DepositAddressManager)

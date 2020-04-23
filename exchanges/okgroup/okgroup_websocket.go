@@ -152,24 +152,30 @@ const (
 // processed at a time
 var orderbookMutex sync.Mutex
 
-var defaultSpotSubscribedChannels = []string{okGroupWsSpotDepth,
-	okGroupWsSpotCandle300s,
-	okGroupWsSpotTicker,
-	okGroupWsSpotTrade}
+var defaultSpotSubscribedChannels = []string{
+	// okGroupWsSpotDepth,
+	// okGroupWsSpotCandle300s,
+	// okGroupWsSpotTicker,
+	// okGroupWsSpotTrade,
+}
 
-var defaultFuturesSubscribedChannels = []string{okGroupWsFuturesDepth,
-	okGroupWsFuturesCandle300s,
-	okGroupWsFuturesTicker,
-	okGroupWsFuturesTrade}
+var defaultFuturesSubscribedChannels = []string{
+	// okGroupWsFuturesDepth,
+	// okGroupWsFuturesCandle300s,
+	// okGroupWsFuturesTicker,
+	// okGroupWsFuturesTrade,
+}
 
-var defaultIndexSubscribedChannels = []string{okGroupWsIndexCandle300s,
-	okGroupWsIndexTicker}
+var defaultIndexSubscribedChannels = []string{
+	// okGroupWsIndexCandle300s,
+	// okGroupWsIndexTicker,
+}
 
 var defaultSwapSubscribedChannels = []string{okGroupWsSwapDepth,
 	okGroupWsSwapCandle300s,
-	okGroupWsSwapTicker,
-	okGroupWsSwapTrade,
-	okGroupWsSwapFundingRate,
+	// okGroupWsSwapTicker,
+	// okGroupWsSwapTrade,
+	// okGroupWsSwapFundingRate,
 	okGroupWsSwapMarkPrice}
 
 // WsConnect initiates a websocket connection
@@ -379,6 +385,8 @@ func (o *OKGroup) WsHandleDataResponse(response *WebsocketDataResponse) {
 		o.wsProcessTickers(response)
 	case okGroupWsTrade:
 		o.wsProcessTrades(response)
+	case okGroupWsMarkPrice:
+		o.wsProcessMarkPrice(response)
 	default:
 		logDataResponse(response, o.Name)
 	}
@@ -394,6 +402,30 @@ func logDataResponse(response *WebsocketDataResponse, exchangeName string) {
 			response.Table,
 			response.Data[i].InstrumentID,
 			response.Data[i].Timestamp)
+	}
+}
+
+func (o *OKGroup) wsProcessMarkPrice(response *WebsocketDataResponse) {
+	for i := range response.Data {
+		a := o.GetAssetTypeFromTableName(response.Table)
+		var c currency.Pair
+		switch a {
+		case asset.Futures, asset.PerpetualSwap:
+			f := strings.Split(response.Data[i].InstrumentID, delimiterDash)
+			c = currency.NewPairWithDelimiter(f[0]+delimiterDash+f[1], f[2], delimiterUnderscore)
+		default:
+			f := strings.Split(response.Data[i].InstrumentID, delimiterDash)
+			c = currency.NewPairWithDelimiter(f[0], f[1], delimiterDash)
+		}
+		mp := wshandler.MarkPrice{
+			ExchangeName: o.Name,
+			AssetType:    o.GetAssetTypeFromTableName(response.Table),
+			Pair:         c,
+			Price:        response.Data[i].MarkPrice,
+			Timestamp:    response.Data[i].Timestamp,
+		}
+		fmt.Printf("%+v\n", mp)
+		o.Websocket.DataHandler <- mp
 	}
 }
 
