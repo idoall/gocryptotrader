@@ -394,9 +394,9 @@ func (o *OKGroup) WsHandleDataResponse(response *WebsocketDataResponse) {
 	case okGroupWsMarkPrice:
 		o.wsProcessMarkPrice(response)
 	case okGroupWsPosition:
-		fmt.Println("用户持仓频道", response)
+		o.wsProcessPosition(response)
 	case okGroupWsOrder:
-		fmt.Println("用户交易频道", response)
+		o.wsProcessOrder(response)
 	default:
 		logDataResponse(response, o.Name)
 	}
@@ -412,6 +412,84 @@ func logDataResponse(response *WebsocketDataResponse, exchangeName string) {
 			response.Table,
 			response.Data[i].InstrumentID,
 			response.Data[i].Timestamp)
+	}
+}
+
+func (o *OKGroup) wsProcessOrder(response *WebsocketDataResponse) {
+	// a := o.GetAssetTypeFromTableName(response.Table)
+	// var c currency.Pair
+	// switch a {
+	// case asset.Futures, asset.PerpetualSwap:
+	// 	f := strings.Split(response.Data[0].InstrumentID, delimiterDash)
+	// 	c = currency.NewPairWithDelimiter(f[0]+delimiterDash+f[1], f[2], delimiterUnderscore)
+	// default:
+	// 	f := strings.Split(response.Data[i].InstrumentID, delimiterDash)
+	// 	c = currency.NewPairWithDelimiter(f[0], f[1], delimiterDash)
+	// }
+	wsp := GetSwapOrderListResponse{
+		Result: true,
+	}
+	for i := range response.Data {
+
+		orderID, _ := strconv.ParseInt(response.Data[i].OrderID, 10, 64)
+		_type, _ := strconv.ParseInt(response.Data[i].Type, 10, 64)
+		status, _ := strconv.ParseInt(response.Data[i].Status, 10, 64)
+		leverage, _ := strconv.ParseFloat(response.Data[i].Leverage, 64)
+		h := GetSwapOrderListResponseData{
+			InstrumentID: response.Data[i].InstrumentID,
+			Size:         response.Data[i].Size,
+			Timestamp:    response.Data[i].Timestamp,
+			Fee:          response.Data[i].Fee,
+			FilledQty:    response.Data[i].FilledQuantity,
+			OrderID:      orderID,
+			Price:        response.Data[i].Price,
+			PriceAvg:     response.Data[i].PriceAverage,
+			Type:         _type,
+			ContractVal:  response.Data[i].ContractValue,
+			Status:       status,
+			Leverage:     leverage,
+		}
+		wsp.OrderInfo = append(wsp.OrderInfo, h)
+	}
+
+	o.Websocket.DataHandler <- wsp
+}
+
+func (o *OKGroup) wsProcessPosition(response *WebsocketDataResponse) {
+	for i := range response.Data {
+		// a := o.GetAssetTypeFromTableName(response.Table)
+		// var c currency.Pair
+		// switch a {
+		// case asset.Futures, asset.PerpetualSwap:
+		// 	f := strings.Split(response.Data[i].InstrumentID, delimiterDash)
+		// 	c = currency.NewPairWithDelimiter(f[0]+delimiterDash+f[1], f[2], delimiterUnderscore)
+		// default:
+		// 	f := strings.Split(response.Data[i].InstrumentID, delimiterDash)
+		// 	c = currency.NewPairWithDelimiter(f[0], f[1], delimiterDash)
+		// }
+		wsp := WebsocketUserSwapPositionResponse{
+			// AssetType:  o.GetAssetTypeFromTableName(response.Table),
+			// Pair:       c,
+			// MarginMode: response.Data[i].MarginMode,
+			// Timestamp:  response.Data[i].Timestamp,
+		}
+		for v := range response.Data[i].Holding {
+			h := WebsocketUserSwapPositionHoldingData{
+				AvailablePosition: response.Data[i].Holding[v].AvailablePosition,
+				AverageCost:       response.Data[i].Holding[v].AverageCost,
+				// InstrumentID:      response.Data[i].InstrumentID,
+				Leverage:         response.Data[i].Holding[v].Leverage,
+				LiquidationPrice: response.Data[i].Holding[v].LiquidationPrice,
+				Margin:           response.Data[i].Holding[v].Margin,
+				Position:         response.Data[i].Holding[v].Position,
+				RealizedPnl:      response.Data[i].Holding[v].RealizedPnl,
+				SettlementPrice:  response.Data[i].Holding[v].SettlementPrice,
+				Side:             response.Data[i].Holding[v].Side,
+				Timestamp:        response.Data[i].Holding[v].Timestamp,
+			}
+			wsp.Holding = append(wsp.Holding, h)
+		}
+		o.Websocket.DataHandler <- wsp
 	}
 }
 

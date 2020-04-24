@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/idoall/gocryptotrader/currency"
+	"github.com/idoall/gocryptotrader/exchanges/asset"
 )
 
 // Order types
@@ -822,6 +823,15 @@ type GetFuturesTagPriceResponse struct {
 // GetSwapPostionsResponse response data for GetSwapPostions
 type GetSwapPostionsResponse struct {
 	MarginMode string                           `json:"margin_mode"`
+	Holding    []GetSwapPostionsResponseHolding `json:"holding"`
+}
+
+// WebsocketPostions response data for GetSwapPostions
+type WebsocketPostions struct {
+	MarginMode string `json:"margin_mode"`
+	AssetType  asset.Item
+	Pair       currency.Pair
+	Timestamp  time.Time                        `json:"timestamp"`
 	Holding    []GetSwapPostionsResponseHolding `json:"holding"`
 }
 
