@@ -430,7 +430,7 @@ func (o *OKGroup) wsProcessOrder(response *WebsocketDataResponse) {
 		wsp := WebsocketResponseOrders{
 			AssetType:    o.GetAssetTypeFromTableName(response.Table),
 			Pair:         c,
-			ExchangeName: o.ExchangeName,
+			ExchangeName: o.Name,
 			Timestamp:    response.Data[i].Timestamp,
 		}
 		for i := range response.Data {
@@ -475,7 +475,7 @@ func (o *OKGroup) wsProcessPosition(response *WebsocketDataResponse) {
 		wsp := WebsocketResponsePosition{
 			AssetType:  o.GetAssetTypeFromTableName(response.Table),
 			Pair:       c,
-			ExchangeName:o.ExchangeName,
+			ExchangeName:o.Name,
 			Timestamp:  response.Data[i].Timestamp,
 		}
 		for v := range response.Data[i].Holding {
