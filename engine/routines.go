@@ -312,14 +312,14 @@ func WebsocketDataHandler(ws *wshandler.Websocket) {
 						d.AssetType,
 						d)
 				}
-			case wshandler.MarkPrice:
-				//if Bot.Settings.Verbose {
-				log.Infof(log.WebsocketMgr, "%s websocket %s %s MarkPrice %+v\n",
-					ws.GetName(),
-					FormatCurrency(d.Pair),
-					d.AssetType,
-					d)
-				// }
+			//case wshandler.MarkPrice:
+			//	//if Bot.Settings.Verbose {
+			//	log.Infof(log.WebsocketMgr, "%s websocket %s %s MarkPrice %+v\n",
+			//		ws.GetName(),
+			//		FormatCurrency(d.Pair),
+			//		d.AssetType,
+			//		d)
+			//	// }
 			case wshandler.FundingData:
 				// Websocket Funding Data
 				if Bot.Settings.Verbose {
