@@ -115,144 +115,42 @@ func main() {
 		log.Fatalf("Unable to initialise bot engine. Error: %s\n", err)
 	}
 
-	// {
-
-	// 	var huobiExch huobi.HUOBI
-	// 	huobiExch.SetDefaults()
-	// 	//获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
-	// 	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Huobi")
-	// 	huobiExch.API.AuthenticatedSupport = true
-	// 	huobiExch.API.AuthenticatedWebsocketSupport = true
-	// 	huobiExch.API.Credentials.Key = ""
-	// 	huobiExch.API.Credentials.Secret = ""
-	// 	huobiExch.SkipAuthCheck = true
-	// 	huobiExch.Verbose = true
-	// 	//--------历史委托信息
-	// 	// req := huobi.ContractHisordersRequest{
-	// 	// 	Symbol:     "BTC",
-	// 	// 	TradeType:  huobi.TradeType0,
-	// 	// 	Type:       huobi.ContractHisOrderType1,
-	// 	// 	Status:     huobi.ContractOrderStatus0,
-	// 	// 	CreateDate: 90,
-	// 	// }
-	// 	// if res, err := huobiExch.GetContractHisorders(req); err != nil {
-	// 	// 	panic(err)
-	// 	// } else {
-	// 	// 	fmt.Println("res", res)
-	// 	// }
-
-	// 	// ----获取获取计划委托当前委托
-	// 	// if res, err := huobiExch.GetContractTriggerOpenOrders("BTC", 1, 20); err != nil {
-	// 	// 	panic(err)
-	// 	// } else {
-	// 	// 	fmt.Println("res", res)
-	// 	// }
-
-	// 	//-----下新订单
-	// 	// req := huobi.ContractNewOrderRequest{}
-	// 	// req.Symbol = "BTC"
-	// 	// req.ContractType = huobi.ContractTypeQuarter                  // 季度合约
-	// 	// req.OrderPriceType = huobi.ContractOrderPriceTypeOptimal20FOK //必须直接成交，最优5档
-	// 	// // 买入开多
-	// 	// // req.Direction = huobi.ContractOrderDirectionBuy
-	// 	// // req.Offset = huobi.ContractOrderOffsetOpen
-	// 	// // 卖出开空
-	// 	// req.Direction = huobi.ContractOrderDirectionSell
-	// 	// req.Offset = huobi.ContractOrderOffsetOpen
-	// 	// req.ClientOrderID = time.Now().Unix()
-	// 	// req.LeverRae = huobi.LeverRae1
-	// 	// req.Volume = 1
-	// 	// // req.Price = 7500.00
-	// 	// if res, err := huobiExch.ContractNewOrder(req); err != nil {
-	// 	// 	panic(err)
-	// 	// } else {
-	// 	// 	fmt.Println(res)
-	// 	// }
-
-	// 	//-----合约计划委托下单--访问页面404
-	// 	// req := huobi.ContractNewTriggerOrderRequest{}
-	// 	// req.Symbol = "BTC"
-	// 	// req.ContractType = huobi.ContractTypeQuarter                  // 季度合约
-	// 	// req.OrderPriceType = huobi.ContractOrderPriceTypeOptimal20FOK //必须直接成交，最优5档
-	// 	// // 买入开多
-	// 	// // req.Direction = huobi.ContractOrderDirectionBuy
-	// 	// // req.Offset = huobi.ContractOrderOffsetOpen
-	// 	// // 卖出开空
-	// 	// req.Direction = huobi.ContractOrderDirectionSell
-	// 	// req.Offset = huobi.ContractOrderOffsetClose //平
-	// 	// req.LeverRae = huobi.LeverRae1
-	// 	// req.Volume = 1
-	// 	// req.TriggerType = huobi.ContractTriggerTypeGE // 大于
-	// 	// req.TriggerPrice = 4963.00
-	// 	// if res, err := huobiExch.ContractNewTriggerOrder(req); err != nil {
-	// 	// 	panic(err)
-	// 	// } else {
-	// 	// 	fmt.Println(res)
-	// 	// }
-
-	// 	//------历史成交记录
-	// 	// _timeFormat_local := "2006-01-02 15:04:05"
-	// 	// req := huobi.ContractMatchResultsRequest{
-	// 	// 	TradeType:  huobi.TradeType0,
-	// 	// 	CreateDate: 90,
-	// 	// 	PageSize:   50,
-	// 	// 	// Symbol:     "BTC",
-	// 	// }
-	// 	// req.Symbol = "BTC"
-	// 	// if res, err := huobiExch.GetContractMatchResults(req); err != nil {
-	// 	// 	panic(err)
-	// 	// } else {
-	// 	// 	fmt.Println(" - ", "历史成交记录", "当前页", res.CurrentPage, "总页数", res.TotalPage, "total_siz", res.TotalSize)
-	// 	// 	tradeList := make(map[int64]*huobi.ContractMatchResultDataItem)
-	// 	// 	for _, v := range res.Trades {
-	// 	// 		var tradeItem *huobi.ContractMatchResultDataItem
-	// 	// 		idArray := strings.Split(v.ID, "-")
-
-	// 	// 		tradeID, _ := strconv.ParseInt(idArray[1], 10, 64)
-	// 	// 		if tradeList[tradeID] == nil {
-	// 	// 			tradeItem = &huobi.ContractMatchResultDataItem{}
-	// 	// 		} else {
-	// 	// 			tradeItem = tradeList[tradeID]
-	// 	// 		}
-	// 	// 		tradeItem.CreateDate = v.CreateDate
-	// 	// 		tradeItem.Symbol = v.Symbol
-	// 	// 		tradeItem.Direction = v.Direction
-	// 	// 		tradeItem.Offset = v.Offset
-	// 	// 		tradeItem.TradePrice = v.TradePrice
-	// 	// 		tradeItem.TradeVolume += v.TradeVolume
-	// 	// 		tradeItem.TradeTurnover += v.TradeTurnover
-	// 	// 		tradeItem.OffsetProfitloss += v.OffsetProfitloss
-	// 	// 		tradeItem.TradeFee += v.TradeFee
-	// 	// 		tradeList[tradeID] = tradeItem
-	// 	// 	}
-
-	// 	// 	for k, v := range tradeList {
-	// 	// 		fmt.Printf("\t ID :%d\n", k)
-	// 	// 		fmt.Printf("\t\t 订单时间 :%s\n", time.Unix(0, int64(v.CreateDate)*int64(time.Millisecond)).Format(_timeFormat_local))
-	// 	// 		fmt.Printf("\t\t 累计成交数量: %.2f\n", v.TradeVolume)
-	// 	// 		fmt.Printf("\t\t 品种代码: %s\n", v.Symbol)
-
-	// 	// 		// 开平方向
-	// 	// 		if v.Offset == huobi.ContractOrderOffsetOpen && v.Direction == huobi.ContractOrderDirectionBuy {
-	// 	// 			fmt.Printf("\t\t 交易类型: %s %s\n", "开多", "买入开多")
-	// 	// 		} else if v.Offset == huobi.ContractOrderOffsetOpen && v.Direction == huobi.ContractOrderDirectionSell {
-	// 	// 			fmt.Printf("\t\t 交易类型: %s %s\n", "开空", "卖出开空")
-	// 	// 		} else if v.Offset == huobi.ContractOrderOffsetClose && v.Direction == huobi.ContractOrderDirectionBuy {
-	// 	// 			fmt.Printf("\t\t 交易类型: %s %s\n", "平空", "买入平空")
-	// 	// 		} else if v.Offset == huobi.ContractOrderOffsetClose && v.Direction == huobi.ContractOrderDirectionSell {
-	// 	// 			fmt.Printf("\t\t 交易类型: %s %s\n", "平多", "卖出平多")
-	// 	// 		}
-
-	// 	// 		fmt.Printf("\t\t 累计成交数量: %.2f\n", v.TradeVolume)
-	// 	// 		fmt.Printf("\t\t 成交价格: %.2f\n", v.TradePrice)
-	// 	// 		fmt.Printf("\t\t 本笔成交金额: %.2f\n", v.TradeTurnover)
-	// 	// 		fmt.Printf("\t\t 平仓盈亏: %.8f\n", v.OffsetProfitloss)
-	// 	// 		fmt.Printf("\t\t 成交手续费: %.8f %s\n", v.TradeFee, v.FeeAsset)
-	// 	// 	}
-
-	// 	// }
-	// 	return
-	// }
+	//{
+	//
+	//	var exch okex.OKEX
+	//exch.SetDefaults()
+	//	//获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
+	//	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Huobi")
+	//exch.API.AuthenticatedSupport = true
+	//exch.API.AuthenticatedWebsocketSupport = true
+	//exch.SkipAuthCheck = true
+	//exch.Verbose = true
+	//	logCfg := gctlog.GenDefaultSettings()
+	//	gctlog.GlobalLogConfig = &logCfg
+	//	exch.OKGroup.Verbose = exch.Verbose
+	//
+	//	info, err := exch.GetFuturesAccountOfAllCurrencies()
+	//	if err != nil {
+	//		panic(err)
+	//	} else {
+	//		fmt.Printf("%+v\n", info)
+	//	}
+	//	return
+	//	//--------历史委托信息
+	//	// req := huobi.ContractHisordersRequest{
+	//	// 	Symbol:     "BTC",
+	//	// 	TradeType:  huobi.TradeType0,
+	//	// 	Type:       huobi.ContractHisOrderType1,
+	//	// 	Status:     huobi.ContractOrderStatus0,
+	//	// 	CreateDate: 90,
+	//	// }
+	//	// if res, err := huobiExch.GetContractHisorders(req); err != nil {
+	//	// 	panic(err)
+	//	// } else {
+	//	// 	fmt.Println("res", res)
+	//	// }
+	//
+	//}
 
 	gctscript.Setup()
 

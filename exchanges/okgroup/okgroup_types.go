@@ -503,6 +503,9 @@ type FuturesCurrencyData struct {
 	RealizedPnl       string                 `json:"realized_pnl,omitempty"`
 	TotalAvailBalance string                 `json:"total_avail_balance,omitempty"`
 	UnrealizedPnl     string                 `json:"unrealized_pnl,omitempty"`
+	CanWithDraw     string                 `json:"can_withdraw,omitempty"`
+	Currency     string                 `json:"currency,omitempty"`
+	LiquiMode     string                 `json:"liqui_mode,omitempty"`
 }
 
 // FuturesContractsData Futures details

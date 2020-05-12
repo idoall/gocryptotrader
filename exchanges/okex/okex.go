@@ -68,7 +68,27 @@ func (o *OKEX) GetFuturesPostionsForCurrency(instrumentID string) (resp okgroup.
 // GetFuturesAccountOfAllCurrencies Get the futures account info of all token.
 // Due to high energy consumption, you are advised to capture data with the "Futures Account of a Currency" API instead.
 func (o *OKEX) GetFuturesAccountOfAllCurrencies() (resp okgroup.FuturesAccountForAllCurrenciesResponse, _ error) {
-	return resp, o.SendHTTPRequest(http.MethodGet, okGroupFuturesSubsection, okgroup.OKGroupAccounts, nil, &resp, true)
+	var result map[string]map[string]okgroup.FuturesCurrencyData
+	if err := o.SendHTTPRequest(http.MethodGet, okGroupFuturesSubsection, okgroup.OKGroupAccounts, nil, &result, true);err!=nil{
+		return resp,err
+	}
+	resp = okgroup.FuturesAccountForAllCurrenciesResponse{}
+	resp.Info.Currency = make(map[string]okgroup.FuturesCurrencyData)
+	for k,v := range result["info"] {
+		fcd := okgroup.FuturesCurrencyData{}
+		fcd.Equity = v.Equity
+		fcd.Margin = v.Margin
+		fcd.Contracts = v.Contracts
+		fcd.MarginMode = v.MarginMode
+		fcd.MarginRatio = v.MarginRatio
+		fcd.RealizedPnl = v.RealizedPnl
+		fcd.TotalAvailBalance = v.TotalAvailBalance
+		fcd.UnrealizedPnl = v.UnrealizedPnl
+		resp.Info.Currency[k] = fcd
+	}
+
+	return
+	//return resp, o.SendHTTPRequest(http.MethodGet, okGroupFuturesSubsection, okgroup.OKGroupAccounts, nil, &resp, true)
 }
 
 // GetFuturesAccountOfACurrency Get the futures account info of a token.

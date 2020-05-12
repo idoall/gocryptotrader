@@ -48,6 +48,14 @@ type WebsocketResponseOrders struct {
 	OrderInfo []WebsocketResponseOrdersData `json:"order_info"`
 }
 
+type WebsocketResponseFuturesAccounts struct {
+	Timestamp    time.Time
+	Pair         currency.Pair
+	AssetType    asset.Item
+	ExchangeName string
+	OrderInfo []WebsocketResponseOrdersData `json:"order_info"`
+}
+
 // GetSwapOrderListResponseData individual order data from GetSwapOrderList
 type WebsocketResponseOrdersData struct {
 	ContractVal  float64   `json:"contract_val,string"`
