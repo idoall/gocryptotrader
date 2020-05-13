@@ -1433,11 +1433,18 @@ type WebsocketUserSwapPositionHoldingData struct {
 // WebsocketUserSwapFutureAccountResponse contains formatted data for user account data
 type WebsocketUserSwapFutureAccountResponse struct {
 	Equity        float64 `json:"equity,string,omitempty"`
+	Margin  float64   `json:"margin,string,omitempty"`
 	FixedBalance  float64 `json:"fixed_balance,string,omitempty"`
 	MarginFrozen  float64 `json:"margin_frozen,string,omitempty"`
 	MarginRatio   float64 `json:"margin_ratio,string,omitempty"`
 	RealizedPnl   float64 `json:"realized_pnl,string,omitempty"`
 	UnrealizedPnl float64 `json:"unrealized_pnl,string,omitempty"`
+	MaintMarginRatio  float64   `json:"maint_margin_ratio,string,omitempty"`
+	MarginForUnfilled  float64   `json:"margin_for_unfilled,string,omitempty"`
+	AvailableQty  float64   `json:"available_qty,string,omitempty"`
+	LiquiMode  string   `json:"liqui_mode,string,omitempty"`
+	ShortOpenMax  int64   `json:"short_open_max,string,omitempty"`
+	LongOpenMax  int64   `json:"long_open_max,string,omitempty"`
 	// MarginMode        A member, but part already exists as part of WebsocketDataResponse
 	// TotalAvailBalance A member, but part already exists as part of WebsocketDataResponse
 	// Margin            A member, but part already exists as part of WebsocketDataResponse

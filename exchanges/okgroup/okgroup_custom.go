@@ -48,12 +48,32 @@ type WebsocketResponseOrders struct {
 	OrderInfo []WebsocketResponseOrdersData `json:"order_info"`
 }
 
-type WebsocketResponseFuturesAccounts struct {
+type WebsocketResponseUserSwapFutureAccounts struct {
 	Timestamp    time.Time
 	Pair         currency.Pair
 	AssetType    asset.Item
 	ExchangeName string
-	OrderInfo []WebsocketResponseOrdersData `json:"order_info"`
+	Data []WebsocketResponseUserSwapFutureAccountsData
+}
+
+type WebsocketResponseUserSwapFutureAccountsData struct {
+	Equity  float64   `json:"equity,string"`
+	InstrumentID  string   `json:"instrument_id,string"`
+	Margin  float64   `json:"margin,string"`
+	MarginFrozen  float64   `json:"margin_frozen,string"`
+	MarginRatio  float64   `json:"margin_ratio,string"`
+	RealizedPnl  float64   `json:"realized_pnl,string"`
+	Timestamp  time.Time   `json:"timestamp,string"`
+	TotalAvailBalance  float64   `json:"total_avail_balance,string"`
+	UnrealizedPnl  float64   `json:"unrealized_pnl,string"`
+	FixedBalance  float64   `json:"fixed_balance,string"`
+	MaintMarginRatio  float64   `json:"maint_margin_ratio,string"`
+	MarginForUnfilled  float64   `json:"margin_for_unfilled,string"`//交割合约独有
+	AvailableQty  float64   `json:"available_qty,string"`	// 可用保证金
+	LiquiMode  string   `json:"liqui_mode,string"`	//交割合约独有
+	MarginMode  string   `json:"margin_mode,string"`
+	ShortOpenMax  int64   `json:"short_open_max,string"`
+	LongOpenMax  int64   `json:"long_open_max,string"`
 }
 
 // GetSwapOrderListResponseData individual order data from GetSwapOrderList

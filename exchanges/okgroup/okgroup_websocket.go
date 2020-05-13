@@ -397,6 +397,8 @@ func (o *OKGroup) WsHandleDataResponse(response *WebsocketDataResponse) {
 		o.wsProcessPosition(response)
 	case okGroupWsOrder:
 		o.wsProcessOrder(response)
+	case okGroupWsAccount:
+		o.wsProcessAccount(response)
 	default:
 		logDataResponse(response, o.Name)
 	}
@@ -412,6 +414,52 @@ func logDataResponse(response *WebsocketDataResponse, exchangeName string) {
 			response.Table,
 			response.Data[i].InstrumentID,
 			response.Data[i].Timestamp)
+	}
+}
+
+func (o *OKGroup) wsProcessAccount(response *WebsocketDataResponse) {
+	for i := range response.Data {
+		a := o.GetAssetTypeFromTableName(response.Table)
+		var c currency.Pair
+		switch a {
+		case asset.Futures, asset.PerpetualSwap:
+			f := strings.Split(response.Data[0].InstrumentID, delimiterDash)
+			c = currency.NewPairWithDelimiter(f[0]+delimiterDash+f[1], f[2], delimiterUnderscore)
+		default:
+			f := strings.Split(response.Data[i].InstrumentID, delimiterDash)
+			c = currency.NewPairWithDelimiter(f[0], f[1], delimiterDash)
+		}
+		wsp := WebsocketResponseUserSwapFutureAccounts{
+			AssetType:    o.GetAssetTypeFromTableName(response.Table),
+			Pair:         c,
+			ExchangeName: o.Name,
+			Timestamp:    response.Data[i].Timestamp,
+		}
+		for i := range response.Data {
+			totalAvailBalance, _ := strconv.ParseFloat(response.Data[i].TotalAvailBalance, 64)
+			h := WebsocketResponseUserSwapFutureAccountsData{
+				Equity:         response.Data[i].Equity,
+				InstrumentID: response.Data[i].InstrumentID,
+				Margin:          response.Data[i].Margin,
+				MarginFrozen:    response.Data[i].MarginFrozen,
+				MarginRatio:      response.Data[i].MarginRatio,
+				RealizedPnl:        response.Data[i].RealizedPnl,
+				Timestamp:    response.Data[i].Timestamp,
+				TotalAvailBalance:     totalAvailBalance,
+				UnrealizedPnl:         response.Data[i].UnrealizedPnl,
+				FixedBalance:  response.Data[i].FixedBalance,
+				AvailableQty:       response.Data[i].AvailableQty,
+				LiquiMode:       response.Data[i].LiquiMode,
+				MarginMode:       response.Data[i].MarginMode,
+				ShortOpenMax:       response.Data[i].ShortOpenMax,
+				LongOpenMax:       response.Data[i].LongOpenMax,
+				MarginForUnfilled : response.Data[i].MarginForUnfilled,
+			}
+
+			wsp.Data = append(wsp.Data, h)
+		}
+
+		o.Websocket.DataHandler <- wsp
 	}
 }
 
