@@ -21,7 +21,7 @@
      "TextTokenData": "td",
      "DateFormat": "2006.01.02 15:04",
      "RegExp": "^20(\\d){2}.(\\d){2}.(\\d){2} (\\d){2}:(\\d){2}$",
-     "CheckString": "2019.12.27 19:00",
+     "CheckString": "2020.11.26 19:00",
      "Path": "https://huobiapi.github.io/docs/spot/v1/en/#change-log"
     }
    },
@@ -39,7 +39,7 @@
      "TextTokenData": "strong",
      "DateFormat": "01/02/06",
      "RegExp": "^(\\d){1,2}/(\\d){1,2}/(\\d){2}$",
-     "CheckString": "2/20/20",
+     "CheckString": "11/16/20",
      "Path": "https://docs.pro.coinbase.com/#changelog"
     }
    },
@@ -55,7 +55,7 @@
      "Val": "change-log",
      "TokenDataEnd": "p",
      "TextTokenData": "strong",
-     "CheckString": "2020-05-06",
+     "CheckString": "2020-11-27",
      "Path": "https://binance-docs.github.io/apidocs/spot/en/#change-log"
     }
    },
@@ -67,7 +67,7 @@
    "Data": {
     "GitHubData": {
      "Repo": "bithumb-pro/bithumb.pro-official-api-docs",
-     "Sha": "6293502c7736ab4971491978225ef4d104bdff31"
+     "Sha": "920748e21d4ce12752ee931e6a99afb9e70da1e5"
     }
    },
    "Disabled": false
@@ -78,7 +78,7 @@
    "Data": {
     "GitHubData": {
      "Repo": "Bittrex/bittrex.github.io",
-     "Sha": "fc1ea9c10c48aa82c4dc2c6be74887ef61b5b31b"
+     "Sha": "3cbb36300c58a5f733bb28e855e5b917e9460d46"
     }
    },
    "Disabled": false
@@ -89,7 +89,7 @@
    "Data": {
     "GitHubData": {
      "Repo": "Coinbene/API-SPOT-v2-Documents",
-     "Sha": "e9135a782ba6016bcf008778be368882ad7c784d"
+     "Sha": "e88e7b0c93a47280f29fc49ac2f9df1f0e2ab7c8"
     }
    },
    "Disabled": false
@@ -100,7 +100,7 @@
    "Data": {
     "GitHubData": {
      "Repo": "Coinbene/API-SWAP-Documents",
-     "Sha": "6b7871dae4d2af028a33dde956fbce101e2f9acd"
+     "Sha": "c42189bb544ad94e722a19396141b8b9b5742cbb"
     }
    },
    "Disabled": false
@@ -122,7 +122,7 @@
    "Data": {
     "GitHubData": {
      "Repo": "gateio/gateapi-go",
-     "Sha": "81e2f1bb92c5406853139ae054bbda599483e127"
+     "Sha": "d9d2fc86b2cbfab69c56afebccf854e16e82bd1e"
     }
    },
    "Disabled": false
@@ -149,7 +149,7 @@
      "TokenDataEnd": "blockquote",
      "TextTokenData": "h1",
      "RegExp": "^BTSE Spot API v(\\d){1}.(\\d){1}$",
-     "CheckString": "BTSE Spot API v3.0.2",
+     "CheckString": "BTSE Spot API v3.2.1",
      "Path": "https://www.btse.com/apiexplorer/spot/#btse-spot-api"
     }
    },
@@ -196,7 +196,7 @@
      "TextTokenData": "h2",
      "DateFormat": "2006-01-02",
      "RegExp": "(2\\d{3}-\\d{1,2}-\\d{1,2})",
-     "CheckString": "2020-03-24",
+     "CheckString": "2020-11-25",
      "Path": "https://docs.poloniex.com/#changelog"
     }
    },
@@ -375,7 +375,7 @@
      "Key": "class",
      "Val": "col-md-12",
      "RegExp": "col-md-12([\\s\\S]*?)clearfix",
-     "CheckString": "37a144dc619776b87c098da5a88bef7fed6c8a7cea2d4b9a38c96750726c93ff",
+     "CheckString": "ebe63f6e972caf90ac6a5cc6668647adcf3683c6c5a6d3b4822989a8d2d54d9f",
      "Path": "https://localbitcoins.com/api-docs/"
     }
    },
@@ -407,7 +407,7 @@
      "Val": "./#change-change",
      "TokenDataEnd": "./#change-",
      "RegExp": "./#change-\\d{8}",
-     "CheckString": "20200331",
+     "CheckString": "20201105",
      "Path": "https://www.okex.com/docs/en/#change-change"
     }
    },
@@ -425,7 +425,7 @@
      "TextTokenData": "td",
      "DateFormat": "2006/01/02",
      "RegExp": "^20(\\d){2}/(\\d){2}/(\\d){2}$",
-     "CheckString": "2020/03/05",
+     "CheckString": "2020/10/28",
      "Path": "https://docs.gemini.com/rest-api/#revision-history"
     }
    },
@@ -439,7 +439,6 @@
      "Key": "class",
      "Val": "css-truncate css-truncate-target",
      "TokenDataEnd": "td",
-     "CheckString": "65e8800b5c6800aad896f888b2a62afc-d29c4f140f6ca068db9970054076ba63e51a9e96bf56d570e62cdb573c86b18526296117-1c388b9ec24e52ca4537240db3f48025ec9fca7a",
      "Path": "https://github.com/ftexchange/ftx"
     }
    },
