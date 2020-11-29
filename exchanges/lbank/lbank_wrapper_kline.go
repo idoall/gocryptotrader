@@ -1,14 +1,9 @@
 package lbank
 
-import (
-	"github.com/idoall/gocryptotrader/common"
-	"github.com/idoall/gocryptotrader/exchanges/kline"
-)
-
 // GetKlines  checks and returns a requested kline if it exists
-func (l *Lbank) GetKlines(arg interface{}) ([]*kline.Kline, error) {
+// func (l *Lbank) GetKlines(arg interface{}) ([]*kline.Kline, error) {
 
-	var klines []*kline.Kline
+// 	var klines []*kline.Kline
 
-	return klines, common.ErrFunctionNotSupported
-}
+// 	return klines, common.ErrFunctionNotSupported
+// }

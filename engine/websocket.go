@@ -151,7 +151,7 @@ func (c *WebsocketClient) write() {
 	defer func() {
 		c.Conn.Close()
 	}()
-	for { // nolint: gosimple
+	for { // nolint // ws client write routine loop
 		select {
 		case message, ok := <-c.Send:
 			if !ok {
@@ -317,13 +317,13 @@ func wsSaveConfig(client *WebsocketClient, data interface{}) error {
 		return err
 	}
 
-	SetupExchanges()
+	Bot.SetupExchanges()
 	wsResp.Data = WebsocketResponseSuccess
 	return client.SendWebsocketMessage(wsResp)
 }
 
 func wsGetAccountInfo(client *WebsocketClient, data interface{}) error {
-	accountInfo := GetAllEnabledExchangeAccountInfo()
+	accountInfo := Bot.GetAllEnabledExchangeAccountInfo()
 	wsResp := WebsocketEventResponse{
 		Event: "GetAccountInfo",
 		Data:  accountInfo,
@@ -335,7 +335,7 @@ func wsGetTickers(client *WebsocketClient, data interface{}) error {
 	wsResp := WebsocketEventResponse{
 		Event: "GetTickers",
 	}
-	wsResp.Data = GetAllActiveTickers()
+	wsResp.Data = Bot.GetAllActiveTickers()
 	return client.SendWebsocketMessage(wsResp)
 }
 
@@ -351,9 +351,17 @@ func wsGetTicker(client *WebsocketClient, data interface{}) error {
 		return err
 	}
 
-	result, err := GetSpecificTicker(currency.NewPairFromString(tickerReq.Currency),
-		tickerReq.Exchange, asset.Item(tickerReq.AssetType))
+	p, err := currency.NewPairFromString(tickerReq.Currency)
+	if err != nil {
+		return err
+	}
 
+	a, err := asset.New(tickerReq.AssetType)
+	if err != nil {
+		return err
+	}
+
+	result, err := Bot.GetSpecificTicker(p, tickerReq.Exchange, a)
 	if err != nil {
 		wsResp.Error = err.Error()
 		client.SendWebsocketMessage(wsResp)
@@ -383,9 +391,17 @@ func wsGetOrderbook(client *WebsocketClient, data interface{}) error {
 		return err
 	}
 
-	result, err := GetSpecificOrderbook(currency.NewPairFromString(orderbookReq.Currency),
-		orderbookReq.Exchange, asset.Item(orderbookReq.AssetType))
+	p, err := currency.NewPairFromString(orderbookReq.Currency)
+	if err != nil {
+		return err
+	}
 
+	a, err := asset.New(orderbookReq.AssetType)
+	if err != nil {
+		return err
+	}
+
+	result, err := Bot.GetSpecificOrderbook(p, orderbookReq.Exchange, a)
 	if err != nil {
 		wsResp.Error = err.Error()
 		client.SendWebsocketMessage(wsResp)

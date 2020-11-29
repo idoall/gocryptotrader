@@ -2,6 +2,7 @@ package exchange
 
 import (
 	"sync"
+	"time"
 
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/currency"
@@ -10,8 +11,9 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
+	"github.com/idoall/gocryptotrader/exchanges/stream"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
+	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
@@ -25,23 +27,24 @@ type IBotExchange interface {
 	IsEnabled() bool
 	SetEnabled(bool)
 	ValidateCredentials() error
-	FetchTicker(currency currency.Pair, assetType asset.Item) (*ticker.Price, error)
-	UpdateTicker(currency currency.Pair, assetType asset.Item) (*ticker.Price, error)
-	FetchOrderbook(currency currency.Pair, assetType asset.Item) (*orderbook.Base, error)
-	UpdateOrderbook(currency currency.Pair, assetType asset.Item) (*orderbook.Base, error)
-	FetchTradablePairs(assetType asset.Item) ([]string, error)
+	FetchTicker(p currency.Pair, a asset.Item) (*ticker.Price, error)
+	UpdateTicker(p currency.Pair, a asset.Item) (*ticker.Price, error)
+	FetchOrderbook(p currency.Pair, a asset.Item) (*orderbook.Base, error)
+	UpdateOrderbook(p currency.Pair, a asset.Item) (*orderbook.Base, error)
+	FetchTradablePairs(a asset.Item) ([]string, error)
 	UpdateTradablePairs(forceUpdate bool) error
-	GetEnabledPairs(assetType asset.Item) currency.Pairs
-	GetAvailablePairs(assetType asset.Item) currency.Pairs
+	GetEnabledPairs(a asset.Item) (currency.Pairs, error)
+	GetAvailablePairs(a asset.Item) (currency.Pairs, error)
 	FetchAccountInfo() (account.Holdings, error)
 	UpdateAccountInfo() (account.Holdings, error)
 	GetAuthenticatedAPISupport(endpoint uint8) bool
-	SetPairs(pairs currency.Pairs, assetType asset.Item, enabled bool) error
+	SetPairs(pairs currency.Pairs, a asset.Item, enabled bool) error
 	GetAssetTypes() asset.Items
-	GetExchangeHistory(currencyPair currency.Pair, assetType asset.Item) ([]TradeHistory, error)
+	GetRecentTrades(p currency.Pair, a asset.Item) ([]trade.Data, error)
+	GetHistoricTrades(p currency.Pair, a asset.Item, startTime, endTime time.Time) ([]trade.Data, error)
 	SupportsAutoPairUpdates() bool
 	SupportsRESTTickerBatchUpdates() bool
-	GetFeeByType(feeBuilder *FeeBuilder) (float64, error)
+	GetFeeByType(f *FeeBuilder) (float64, error)
 	GetLastPairsUpdateTime() int64
 	GetWithdrawPermissions() uint32
 	FormatWithdrawPermissions() string
@@ -49,9 +52,10 @@ type IBotExchange interface {
 	GetFundingHistory() ([]FundHistory, error)
 	SubmitOrder(s *order.Submit) (order.SubmitResponse, error)
 	ModifyOrder(action *order.Modify) (string, error)
-	CancelOrder(order *order.Cancel) error
+	CancelOrder(o *order.Cancel) error
+	CancelBatchOrders(o []order.Cancel) (order.CancelBatchResponse, error)
 	CancelAllOrders(orders *order.Cancel) (order.CancelAllResponse, error)
-	GetOrderInfo(orderID string) (order.Detail, error)
+	GetOrderInfo(orderID string, pair currency.Pair, assetType asset.Item) (order.Detail, error)
 	GetDepositAddress(cryptocurrency currency.Code, accountID string) (string, error)
 	GetOrderHistory(getOrdersRequest *order.GetOrdersRequest) ([]order.Detail, error)
 	GetActiveOrders(getOrdersRequest *order.GetOrdersRequest) ([]order.Detail, error)
@@ -61,20 +65,25 @@ type IBotExchange interface {
 	SetHTTPClientUserAgent(ua string)
 	GetHTTPClientUserAgent() string
 	SetClientProxyAddress(addr string) error
-	SupportsWebsocket() bool
 	SupportsREST() bool
-	IsWebsocketEnabled() bool
-	GetWebsocket() (*wshandler.Websocket, error)
-	SubscribeToWebsocketChannels(channels []wshandler.WebsocketChannelSubscription) error
-	UnsubscribeToWebsocketChannels(channels []wshandler.WebsocketChannelSubscription) error
-	AuthenticateWebsocket() error
-	GetSubscriptions() ([]wshandler.WebsocketChannelSubscription, error)
+	GetSubscriptions() ([]stream.ChannelSubscription, error)
 	GetDefaultConfig() (*config.ExchangeConfig, error)
 	GetBase() *Base
 	SupportsAsset(assetType asset.Item) bool
-	GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]Candle, error)
+	GetHistoricCandles(p currency.Pair, a asset.Item, timeStart, timeEnd time.Time, interval kline.Interval) (kline.Item, error)
+	GetHistoricCandlesExtended(p currency.Pair, a asset.Item, timeStart, timeEnd time.Time, interval kline.Interval) (kline.Item, error)
 	DisableRateLimiter() error
 	EnableRateLimiter() error
-	// GetKlines 自定义获取 K 线
-	GetKlines(arg interface{}) ([]*kline.Kline, error)
+
+	// Websocket specific wrapper functionality
+	// GetWebsocket returns a pointer to the websocket
+	GetWebsocket() (*stream.Websocket, error)
+	IsWebsocketEnabled() bool
+	SupportsWebsocket() bool
+	SubscribeToWebsocketChannels(channels []stream.ChannelSubscription) error
+	UnsubscribeToWebsocketChannels(channels []stream.ChannelSubscription) error
+	// FlushWebsocketChannels checks and flushes subscriptions if there is a
+	// pair,asset, url/proxy or subscription change
+	FlushWebsocketChannels() error
+	AuthenticateWebsocket() error
 }

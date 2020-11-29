@@ -1,6 +1,10 @@
 package sharedtestvalues
 
-import "time"
+import (
+	"time"
+
+	"github.com/idoall/gocryptotrader/exchanges/stream"
+)
 
 // This package is only to be referenced in test files
 const (
@@ -12,7 +16,7 @@ const (
 	WebsocketResponseExtendedTimeout = (15 * time.Second)
 	// WebsocketChannelOverrideCapacity used in websocket testing
 	// Defines channel capacity as defaults size can block tests
-	WebsocketChannelOverrideCapacity = 20
+	WebsocketChannelOverrideCapacity = 75
 
 	MockTesting = "Mock testing framework in use for %s exchange @ %s on REST endpoints only"
 	LiveTesting = "Mock testing bypassed; live testing of REST endpoints in use for %s exchange @ %s"
@@ -28,4 +32,18 @@ func GetWebsocketInterfaceChannelOverride() chan interface{} {
 // with the capacity set to WebsocketChannelOverrideCapacity
 func GetWebsocketStructChannelOverride() chan struct{} {
 	return make(chan struct{}, WebsocketChannelOverrideCapacity)
+}
+
+// NewTestWebsocket returns a test websocket object
+func NewTestWebsocket() *stream.Websocket {
+	return &stream.Websocket{
+		Init:              true,
+		DataHandler:       make(chan interface{}, 75),
+		ToRoutine:         make(chan interface{}, 1000),
+		TrafficAlert:      make(chan struct{}),
+		ReadMessageErrors: make(chan error),
+		Subscribe:         make(chan []stream.ChannelSubscription, 10),
+		Unsubscribe:       make(chan []stream.ChannelSubscription, 10),
+		Match:             stream.NewMatch(),
+	}
 }

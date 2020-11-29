@@ -3,9 +3,6 @@ package okcoin
 import (
 	"time"
 
-	"github.com/idoall/gocryptotrader/common"
-	"github.com/idoall/gocryptotrader/currency"
-	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/okgroup"
 )
 
@@ -16,15 +13,10 @@ const (
 	okCoinAPIURL              = "https://www.okcoin.com/" + okCoinAPIPath
 	okCoinAPIVersion          = "/v3/"
 	okCoinExchangeName        = "OKCOIN International"
-	okCoinWebsocketURL        = "wss://real.okcoin.com:10442/ws/v3"
+	okCoinWebsocketURL        = "wss://real.okcoin.com:8443/ws/v3"
 )
 
 // OKCoin bases all methods off okgroup implementation
 type OKCoin struct {
 	okgroup.OKGroup
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (o *OKCoin) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrFunctionNotSupported
 }

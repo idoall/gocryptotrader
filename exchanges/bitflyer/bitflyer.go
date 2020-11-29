@@ -1,13 +1,13 @@
 package bitflyer
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 
-	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/request"
@@ -70,11 +70,6 @@ const (
 // Bitflyer is the overarching type across this package
 type Bitflyer struct {
 	exchange.Base
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (b *Bitflyer) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
 }
 
 // GetLatestBlockCA returns the latest block information from bitflyer chain
@@ -310,7 +305,7 @@ func (b *Bitflyer) GetTradingCommission() {
 
 // SendHTTPRequest sends an unauthenticated request
 func (b *Bitflyer) SendHTTPRequest(path string, result interface{}) error {
-	return b.SendPayload(&request.Item{
+	return b.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -325,7 +320,8 @@ func (b *Bitflyer) SendHTTPRequest(path string, result interface{}) error {
 // if you have access and update the authenticated requests
 // TODO: Fill out this function once API access is obtained
 func (b *Bitflyer) SendAuthHTTPRequest() {
-	// nolint: gocritic headers := make(map[string]string)
+	// nolint:gocritic // code example
+	// headers := make(map[string]string)
 	// headers["ACCESS-KEY"] = b.API.Credentials.Key
 	// headers["ACCESS-TIMESTAMP"] = strconv.FormatInt(time.Now().UnixNano(), 10)
 }

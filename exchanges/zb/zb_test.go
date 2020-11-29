@@ -3,20 +3,21 @@ package zb
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/idoall/gocryptotrader/common"
-	"github.com/idoall/gocryptotrader/config"
+	"github.com/idoall/gocryptotrader/common/convert"
 	"github.com/idoall/gocryptotrader/core"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
+	"github.com/idoall/gocryptotrader/exchanges/stream"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
@@ -25,69 +26,40 @@ const (
 	apiKey                  = ""
 	apiSecret               = ""
 	canManipulateRealOrders = false
+	testCurrency            = "btc_usdt"
 )
 
 var z ZB
 var wsSetupRan bool
 
-func TestMain(m *testing.M) {
-	z.SetDefaults()
-	cfg := config.GetConfig()
-	err := cfg.LoadConfig("../../testdata/configtest.json", true)
-	if err != nil {
-		log.Fatal("ZB load config error", err)
-	}
-	zbConfig, err := cfg.GetExchangeConfig("ZB")
-	if err != nil {
-		log.Fatal("ZB Setup() init error", err)
-	}
-	zbConfig.API.AuthenticatedSupport = true
-	zbConfig.API.AuthenticatedWebsocketSupport = true
-	zbConfig.API.Credentials.Key = apiKey
-	zbConfig.API.Credentials.Secret = apiSecret
-
-	err = z.Setup(zbConfig)
-	if err != nil {
-		log.Fatal("ZB setup error", err)
-	}
-
-	os.Exit(m.Run())
-}
-
 func setupWsAuth(t *testing.T) {
 	if wsSetupRan {
 		return
 	}
-	if !z.Websocket.IsEnabled() && !z.API.AuthenticatedWebsocketSupport || !areTestAPIKeysSet() || !canManipulateRealOrders {
-		t.Skip(wshandler.WebsocketNotEnabled)
-	}
-	z.WebsocketConn = &wshandler.WebsocketConnection{
-		ExchangeName:         z.Name,
-		URL:                  zbWebsocketAPI,
-		Verbose:              z.Verbose,
-		ResponseMaxLimit:     exchange.DefaultWebsocketResponseMaxLimit,
-		ResponseCheckTimeout: exchange.DefaultWebsocketResponseCheckTimeout,
+	if !z.Websocket.IsEnabled() &&
+		!z.API.AuthenticatedWebsocketSupport ||
+		!z.ValidateAPICredentials() ||
+		!canManipulateRealOrders {
+		t.Skip(stream.WebsocketNotEnabled)
 	}
 	var dialer websocket.Dialer
-	err := z.WebsocketConn.Dial(&dialer, http.Header{})
+	err := z.Websocket.Conn.Dial(&dialer, http.Header{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	z.Websocket.DataHandler = make(chan interface{}, 11)
-	z.Websocket.TrafficAlert = make(chan struct{}, 11)
-	go z.WsHandleData()
+	go z.wsReadData()
 	wsSetupRan = true
 }
 
 func TestSpotNewOrder(t *testing.T) {
 	t.Parallel()
 
-	if !z.ValidateAPICredentials() {
+	if !z.ValidateAPICredentials() || !canManipulateRealOrders {
 		t.Skip()
 	}
 
 	arg := SpotNewOrderRequestParams{
-		Symbol: "btc_usdt",
+		Symbol: testCurrency,
 		Type:   SpotNewOrderRequestParamsTypeSell,
 		Amount: 0.01,
 		Price:  10246.1,
@@ -101,11 +73,11 @@ func TestSpotNewOrder(t *testing.T) {
 func TestCancelExistingOrder(t *testing.T) {
 	t.Parallel()
 
-	if !z.ValidateAPICredentials() {
+	if !z.ValidateAPICredentials() || !canManipulateRealOrders {
 		t.Skip()
 	}
 
-	err := z.CancelExistingOrder(20180629145864850, "btc_usdt")
+	err := z.CancelExistingOrder(20180629145864850, testCurrency)
 	if err != nil {
 		t.Errorf("ZB CancelExistingOrder: %s", err)
 	}
@@ -113,7 +85,7 @@ func TestCancelExistingOrder(t *testing.T) {
 
 func TestGetLatestSpotPrice(t *testing.T) {
 	t.Parallel()
-	_, err := z.GetLatestSpotPrice("btc_usdt")
+	_, err := z.GetLatestSpotPrice(testCurrency)
 	if err != nil {
 		t.Errorf("ZB GetLatestSpotPrice: %s", err)
 	}
@@ -121,7 +93,7 @@ func TestGetLatestSpotPrice(t *testing.T) {
 
 func TestGetTicker(t *testing.T) {
 	t.Parallel()
-	_, err := z.GetTicker("btc_usdt")
+	_, err := z.GetTicker(testCurrency)
 	if err != nil {
 		t.Errorf("ZB GetTicker: %s", err)
 	}
@@ -137,7 +109,7 @@ func TestGetTickers(t *testing.T) {
 
 func TestGetOrderbook(t *testing.T) {
 	t.Parallel()
-	_, err := z.GetOrderbook("btc_usdt")
+	_, err := z.GetOrderbook(testCurrency)
 	if err != nil {
 		t.Errorf("ZB GetTicker: %s", err)
 	}
@@ -148,20 +120,6 @@ func TestGetMarkets(t *testing.T) {
 	_, err := z.GetMarkets()
 	if err != nil {
 		t.Errorf("ZB GetMarkets: %s", err)
-	}
-}
-
-func TestGetSpotKline(t *testing.T) {
-	t.Parallel()
-
-	arg := KlinesRequestParams{
-		Symbol: "btc_usdt",
-		Type:   TimeIntervalFiveMinutes,
-		Size:   10,
-	}
-	_, err := z.GetSpotKline(arg)
-	if err != nil {
-		t.Errorf("ZB GetSpotKline: %s", err)
 	}
 }
 
@@ -180,9 +138,10 @@ func setFeeBuilder() *exchange.FeeBuilder {
 
 // TestGetFeeByTypeOfflineTradeFee logic test
 func TestGetFeeByTypeOfflineTradeFee(t *testing.T) {
+	t.Parallel()
 	var feeBuilder = setFeeBuilder()
 	z.GetFeeByType(feeBuilder)
-	if !areTestAPIKeysSet() {
+	if !z.ValidateAPICredentials() {
 		if feeBuilder.FeeType != exchange.OfflineTradeFee {
 			t.Errorf("Expected %v, received %v", exchange.OfflineTradeFee, feeBuilder.FeeType)
 		}
@@ -278,47 +237,52 @@ func TestFormatWithdrawPermissions(t *testing.T) {
 }
 
 func TestGetActiveOrders(t *testing.T) {
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
+	}
 	var getOrdersRequest = order.GetOrdersRequest{
-		OrderType: order.AnyType,
-		Currencies: []currency.Pair{currency.NewPair(currency.XRP,
+		Type: order.AnyType,
+		Pairs: []currency.Pair{currency.NewPair(currency.XRP,
 			currency.USDT)},
 	}
 
 	_, err := z.GetActiveOrders(&getOrdersRequest)
-	if areTestAPIKeysSet() && err != nil {
-		t.Errorf("Could not get open orders: %s", err)
-	} else if !areTestAPIKeysSet() && err == nil {
-		t.Error("Expecting an error when no keys are set")
+	if z.ValidateAPICredentials() && err != nil {
+		t.Error(err)
+	} else if !z.ValidateAPICredentials() && err == nil {
+		t.Error("expecting an error when no keys are set")
 	}
 }
 
 func TestGetOrderHistory(t *testing.T) {
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
+	}
 	var getOrdersRequest = order.GetOrdersRequest{
-		OrderType: order.AnyType,
-		OrderSide: order.Buy,
-		Currencies: []currency.Pair{currency.NewPair(currency.LTC,
+		Type: order.AnyType,
+		Side: order.Buy,
+		Pairs: []currency.Pair{currency.NewPair(currency.LTC,
 			currency.BTC)},
 	}
 
 	_, err := z.GetOrderHistory(&getOrdersRequest)
-	if areTestAPIKeysSet() && err != nil {
-		t.Errorf("Could not get order history: %s", err)
-	} else if !areTestAPIKeysSet() && err == nil {
-		t.Error("Expecting an error when no keys are set")
+	if z.ValidateAPICredentials() && err != nil {
+		t.Error(err)
+	} else if !z.ValidateAPICredentials() && err == nil {
+		t.Error("expecting an error when no keys are set")
 	}
 }
 
 // Any tests below this line have the ability to impact your orders on the exchange. Enable canManipulateRealOrders to run them
 // ----------------------------------------------------------------------------------------------------------------------------
-func areTestAPIKeysSet() bool {
-	return z.ValidateAPICredentials()
-}
 
 func TestSubmitOrder(t *testing.T) {
-	if areTestAPIKeysSet() && !canManipulateRealOrders {
-		t.Skip(fmt.Sprintf("ApiKey: %s. Can place orders: %v",
-			z.API.Credentials.Key,
+	if z.ValidateAPICredentials() && !canManipulateRealOrders {
+		t.Skip(fmt.Sprintf("Can place orders: %v",
 			canManipulateRealOrders))
+	}
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
 	}
 
 	var orderSubmission = &order.Submit{
@@ -327,70 +291,82 @@ func TestSubmitOrder(t *testing.T) {
 			Base:      currency.XRP,
 			Quote:     currency.USDT,
 		},
-		OrderSide: order.Buy,
-		OrderType: order.Limit,
+		Side:      order.Buy,
+		Type:      order.Limit,
 		Price:     1,
 		Amount:    1,
 		ClientID:  "meowOrder",
+		AssetType: asset.Spot,
 	}
 	response, err := z.SubmitOrder(orderSubmission)
-	if areTestAPIKeysSet() && (err != nil || !response.IsOrderPlaced) {
-		t.Errorf("Order failed to be placed: %v", err)
-	} else if !areTestAPIKeysSet() && err == nil {
-		t.Error("Expecting an error when no keys are set")
+	if z.ValidateAPICredentials() && err != nil {
+		t.Error(err)
+	} else if !z.ValidateAPICredentials() && err == nil {
+		t.Error("expecting an error when no keys are set")
+	}
+	if z.ValidateAPICredentials() && response.OrderID == "" {
+		t.Error("expected order id")
 	}
 }
 
 func TestCancelExchangeOrder(t *testing.T) {
-	if areTestAPIKeysSet() && !canManipulateRealOrders {
+	if z.ValidateAPICredentials() && !canManipulateRealOrders {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
+	}
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
 	}
 
 	currencyPair := currency.NewPair(currency.XRP, currency.USDT)
 	var orderCancellation = &order.Cancel{
-		OrderID:       "1",
+		ID:            "1",
 		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
-		CurrencyPair:  currencyPair,
+		Pair:          currencyPair,
+		AssetType:     asset.Spot,
 	}
 
 	err := z.CancelOrder(orderCancellation)
-	if !areTestAPIKeysSet() && err == nil {
-		t.Error("Expecting an error when no keys are set")
-	}
-	if areTestAPIKeysSet() && err != nil {
-		t.Errorf("Could not cancel orders: %v", err)
+	if z.ValidateAPICredentials() && err != nil {
+		t.Error(err)
+	} else if !z.ValidateAPICredentials() && err == nil {
+		t.Error("expecting an error when no keys are set")
 	}
 }
 
 func TestCancelAllExchangeOrders(t *testing.T) {
-	if areTestAPIKeysSet() && !canManipulateRealOrders {
+	if z.ValidateAPICredentials() && !canManipulateRealOrders {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
+	}
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
 	}
 
 	currencyPair := currency.NewPair(currency.XRP, currency.USDT)
 	var orderCancellation = &order.Cancel{
-		OrderID:       "1",
+		ID:            "1",
 		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
-		CurrencyPair:  currencyPair,
+		Pair:          currencyPair,
+		AssetType:     asset.Spot,
 	}
 
 	resp, err := z.CancelAllOrders(orderCancellation)
 
-	if !areTestAPIKeysSet() && err == nil {
-		t.Error("Expecting an error when no keys are set")
+	if z.ValidateAPICredentials() && err != nil {
+		t.Error(err)
+	} else if !z.ValidateAPICredentials() && err == nil {
+		t.Error("expecting an error when no keys are set")
 	}
-	if areTestAPIKeysSet() && err != nil {
-		t.Errorf("Could not cancel orders: %v", err)
-	}
-
 	if len(resp.Status) > 0 {
 		t.Errorf("%v orders failed to cancel", len(resp.Status))
 	}
 }
 
 func TestGetAccountInfo(t *testing.T) {
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
+	}
 	if z.ValidateAPICredentials() {
 		_, err := z.UpdateAccountInfo()
 		if err != nil {
@@ -405,18 +381,28 @@ func TestGetAccountInfo(t *testing.T) {
 }
 
 func TestModifyOrder(t *testing.T) {
-	if areTestAPIKeysSet() && !canManipulateRealOrders {
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
+	}
+	if z.ValidateAPICredentials() && !canManipulateRealOrders {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
-	_, err := z.ModifyOrder(&order.Modify{})
+	_, err := z.ModifyOrder(&order.Modify{AssetType: asset.Spot})
 	if err == nil {
 		t.Error("ModifyOrder() Expected error")
 	}
 }
 
 func TestWithdraw(t *testing.T) {
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
+	}
+	if z.ValidateAPICredentials() && !canManipulateRealOrders {
+		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
+	}
+
 	withdrawCryptoRequest := withdraw.Request{
-		Crypto: &withdraw.CryptoRequest{
+		Crypto: withdraw.CryptoRequest{
 			Address:   core.BitcoinDonationAddress,
 			FeeAmount: 1,
 		},
@@ -425,21 +411,19 @@ func TestWithdraw(t *testing.T) {
 		Description: "WITHDRAW IT ALL",
 	}
 
-	if areTestAPIKeysSet() && !canManipulateRealOrders {
-		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
-	}
-
 	_, err := z.WithdrawCryptocurrencyFunds(&withdrawCryptoRequest)
-	if !areTestAPIKeysSet() && err == nil {
-		t.Error("Expecting an error when no keys are set")
-	}
-	if areTestAPIKeysSet() && err != nil {
-		t.Errorf("Withdraw failed to be placed: %v", err)
+	if z.ValidateAPICredentials() && err != nil {
+		t.Error(err)
+	} else if !z.ValidateAPICredentials() && err == nil {
+		t.Error("expecting an error when no keys are set")
 	}
 }
 
 func TestWithdrawFiat(t *testing.T) {
-	if areTestAPIKeysSet() && !canManipulateRealOrders {
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
+	}
+	if z.ValidateAPICredentials() && !canManipulateRealOrders {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
 
@@ -451,7 +435,10 @@ func TestWithdrawFiat(t *testing.T) {
 }
 
 func TestWithdrawInternationalBank(t *testing.T) {
-	if areTestAPIKeysSet() && !canManipulateRealOrders {
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
+	}
+	if z.ValidateAPICredentials() && !canManipulateRealOrders {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
 
@@ -463,7 +450,10 @@ func TestWithdrawInternationalBank(t *testing.T) {
 }
 
 func TestGetDepositAddress(t *testing.T) {
-	if areTestAPIKeysSet() {
+	if mockTests {
+		t.Skip("skipping authenticated function for mock testing")
+	}
+	if z.ValidateAPICredentials() {
 		_, err := z.GetDepositAddress(currency.BTC, "")
 		if err != nil {
 			t.Error("GetDepositAddress() error PLEASE MAKE SURE YOU CREATE DEPOSIT ADDRESSES VIA ZB.COM",
@@ -513,20 +503,6 @@ func TestWsTransferFunds(t *testing.T) {
 	}
 }
 
-// TestWsCreateSuUserKey ws test
-func TestWsCreateSuUserKey(t *testing.T) {
-	setupWsAuth(t)
-	subUsers, err := z.wsGetSubUserList()
-	if err != nil {
-		t.Fatal(err)
-	}
-	userID := subUsers.Message[0].UserID
-	_, err = z.wsCreateSubUserKey(true, true, true, true, "subu", strconv.FormatInt(userID, 10))
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
 // TestGetSubUserList ws test
 func TestGetSubUserList(t *testing.T) {
 	setupWsAuth(t)
@@ -540,6 +516,23 @@ func TestGetSubUserList(t *testing.T) {
 func TestAddSubUser(t *testing.T) {
 	setupWsAuth(t)
 	_, err := z.wsAddSubUser("1", "123456789101112aA!")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestWsCreateSuUserKey ws test
+func TestWsCreateSuUserKey(t *testing.T) {
+	setupWsAuth(t)
+	subUsers, err := z.wsGetSubUserList()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(subUsers.Message) == 0 {
+		t.Skip("User ID required for test to continue. Create a subuser first")
+	}
+	userID := subUsers.Message[0].UserID
+	_, err = z.wsCreateSubUserKey(true, true, true, true, "subu", strconv.FormatInt(userID, 10))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -596,5 +589,427 @@ func TestWsGetOrdersIgnoreTradeType(t *testing.T) {
 	_, err := z.wsGetOrdersIgnoreTradeType(currency.NewPairWithDelimiter(currency.LTC.String(), currency.BTC.String(), "").Lower(), 1, 1)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestWsMarketConfig(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "code":1000,
+    "data":{
+        "btc_usdt":{
+            "amountScale":4,
+            "priceScale":2
+            },
+        "bcc_usdt":{
+            "amountScale":3,
+            "priceScale":2
+            }
+    },
+    "success":true,
+    "channel":"markets",
+    "message":"操作成功。"
+}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsTicker(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "channel": "ltcbtc_ticker",
+    "date": "1472800466093",
+    "no": "1337",
+    "ticker": {
+        "buy": "3826.94",
+        "high": "3838.22",
+        "last": "3826.94",
+        "low": "3802.0",
+        "sell": "3828.25",
+        "vol": "90151.83"
+    }
+}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsOrderbook(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "asks": [
+        [
+            3846.94,
+            0.659
+        ]
+    ],
+    "bids": [
+        [
+            3826.94,
+            4.843
+        ]
+    ],
+    "channel": "ltcbtc_depth",
+    "no": "1337"
+}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsTrades(t *testing.T) {
+	pressXToJSON := []byte(`{"data":[{"date":1581473835,"amount":"13.620","price":"242.89","trade_type":"bid","type":"buy","tid":703896035},{"date":1581473835,"amount":"0.156","price":"242.89","trade_type":"bid","type":"buy","tid":703896036}],"dataType":"trades","channel":"ethusdt_trades"}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsPlaceOrderJSON(t *testing.T) {
+	pressXToJSON := []byte(`{"message":"操作成功。","no":"1337","data":"{"entrustId":201711133673}","code":1000,"channel":"btcusdt_order","success":true}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsCancelOrderJSON(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "success": true,
+    "code": 1000,
+    "channel": "ltcbtc_cancelorder",
+    "message": "操作成功。",
+    "no": "1337"
+}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsGetOrderJSON(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "success": true,
+    "code": 1000,
+    "data": {
+        "currency": "ltc_btc",
+        "id": "20160902387645980",
+        "price": 100,
+        "status": 0,
+        "total_amount": 0.01,
+        "trade_amount": 0,
+        "trade_date": 1472814905567,
+        "trade_money": 0,
+        "type": 1
+    },
+    "channel": "ltcbtc_getorder",
+    "message": "操作成功。",
+    "no": "1337"
+}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsGetOrdersJSON(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "success": true,
+    "code": 1000,
+    "data": [
+        {
+           "currency": "ltc_btc",
+           "id": "20160901385862136",
+           "price": 3700,
+           "status": 0,
+           "total_amount": 1.845,
+           "trade_amount": 0,
+           "trade_date": 1472706387742,
+           "trade_money": 0,
+           "type": 1
+        }
+    ],
+    "channel": "ltcbtc_getorders",
+    "message": "操作成功。",
+    "no": "1337"
+}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsGetOrderIgnoreTypeJSON(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "success": true,
+    "code": 1000,
+    "data": [
+        {
+            "currency": "ltc_btc",
+            "id": "20160901385862136",
+            "price": 3700,
+            "status": 0,
+            "total_amount": 1.845,
+            "trade_amount": 0,
+            "trade_date": 1472706387742,
+            "trade_money": 0,
+            "type": 1
+        }
+    ],
+    "channel": "ltcbtc_getordersignoretradetype",
+    "message": "操作成功。",
+    "no": "1337"
+}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsGetUserInfo(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "message": "操作成功",
+    "no": "15207605119",
+    "data": {
+        "coins": [
+            {
+                "freez": "1.35828369",
+                "enName": "BTC",
+                "unitDecimal": 8,
+                "cnName": "BTC",
+                "unitTag": "฿",
+                "available": "0.72771906",
+                "key": "btc"
+            },
+            {
+                "freez": "0.011",
+                "enName": "LTC",
+                "unitDecimal": 8,
+                "cnName": "LTC",
+                "unitTag": "Ł",
+                "available": "3.51859814",
+                "key": "ltc"
+            }
+        ],
+        "base": {
+            "username": "15207605119",
+            "trade_password_enabled": true,
+            "auth_google_enabled": true,
+            "auth_mobile_enabled": true
+        }
+    },
+    "code": 1000,
+    "channel": "getaccountinfo",
+    "success": true
+}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsGetSubUsersResponse(t *testing.T) {
+	pressXToJSON := []byte(`{"success": true,"code": 1000,"channel": "getSubUserList","message": "[{"isOpenApi": false,"memo": "1","userName": "15914665280@1","userId": 110980,"isFreez": false}, {"isOpenApi": false,"memo": "2","userName": "15914665280@2","userId": 110984,"isFreez": false}, {"isOpenApi": false,"memo": "test3","userName": "15914665280@3","userId": 111014,"isFreez": false}]","no": "0"}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsCreateSubUserResponse(t *testing.T) {
+	pressXToJSON := []byte(`{
+	"success": true,
+	"code": 1000,
+	"channel": "createSubUserKey",
+	"message": "{"apiKey ":"41 bf75f9 - 525e-4876 - 8257 - b880a938d4d2 ","apiSecret ":"046 b4706fe88b5728991274962d7fc46b4779c0c"}",
+	"no": "1337"
+}`)
+	err := z.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetSpotKline(t *testing.T) {
+	arg := KlinesRequestParams{
+		Symbol: testCurrency,
+		Type:   kline.OneMin.Short() + "in",
+		Size:   int64(z.Features.Enabled.Kline.ResultLimit),
+	}
+	if mockTests {
+		startTime := time.Date(2020, 9, 1, 0, 0, 0, 0, time.UTC)
+		arg.Since = convert.UnixMillis(startTime)
+		arg.Type = "1day"
+	}
+
+	_, err := z.GetSpotKline(arg)
+	if err != nil {
+		t.Errorf("ZB GetSpotKline: %s", err)
+	}
+}
+
+func TestGetHistoricCandles(t *testing.T) {
+	currencyPair, err := currency.NewPairFromString(testCurrency)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	startTime := time.Now().Add(-time.Hour * 1)
+	endTime := time.Now()
+	if mockTests {
+		startTime = time.Date(2020, 9, 1, 0, 0, 0, 0, time.UTC)
+		endTime = time.Date(2020, 9, 2, 0, 0, 0, 0, time.UTC)
+	}
+
+	_, err = z.GetHistoricCandles(currencyPair, asset.Spot, startTime, endTime, kline.OneDay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = z.GetHistoricCandles(currencyPair, asset.Spot, startTime, endTime, kline.Interval(time.Hour*7))
+	if err == nil {
+		t.Fatal("unexpected result")
+	}
+}
+
+func TestGetHistoricCandlesExtended(t *testing.T) {
+	currencyPair, err := currency.NewPairFromString(testCurrency)
+	if err != nil {
+		t.Fatal(err)
+	}
+	startTime := time.Now().Add(-time.Hour * 1)
+	endTime := time.Now()
+	if mockTests {
+		startTime = time.Date(2020, 9, 1, 0, 0, 0, 0, time.UTC)
+		endTime = time.Date(2020, 9, 2, 0, 0, 0, 0, time.UTC)
+	}
+	_, err = z.GetHistoricCandlesExtended(currencyPair, asset.Spot, startTime, endTime, kline.OneDay)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_FormatExchangeKlineInterval(t *testing.T) {
+	testCases := []struct {
+		name     string
+		interval kline.Interval
+		output   string
+	}{
+		{
+			"OneMin",
+			kline.OneMin,
+			"1min",
+		},
+		{
+			"OneHour",
+			kline.OneHour,
+			"1hour",
+		},
+		{
+			"OneDay",
+			kline.OneDay,
+			"1day",
+		},
+		{
+			"ThreeDay",
+			kline.ThreeDay,
+			"3day",
+		},
+		{
+			"OneWeek",
+			kline.OneWeek,
+			"1week",
+		},
+		{
+			"AllOther",
+			kline.FifteenDay,
+			"",
+		},
+	}
+
+	for x := range testCases {
+		test := testCases[x]
+
+		t.Run(test.name, func(t *testing.T) {
+			ret := z.FormatExchangeKlineInterval(test.interval)
+
+			if ret != test.output {
+				t.Fatalf("unexpected result return expected: %v received: %v", test.output, ret)
+			}
+		})
+	}
+}
+
+func TestValidateCandlesRequest(t *testing.T) {
+	_, err := z.validateCandlesRequest(currency.Pair{}, "", time.Time{}, time.Time{}, kline.Interval(-1))
+	if err != nil && err.Error() != "invalid time range supplied. Start: 0001-01-01 00:00:00 +0000 UTC End 0001-01-01 00:00:00 +0000 UTC" {
+		t.Error(err)
+	}
+	_, err = z.validateCandlesRequest(currency.Pair{}, "", time.Date(2020, 1, 1, 1, 1, 1, 1, time.UTC), time.Time{}, kline.Interval(-1))
+	if err != nil && err.Error() != "invalid time range supplied. Start: 2020-01-01 01:01:01.000000001 +0000 UTC End 0001-01-01 00:00:00 +0000 UTC" {
+		t.Error(err)
+	}
+	_, err = z.validateCandlesRequest(currency.Pair{}, asset.Spot, time.Date(2020, 1, 1, 1, 1, 1, 1, time.UTC), time.Date(2020, 1, 1, 1, 1, 1, 3, time.UTC), kline.OneHour)
+	if err != nil && err.Error() != "pair not enabled" {
+		t.Error(err)
+	}
+	var p currency.Pair
+	p, err = currency.NewPairFromString(testCurrency)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var item kline.Item
+	item, err = z.validateCandlesRequest(p, asset.Spot, time.Date(2020, 1, 1, 1, 1, 1, 1, time.UTC), time.Date(2020, 1, 1, 1, 1, 1, 3, time.UTC), kline.OneHour)
+	if err != nil {
+		t.Error(err)
+	}
+	if !item.Pair.Equal(p) {
+		t.Errorf("unexpected result, expected %v, received %v", p, item.Pair)
+	}
+	if item.Asset != asset.Spot {
+		t.Errorf("unexpected result, expected %v, received %v", asset.Spot, item.Asset)
+	}
+	if item.Interval != kline.OneHour {
+		t.Errorf("unexpected result, expected %v, received %v", kline.OneHour, item.Interval)
+	}
+	if item.Exchange != z.Name {
+		t.Errorf("unexpected result, expected %v, received %v", z.Name, item.Exchange)
+	}
+}
+
+func TestGetTrades(t *testing.T) {
+	t.Parallel()
+
+	trades, err := z.GetTrades("btc_usdt")
+	if err != nil {
+		t.Error(err)
+	}
+	if len(trades) == 0 {
+		t.Error("expected results")
+	}
+}
+
+func TestGetRecentTrades(t *testing.T) {
+	t.Parallel()
+
+	currencyPair, err := currency.NewPairFromString("btc_usdt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = z.GetRecentTrades(currencyPair, asset.Spot)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetHistoricTrades(t *testing.T) {
+	t.Parallel()
+	currencyPair, err := currency.NewPairFromString("btc_usdt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = z.GetHistoricTrades(currencyPair, asset.Spot, time.Now().Add(-time.Minute*15), time.Now())
+	if err != nil && err != common.ErrFunctionNotSupported {
+		t.Error(err)
 	}
 }

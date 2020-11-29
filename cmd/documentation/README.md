@@ -14,7 +14,7 @@ This documentation package is part of the GoCryptoTrader codebase.
 
 ## This is still in active development
 
-You can track ideas, planned features and what's in progresss on this Trello board: [https://trello.com/b/ZAhMhpOy/gocryptotrader](https://trello.com/b/ZAhMhpOy/gocryptotrader).
+You can track ideas, planned features and what's in progress on this Trello board: [https://trello.com/b/ZAhMhpOy/gocryptotrader](https://trello.com/b/ZAhMhpOy/gocryptotrader).
 
 Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader Slack](https://join.slack.com/t/gocryptotrader/shared_invite/enQtNTQ5NDAxMjA2Mjc5LTc5ZDE1ZTNiOGM3ZGMyMmY1NTAxYWZhODE0MWM5N2JlZDk1NDU0YTViYzk4NTk3OTRiMDQzNGQ1YTc4YmRlMTk)
 
@@ -22,7 +22,7 @@ Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader 
 
 #### This tool allows for the generation of new documentation through templating
 
-From the `gocryptotrader/cmd/documentation/` folder, using the go command: **go run documentation.go** this will auto-generate and regenerate documentation  across the **GoCryptoTrader** code base.
+From the `gocryptotrader/cmd/documentation/` folder, using the go command: **go run documentation.go** this will auto-generate and regenerate documentation across the **GoCryptoTrader** code base.
 >Using the -v command will, ie **go run documentation.go -v** put the tool into verbose mode allowing you to see what is happening with a little more depth.
 
 Be aware, this tool will:
@@ -36,19 +36,19 @@ Be aware, this tool will:
 
 ```json
 {
-"githubRepo": "https://api.github.com/repos/idoall/gocryptotrader", This is your current repo
-"exclusionList": { This allows for excluded directories and files
-"Files": null,
-"Directories": [
-"_templates",
-".git",
-"web"
-]
-},
-"rootReadmeActive": true, allows a root directory README.md
-"licenseFileActive": true, allows for a license file to be generated
-"contributorFileActive": true, fetches a new contributor list
-"referencePathToRepo": "../../"
+ "githubRepo": "https://api.github.com/repos/idoall/gocryptotrader", This is your current repo
+ "exclusionList": { This allows for excluded directories and files
+  "Files": null,
+  "Directories": [
+   "_templates",
+   ".git",
+   "web"
+  ]
+ },
+ "rootReadmeActive": true, allows a root directory README.md
+ "licenseFileActive": true, allows for a license file to be generated
+ "contributorFileActive": true, fetches a new contributor list
+ "referencePathToRepo": "../../"
 }
 ```
 ### Template example

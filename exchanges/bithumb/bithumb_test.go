@@ -4,14 +4,16 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/core"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
-	"github.com/idoall/gocryptotrader/portfolio/banking"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
@@ -86,6 +88,25 @@ func TestGetTransactionHistory(t *testing.T) {
 	_, err := b.GetTransactionHistory(testCurrency)
 	if err != nil {
 		t.Error("Bithumb GetTransactionHistory() error", err)
+	}
+}
+
+func TestGetAccountInformation(t *testing.T) {
+	t.Parallel()
+
+	// Offline test
+	_, err := b.GetAccountInformation("", "")
+	if err == nil {
+		t.Error("expected error when no order currency is specified")
+	}
+
+	if !areTestAPIKeysSet() {
+		t.Skip()
+	}
+
+	_, err = b.GetAccountInformation(testCurrency, currency.KRW.String())
+	if err != nil {
+		t.Error(err)
 	}
 }
 
@@ -204,6 +225,20 @@ func TestMarketSellOrder(t *testing.T) {
 	}
 }
 
+func TestUpdateTicker(t *testing.T) {
+	cp := currency.NewPair(currency.QTUM, currency.KRW)
+	_, err := b.UpdateTicker(cp, asset.Spot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cp = currency.NewPair(currency.DASH, currency.KRW)
+	_, err = b.UpdateTicker(cp, asset.Spot)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func setFeeBuilder() *exchange.FeeBuilder {
 	return &exchange.FeeBuilder{
 		Amount:        1,
@@ -308,8 +343,8 @@ func TestFormatWithdrawPermissions(t *testing.T) {
 func TestGetActiveOrders(t *testing.T) {
 	t.Parallel()
 	var getOrdersRequest = order.GetOrdersRequest{
-		OrderType: order.AnyType,
-		OrderSide: order.Sell,
+		Type: order.AnyType,
+		Side: order.Sell,
 	}
 
 	_, err := b.GetActiveOrders(&getOrdersRequest)
@@ -323,7 +358,7 @@ func TestGetActiveOrders(t *testing.T) {
 func TestGetOrderHistory(t *testing.T) {
 	t.Parallel()
 	var getOrdersRequest = order.GetOrdersRequest{
-		OrderType: order.AnyType,
+		Type: order.AnyType,
 	}
 
 	_, err := b.GetOrderHistory(&getOrdersRequest)
@@ -351,11 +386,12 @@ func TestSubmitOrder(t *testing.T) {
 			Base:  currency.BTC,
 			Quote: currency.LTC,
 		},
-		OrderSide: order.Buy,
-		OrderType: order.Limit,
+		Side:      order.Buy,
+		Type:      order.Limit,
 		Price:     1,
 		Amount:    1,
 		ClientID:  "meowOrder",
+		AssetType: asset.Spot,
 	}
 	response, err := b.SubmitOrder(orderSubmission)
 	if areTestAPIKeysSet() && (err != nil || !response.IsOrderPlaced) {
@@ -373,10 +409,11 @@ func TestCancelExchangeOrder(t *testing.T) {
 
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = &order.Cancel{
-		OrderID:       "1",
+		ID:            "1",
 		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
-		CurrencyPair:  currencyPair,
+		Pair:          currencyPair,
+		AssetType:     asset.Spot,
 	}
 
 	err := b.CancelOrder(orderCancellation)
@@ -396,10 +433,11 @@ func TestCancelAllExchangeOrders(t *testing.T) {
 
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = &order.Cancel{
-		OrderID:       "1",
+		ID:            "1",
 		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
-		CurrencyPair:  currencyPair,
+		Pair:          currencyPair,
+		AssetType:     asset.Spot,
 	}
 
 	resp, err := b.CancelAllOrders(orderCancellation)
@@ -433,13 +471,18 @@ func TestGetAccountInfo(t *testing.T) {
 
 func TestModifyOrder(t *testing.T) {
 	t.Parallel()
-	curr := currency.NewPairFromString("BTCUSD")
-	_, err := b.ModifyOrder(&order.Modify{
-		OrderID:      "1337",
-		Price:        100,
-		Amount:       1000,
-		Side:         order.Sell,
-		CurrencyPair: curr})
+	curr, err := currency.NewPairFromString("BTCUSD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = b.ModifyOrder(&order.Modify{
+		ID:        "1337",
+		Price:     100,
+		Amount:    1000,
+		Side:      order.Sell,
+		Pair:      curr,
+		AssetType: asset.Spot,
+	})
 	if err == nil {
 		t.Error("ModifyOrder() Expected error")
 	}
@@ -455,7 +498,7 @@ func TestWithdraw(t *testing.T) {
 		Amount:      -1,
 		Currency:    currency.BTC,
 		Description: "WITHDRAW IT ALL",
-		Crypto: &withdraw.CryptoRequest{
+		Crypto: withdraw.CryptoRequest{
 			Address: core.BitcoinDonationAddress,
 		},
 	}
@@ -476,8 +519,7 @@ func TestWithdrawFiat(t *testing.T) {
 	}
 
 	var withdrawFiatRequest = withdraw.Request{
-		Fiat: &withdraw.FiatRequest{
-			Bank:                     &banking.Account{},
+		Fiat: withdraw.FiatRequest{
 			WireCurrency:             currency.KRW.String(),
 			RequiresIntermediaryBank: false,
 			IsExpressWire:            false,
@@ -521,5 +563,60 @@ func TestGetDepositAddress(t *testing.T) {
 		if err == nil {
 			t.Error("GetDepositAddress() error cannot be nil")
 		}
+	}
+}
+
+func TestGetCandleStick(t *testing.T) {
+	_, err := b.GetCandleStick("BTC_KRW", "1m")
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetHistoricCandles(t *testing.T) {
+	currencyPair, err := currency.NewPairFromString("BTCKRW")
+	if err != nil {
+		t.Fatal(err)
+	}
+	startTime := time.Now().Add(-time.Hour * 24)
+	_, err = b.GetHistoricCandles(currencyPair, asset.Spot, startTime, time.Now(), kline.OneDay)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetHistoricCandlesExtended(t *testing.T) {
+	currencyPair, err := currency.NewPairFromString("BTCKRW")
+	if err != nil {
+		t.Fatal(err)
+	}
+	startTime := time.Now().Add(-time.Hour * 24)
+	_, err = b.GetHistoricCandlesExtended(currencyPair, asset.Spot, startTime, time.Now(), kline.OneDay)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetRecentTrades(t *testing.T) {
+	t.Parallel()
+	currencyPair, err := currency.NewPairFromString("BTC_KRW")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = b.GetRecentTrades(currencyPair, asset.Spot)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetHistoricTrades(t *testing.T) {
+	t.Parallel()
+	currencyPair, err := currency.NewPairFromString("BTC_KRW")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = b.GetHistoricTrades(currencyPair, asset.Spot, time.Now().Add(-time.Minute*15), time.Now())
+	if err != nil && err != common.ErrFunctionNotSupported {
+		t.Error(err)
 	}
 }

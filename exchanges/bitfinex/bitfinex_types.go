@@ -1,5 +1,11 @@
 package bitfinex
 
+import (
+	"time"
+
+	"github.com/idoall/gocryptotrader/exchanges/order"
+)
+
 // AcceptedOrderType defines the accepted market types, exchange strings denote
 // non-contract order types.
 var AcceptedOrderType = []string{"market", "limit", "stop", "trailing-stop",
@@ -69,6 +75,7 @@ type Trade struct {
 	Rate      float64
 	Period    int64
 	Type      string
+	Side      order.Side
 }
 
 // Lendbook holds most recent funding data for a relevant currency
@@ -308,7 +315,7 @@ type MovementHistory struct {
 type TradeHistory struct {
 	Price       float64 `json:"price,string"`
 	Amount      float64 `json:"amount,string"`
-	Timestamp   string  `json:"timestamp"`
+	Timestamp   int64   `json:"timestamp"`
 	Exchange    string  `json:"exchange"`
 	Type        string  `json:"type"`
 	FeeCurrency string  `json:"fee_currency"`
@@ -367,9 +374,11 @@ type WebsocketChanInfo struct {
 
 // WebsocketBook holds booking information
 type WebsocketBook struct {
-	Price  float64
 	ID     int64
+	Price  float64
 	Amount float64
+	Rate   float64
+	Period int64
 }
 
 // WebsocketTrade holds trade information
@@ -386,12 +395,29 @@ type WebsocketTrade struct {
 
 // Candle holds OHLC data
 type Candle struct {
-	Timestamp int64
+	Timestamp time.Time
 	Open      float64
 	Close     float64
 	High      float64
 	Low       float64
 	Volume    float64
+}
+
+// Leaderboard keys
+const (
+	LeaderboardUnrealisedProfitPeriodDelta = "plu_diff"
+	LeaderboardUnrealisedProfitInception   = "plu"
+	LeaderboardVolume                      = "vol"
+	LeaderbookRealisedProfit               = "plr"
+)
+
+// LeaderboardEntry holds leaderboard data
+type LeaderboardEntry struct {
+	Timestamp     time.Time
+	Username      string
+	Ranking       int
+	Value         float64
+	TwitterHandle string
 }
 
 // WebsocketTicker holds ticker information
@@ -438,7 +464,7 @@ type WebsocketOrder struct {
 	Status     string
 	Price      float64
 	PriceAvg   float64
-	Timestamp  string
+	Timestamp  int64
 	Notify     int
 }
 
@@ -507,13 +533,21 @@ const (
 	wsBalanceUpdate                        = "bu"
 	wsMarginInfoUpdate                     = "miu"
 	wsNotification                         = "n"
+	wsOrderSnapshot                        = "os"
 	wsOrderNew                             = "on"
 	wsOrderUpdate                          = "ou"
 	wsOrderCancel                          = "oc"
+	wsRequest                              = "-req"
+	wsOrderNewRequest                      = wsOrderNew + wsRequest
+	wsOrderUpdateRequest                   = wsOrderUpdate + wsRequest
+	wsOrderCancelRequest                   = wsOrderCancel + wsRequest
 	wsFundingOrderSnapshot                 = "fos"
 	wsFundingOrderNew                      = "fon"
 	wsFundingOrderUpdate                   = "fou"
 	wsFundingOrderCancel                   = "foc"
+	wsFundingOrderNewRequest               = wsFundingOrderNew + wsRequest
+	wsFundingOrderUpdateRequest            = wsFundingOrderUpdate + wsRequest
+	wsFundingOrderCancelRequest            = wsFundingOrderCancel + wsRequest
 	wsCancelMultipleOrders                 = "oc_multi"
 	wsBook                                 = "book"
 	wsCandles                              = "candles"
@@ -534,22 +568,22 @@ type WsAuthRequest struct {
 
 // WsFundingOffer funding offer received via websocket
 type WsFundingOffer struct {
-	ID         int64
-	Symbol     string
-	Created    int64
-	Updated    int64
-	Amount     float64
-	AmountOrig float64
-	Type       string
-	Flags      interface{}
-	Status     string
-	Rate       float64
-	Period     int64
-	Notify     bool
-	Hidden     bool
-	Insure     bool
-	Renew      bool
-	RateReal   float64
+	ID             int64
+	Symbol         string
+	Created        int64
+	Updated        int64
+	Amount         float64
+	OriginalAmount float64
+	Type           string
+	Flags          interface{}
+	Status         string
+	Rate           float64
+	Period         int64
+	Notify         bool
+	Hidden         bool
+	Insure         bool
+	Renew          bool
+	RateReal       float64
 }
 
 // WsCredit credit details received via websocket

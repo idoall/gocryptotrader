@@ -1,6 +1,7 @@
 package gateio
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,13 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/convert"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
@@ -35,6 +35,7 @@ const (
 	gateioTradeHistory    = "private/tradeHistory"
 	gateioDepositAddress  = "private/depositAddress"
 	gateioTicker          = "ticker"
+	gateioTrades          = "tradeHistory"
 	gateioTickers         = "tickers"
 	gateioOrderbook       = "orderBook"
 
@@ -43,13 +44,7 @@ const (
 
 // Gateio is the overarching type across this package
 type Gateio struct {
-	WebsocketConn *wshandler.WebsocketConnection
 	exchange.Base
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (g *Gateio) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
 }
 
 // GetSymbols returns all supported symbols
@@ -127,6 +122,17 @@ func (g *Gateio) GetTickers() (map[string]TickerResponse, error) {
 	return resp, nil
 }
 
+// GetTrades returns trades for symbols
+func (g *Gateio) GetTrades(symbol string) (TradeHistory, error) {
+	urlPath := fmt.Sprintf("%s/%s/%s/%s", g.API.Endpoints.URLSecondary, gateioAPIVersion, gateioTrades, symbol)
+	var resp TradeHistory
+	err := g.SendHTTPRequest(urlPath, &resp)
+	if err != nil {
+		return TradeHistory{}, err
+	}
+	return resp, nil
+}
+
 // GetOrderbook returns the orderbook data for a suppled symbol
 func (g *Gateio) GetOrderbook(symbol string) (Orderbook, error) {
 	urlPath := fmt.Sprintf("%s/%s/%s/%s", g.API.Endpoints.URLSecondary, gateioAPIVersion, gateioOrderbook, symbol)
@@ -189,8 +195,8 @@ func (g *Gateio) GetOrderbook(symbol string) (Orderbook, error) {
 }
 
 // GetSpotKline returns kline data for the most recent time period
-func (g *Gateio) GetSpotKline(arg KlinesRequestParams) ([]*KLineResponse, error) {
-	urlPath := fmt.Sprintf("%s/%s/%s/%s?group_sec=%d&range_hour=%d",
+func (g *Gateio) GetSpotKline(arg KlinesRequestParams) (kline.Item, error) {
+	urlPath := fmt.Sprintf("%s/%s/%s/%s?group_sec=%s&range_hour=%d",
 		g.API.Endpoints.URLSecondary,
 		gateioAPIVersion,
 		gateioKline,
@@ -201,58 +207,59 @@ func (g *Gateio) GetSpotKline(arg KlinesRequestParams) ([]*KLineResponse, error)
 	var rawKlines map[string]interface{}
 	err := g.SendHTTPRequest(urlPath, &rawKlines)
 	if err != nil {
-		return nil, err
+		return kline.Item{}, err
 	}
 
-	var result []*KLineResponse
+	result := kline.Item{
+		Exchange: g.Name,
+	}
+
 	if rawKlines == nil || rawKlines["data"] == nil {
-		return nil, fmt.Errorf("rawKlines is nil. Err: %s", err)
+		return kline.Item{}, errors.New("rawKlines is nil")
 	}
 
 	rawKlineDatasString, _ := json.Marshal(rawKlines["data"].([]interface{}))
 	var rawKlineDatas [][]interface{}
 	if err := json.Unmarshal(rawKlineDatasString, &rawKlineDatas); err != nil {
-		return nil, fmt.Errorf("rawKlines unmarshal failed. Err: %s", err)
+		return kline.Item{}, fmt.Errorf("rawKlines unmarshal failed. Err: %s", err)
 	}
 
 	for _, k := range rawKlineDatas {
-		otString, _ := strconv.ParseFloat(k[0].(string), 64)
+		otString, err := strconv.ParseFloat(k[0].(string), 64)
+		if err != nil {
+			return kline.Item{}, err
+		}
 		ot, err := convert.TimeFromUnixTimestampFloat(otString)
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse Kline.OpenTime. Err: %s", err)
+			return kline.Item{}, fmt.Errorf("cannot parse Kline.OpenTime. Err: %s", err)
 		}
 		_vol, err := convert.FloatFromString(k[1])
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse Kline.Volume. Err: %s", err)
-		}
-		_id, err := convert.FloatFromString(k[0])
-		if err != nil {
-			return nil, fmt.Errorf("cannot parse Kline.Id. Err: %s", err)
+			return kline.Item{}, fmt.Errorf("cannot parse Kline.Volume. Err: %s", err)
 		}
 		_close, err := convert.FloatFromString(k[2])
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse Kline.Close. Err: %s", err)
+			return kline.Item{}, fmt.Errorf("cannot parse Kline.Close. Err: %s", err)
 		}
 		_high, err := convert.FloatFromString(k[3])
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse Kline.High. Err: %s", err)
+			return kline.Item{}, fmt.Errorf("cannot parse Kline.High. Err: %s", err)
 		}
 		_low, err := convert.FloatFromString(k[4])
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse Kline.Low. Err: %s", err)
+			return kline.Item{}, fmt.Errorf("cannot parse Kline.Low. Err: %s", err)
 		}
 		_open, err := convert.FloatFromString(k[5])
 		if err != nil {
-			return nil, fmt.Errorf("cannot parse Kline.Open. Err: %s", err)
+			return kline.Item{}, fmt.Errorf("cannot parse Kline.Open. Err: %s", err)
 		}
-		result = append(result, &KLineResponse{
-			ID:        _id,
-			KlineTime: ot,
-			Volume:    _vol,
-			Close:     _close,
-			High:      _high,
-			Low:       _low,
-			Open:      _open,
+		result.Candles = append(result.Candles, kline.Candle{
+			Time:   ot,
+			Volume: _vol,
+			Close:  _close,
+			High:   _high,
+			Low:    _low,
+			Open:   _open,
 		})
 	}
 	return result, nil
@@ -310,7 +317,7 @@ func (g *Gateio) CancelExistingOrder(orderID int64, symbol string) (bool, error)
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (g *Gateio) SendHTTPRequest(path string, result interface{}) error {
-	return g.SendPayload(&request.Item{
+	return g.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -409,7 +416,7 @@ func (g *Gateio) SendAuthenticatedHTTPRequest(method, endpoint, param string, re
 	urlPath := fmt.Sprintf("%s/%s/%s", g.API.Endpoints.URL, gateioAPIVersion, endpoint)
 
 	var intermidiary json.RawMessage
-	err := g.SendPayload(&request.Item{
+	err := g.SendPayload(context.Background(), &request.Item{
 		Method:        method,
 		Path:          urlPath,
 		Headers:       headers,

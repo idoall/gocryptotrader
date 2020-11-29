@@ -1,13 +1,19 @@
 package testhelpers
 
 import (
+	"database/sql"
 	"os"
+	"path/filepath"
 	"reflect"
 
 	"github.com/idoall/gocryptotrader/database"
 	"github.com/idoall/gocryptotrader/database/drivers"
 	psqlConn "github.com/idoall/gocryptotrader/database/drivers/postgres"
 	sqliteConn "github.com/idoall/gocryptotrader/database/drivers/sqlite3"
+	"github.com/idoall/gocryptotrader/database/repository"
+	"github.com/idoall/gocryptotrader/log"
+	"github.com/thrasher-corp/goose"
+	"github.com/thrasher-corp/sqlboiler/boil"
 )
 
 var (
@@ -15,6 +21,8 @@ var (
 	TempDir string
 	// PostgresTestDatabase postgresql database config details
 	PostgresTestDatabase *database.Config
+	// MigrationDir default folder for migration's
+	MigrationDir = filepath.Join("..", "..", "migrations")
 )
 
 // GetConnectionDetails returns connection details for CI or test db instances
@@ -66,9 +74,8 @@ func GetConnectionDetails() *database.Config {
 }
 
 // ConnectToDatabase opens connection to database and returns pointer to instance of database.DB
-func ConnectToDatabase(conn *database.Config) (dbConn *database.Db, err error) {
+func ConnectToDatabase(conn *database.Config) (dbConn *database.Instance, err error) {
 	database.DB.Config = conn
-
 	if conn.Driver == database.DBPostgreSQL {
 		dbConn, err = psqlConn.Connect()
 		if err != nil {
@@ -77,17 +84,21 @@ func ConnectToDatabase(conn *database.Config) (dbConn *database.Db, err error) {
 	} else if conn.Driver == database.DBSQLite3 || conn.Driver == database.DBSQLite {
 		database.DB.DataPath = TempDir
 		dbConn, err = sqliteConn.Connect()
-
 		if err != nil {
 			return nil, err
 		}
 	}
-	database.DB.Connected = true
+
+	err = migrateDB(database.DB.SQL)
+	if err != nil {
+		return nil, err
+	}
+
 	return
 }
 
 // CloseDatabase closes database connection
-func CloseDatabase(conn *database.Db) (err error) {
+func CloseDatabase(conn *database.Instance) (err error) {
 	if conn != nil {
 		return conn.SQL.Close()
 	}
@@ -97,4 +108,21 @@ func CloseDatabase(conn *database.Db) (err error) {
 // CheckValidConfig checks if database connection details are empty
 func CheckValidConfig(config *drivers.ConnectionDetails) bool {
 	return !reflect.DeepEqual(drivers.ConnectionDetails{}, *config)
+}
+
+func migrateDB(db *sql.DB) error {
+	return goose.Run("up", db, repository.GetSQLDialect(), MigrationDir, "")
+}
+
+// EnableVerboseTestOutput enables debug output for SQL queries
+func EnableVerboseTestOutput() {
+	c := log.GenDefaultSettings()
+	log.RWM.Lock()
+	log.GlobalLogConfig = &c
+	log.RWM.Unlock()
+	log.SetupGlobalLogger()
+
+	DBLogger := database.Logger{}
+	boil.DebugMode = true
+	boil.DebugWriter = DBLogger
 }

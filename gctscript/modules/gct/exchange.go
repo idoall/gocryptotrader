@@ -2,12 +2,15 @@ package gct
 
 import (
 	"fmt"
-	"strings"
+	"time"
 
 	objects "github.com/d5/tengo/v2"
+	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
+	"github.com/idoall/gocryptotrader/gctscript/modules/ta/indicators"
 	"github.com/idoall/gocryptotrader/gctscript/wrappers"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
@@ -24,6 +27,7 @@ var exchangeModule = map[string]objects.Object{
 	"ordersubmit":    &objects.UserFunction{Name: "ordersubmit", Value: ExchangeOrderSubmit},
 	"withdrawcrypto": &objects.UserFunction{Name: "withdrawcrypto", Value: ExchangeWithdrawCrypto},
 	"withdrawfiat":   &objects.UserFunction{Name: "withdrawfiat", Value: ExchangeWithdrawFiat},
+	"ohlcv":          &objects.UserFunction{Name: "ohlcv", Value: exchangeOHLCV},
 }
 
 // ExchangeOrderbook returns orderbook for requested exchange & currencypair
@@ -49,10 +53,17 @@ func ExchangeOrderbook(args ...objects.Object) (objects.Object, error) {
 		return nil, fmt.Errorf(ErrParameterConvertFailed, assetTypeParam)
 	}
 
-	pairs := currency.NewPairDelimiter(currencyPair, delimiter)
-	assetType := asset.Item(assetTypeParam)
+	pair, err := currency.NewPairDelimiter(currencyPair, delimiter)
+	if err != nil {
+		return nil, err
+	}
 
-	ob, err := wrappers.GetWrapper().Orderbook(exchangeName, pairs, assetType)
+	assetType, err := asset.New(assetTypeParam)
+	if err != nil {
+		return nil, err
+	}
+
+	ob, err := wrappers.GetWrapper().Orderbook(exchangeName, pair, assetType)
 	if err != nil {
 		return nil, err
 	}
@@ -108,10 +119,17 @@ func ExchangeTicker(args ...objects.Object) (objects.Object, error) {
 		return nil, fmt.Errorf(ErrParameterConvertFailed, assetTypeParam)
 	}
 
-	pairs := currency.NewPairDelimiter(currencyPair, delimiter)
-	assetType := asset.Item(assetTypeParam)
+	pair, err := currency.NewPairDelimiter(currencyPair, delimiter)
+	if err != nil {
+		return nil, err
+	}
 
-	tx, err := wrappers.GetWrapper().Ticker(exchangeName, pairs, assetType)
+	assetType, err := asset.New(assetTypeParam)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := wrappers.GetWrapper().Ticker(exchangeName, pair, assetType)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +193,10 @@ func ExchangePairs(args ...objects.Object) (objects.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf(ErrParameterConvertFailed, assetTypeParam)
 	}
-	assetType := asset.Item(strings.ToLower(assetTypeParam))
+	assetType, err := asset.New(assetTypeParam)
+	if err != nil {
+		return nil, err
+	}
 
 	rtnValue, err := wrappers.GetWrapper().Pairs(exchangeName, enabledOnly, assetType)
 	if err != nil {
@@ -183,8 +204,9 @@ func ExchangePairs(args ...objects.Object) (objects.Object, error) {
 	}
 
 	r := objects.Array{}
-	for x := range rtnValue.Slice() {
-		r.Value = append(r.Value, &objects.String{Value: rtnValue.Slice()[x].String()})
+	pairs := *(*[]currency.Pair)(rtnValue)
+	for x := range pairs {
+		r.Value = append(r.Value, &objects.String{Value: pairs[x].String()})
 	}
 	return &r, nil
 }
@@ -226,7 +248,7 @@ func ExchangeAccountInfo(args ...objects.Object) (objects.Object, error) {
 
 // ExchangeOrderQuery query order on exchange
 func ExchangeOrderQuery(args ...objects.Object) (objects.Object, error) {
-	if len(args) != 2 {
+	if len(args) < 2 {
 		return nil, objects.ErrWrongNumArguments
 	}
 
@@ -238,7 +260,36 @@ func ExchangeOrderQuery(args ...objects.Object) (objects.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf(ErrParameterConvertFailed, orderID)
 	}
-	orderDetails, err := wrappers.GetWrapper().QueryOrder(exchangeName, orderID)
+
+	var pair currency.Pair
+	assetTypeString := asset.Spot.String()
+
+	switch len(args) {
+	case 4:
+		assetTypeString, ok = objects.ToString(args[3])
+		if !ok {
+			return nil, fmt.Errorf(ErrParameterConvertFailed, assetTypeString)
+		}
+		fallthrough
+	case 3:
+		currencyPairString, isOk := objects.ToString(args[2])
+		if !isOk {
+			return nil, fmt.Errorf(ErrParameterConvertFailed, currencyPairString)
+		}
+
+		var err error
+		pair, err = currency.NewPairFromString(currencyPairString)
+		if err != nil {
+			return nil, fmt.Errorf(ErrParameterConvertFailed, currencyPairString)
+		}
+	}
+
+	assetType, err := asset.New(assetTypeString)
+	if err != nil {
+		return nil, err
+	}
+
+	orderDetails, err := wrappers.GetWrapper().QueryOrder(exchangeName, orderID, pair, assetType)
 	if err != nil {
 		return nil, err
 	}
@@ -260,15 +311,15 @@ func ExchangeOrderQuery(args ...objects.Object) (objects.Object, error) {
 	data["exchange"] = &objects.String{Value: orderDetails.Exchange}
 	data["id"] = &objects.String{Value: orderDetails.ID}
 	data["accountid"] = &objects.String{Value: orderDetails.AccountID}
-	data["currencypair"] = &objects.String{Value: orderDetails.CurrencyPair.String()}
+	data["currencypair"] = &objects.String{Value: orderDetails.Pair.String()}
 	data["price"] = &objects.Float{Value: orderDetails.Price}
 	data["amount"] = &objects.Float{Value: orderDetails.Amount}
 	data["amountexecuted"] = &objects.Float{Value: orderDetails.ExecutedAmount}
 	data["amountremaining"] = &objects.Float{Value: orderDetails.RemainingAmount}
 	data["fee"] = &objects.Float{Value: orderDetails.Fee}
-	data["side"] = &objects.String{Value: orderDetails.OrderSide.String()}
-	data["type"] = &objects.String{Value: orderDetails.OrderType.String()}
-	data["date"] = &objects.String{Value: orderDetails.OrderDate.String()}
+	data["side"] = &objects.String{Value: orderDetails.Side.String()}
+	data["type"] = &objects.String{Value: orderDetails.Type.String()}
+	data["date"] = &objects.String{Value: orderDetails.Date.String()}
 	data["status"] = &objects.String{Value: orderDetails.Status.String()}
 	data["trades"] = &tradeHistory
 
@@ -279,7 +330,7 @@ func ExchangeOrderQuery(args ...objects.Object) (objects.Object, error) {
 
 // ExchangeOrderCancel cancels order on requested exchange
 func ExchangeOrderCancel(args ...objects.Object) (objects.Object, error) {
-	if len(args) != 2 {
+	if len(args) < 2 || len(args) > 4 {
 		return nil, objects.ErrWrongNumArguments
 	}
 
@@ -287,17 +338,50 @@ func ExchangeOrderCancel(args ...objects.Object) (objects.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf(ErrParameterConvertFailed, exchangeName)
 	}
-	orderID, ok := objects.ToString(args[1])
+	if exchangeName == "" {
+		return nil, fmt.Errorf(ErrEmptyParameter, "exchange name")
+	}
+	var orderID string
+	orderID, ok = objects.ToString(args[1])
 	if !ok {
 		return nil, fmt.Errorf(ErrParameterConvertFailed, orderID)
 	}
+	if orderID == "" {
+		return nil, fmt.Errorf(ErrEmptyParameter, "orderID")
+	}
+	var err error
+	var cp currency.Pair
+	if len(args) > 2 {
+		var currencyPair string
+		currencyPair, ok = objects.ToString(args[2])
+		if !ok {
+			return nil, fmt.Errorf(ErrParameterConvertFailed, currencyPair)
+		}
+		cp, err = currency.NewPairFromString(currencyPair)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var a asset.Item
+	if len(args) > 3 {
+		var assetType string
+		assetType, ok = objects.ToString(args[3])
+		if !ok {
+			return nil, fmt.Errorf(ErrParameterConvertFailed, assetType)
+		}
+		a, err = asset.New(assetType)
+		if err != nil {
+			return nil, err
+		}
+	}
 
-	rtn, err := wrappers.GetWrapper().CancelOrder(exchangeName, orderID)
+	var isCancelled bool
+	isCancelled, err = wrappers.GetWrapper().CancelOrder(exchangeName, orderID, cp, a)
 	if err != nil {
 		return nil, err
 	}
 
-	if rtn {
+	if isCancelled {
 		return objects.TrueValue, nil
 	}
 	return objects.FalseValue, nil
@@ -305,7 +389,7 @@ func ExchangeOrderCancel(args ...objects.Object) (objects.Object, error) {
 
 // ExchangeOrderSubmit submit order on exchange
 func ExchangeOrderSubmit(args ...objects.Object) (objects.Object, error) {
-	if len(args) != 8 {
+	if len(args) != 9 {
 		return nil, objects.ErrWrongNumArguments
 	}
 
@@ -320,6 +404,10 @@ func ExchangeOrderSubmit(args ...objects.Object) (objects.Object, error) {
 	delimiter, ok := objects.ToString(args[2])
 	if !ok {
 		return nil, fmt.Errorf(ErrParameterConvertFailed, delimiter)
+	}
+	pair, err := currency.NewPairDelimiter(currencyPair, delimiter)
+	if err != nil {
+		return nil, err
 	}
 	orderType, ok := objects.ToString(args[3])
 	if !ok {
@@ -341,23 +429,27 @@ func ExchangeOrderSubmit(args ...objects.Object) (objects.Object, error) {
 	if !ok {
 		return nil, fmt.Errorf(ErrParameterConvertFailed, orderClientID)
 	}
-	pair := currency.NewPairDelimiter(currencyPair, delimiter)
-
-	tempSubmit := &order.Submit{
-		Pair:      pair,
-		OrderType: order.Type(orderType),
-		OrderSide: order.Side(orderSide),
-		Price:     orderPrice,
-		Amount:    orderAmount,
-		ClientID:  orderClientID,
+	assetType, ok := objects.ToString(args[8])
+	if !ok {
+		return nil, fmt.Errorf(ErrParameterConvertFailed, orderClientID)
 	}
-
-	err := tempSubmit.Validate()
+	a, err := asset.New(assetType)
 	if err != nil {
 		return nil, err
 	}
 
-	rtn, err := wrappers.GetWrapper().SubmitOrder(exchangeName, tempSubmit)
+	tempSubmit := &order.Submit{
+		Pair:      pair,
+		Type:      order.Type(orderType),
+		Side:      order.Side(orderSide),
+		Price:     orderPrice,
+		Amount:    orderAmount,
+		ClientID:  orderClientID,
+		AssetType: a,
+		Exchange:  exchangeName,
+	}
+
+	rtn, err := wrappers.GetWrapper().SubmitOrder(tempSubmit)
 	if err != nil {
 		return nil, err
 	}
@@ -436,7 +528,8 @@ func ExchangeWithdrawCrypto(args ...objects.Object) (objects.Object, error) {
 	}
 
 	withdrawRequest := &withdraw.Request{
-		Crypto: &withdraw.CryptoRequest{
+		Exchange: exchangeName,
+		Crypto: withdraw.CryptoRequest{
 			Address:    address,
 			AddressTag: addressTag,
 			FeeAmount:  feeAmount,
@@ -446,7 +539,7 @@ func ExchangeWithdrawCrypto(args ...objects.Object) (objects.Object, error) {
 		Amount:      amount,
 	}
 
-	rtn, err := wrappers.GetWrapper().WithdrawalCryptoFunds(exchangeName, withdrawRequest)
+	rtn, err := wrappers.GetWrapper().WithdrawalCryptoFunds(withdrawRequest)
 	if err != nil {
 		return nil, err
 	}
@@ -482,15 +575,122 @@ func ExchangeWithdrawFiat(args ...objects.Object) (objects.Object, error) {
 	}
 
 	withdrawRequest := &withdraw.Request{
+		Exchange:    exchangeName,
 		Currency:    currency.NewCode(cur),
 		Description: description,
 		Amount:      amount,
 	}
 
-	rtn, err := wrappers.GetWrapper().WithdrawalFiatFunds(exchangeName, bankAccountID, withdrawRequest)
+	rtn, err := wrappers.GetWrapper().WithdrawalFiatFunds(bankAccountID, withdrawRequest)
 	if err != nil {
 		return nil, err
 	}
 
 	return &objects.String{Value: rtn}, nil
+}
+
+// OHLCV defines a custom Open High Low Close Volume tengo object
+type OHLCV struct {
+	objects.Map
+}
+
+// TypeName returns the name of the custom type.
+func (o *OHLCV) TypeName() string {
+	return indicators.OHLCV
+}
+
+func exchangeOHLCV(args ...objects.Object) (objects.Object, error) {
+	if len(args) != 7 {
+		return nil, objects.ErrWrongNumArguments
+	}
+
+	exchangeName, ok := objects.ToString(args[0])
+	if !ok {
+		return nil, fmt.Errorf(ErrParameterConvertFailed, exchangeName)
+	}
+	currencyPair, ok := objects.ToString(args[1])
+	if !ok {
+		return nil, fmt.Errorf(ErrParameterConvertFailed, currencyPair)
+	}
+	delimiter, ok := objects.ToString(args[2])
+	if !ok {
+		return nil, fmt.Errorf(ErrParameterConvertFailed, delimiter)
+	}
+	assetTypeParam, ok := objects.ToString(args[3])
+	if !ok {
+		return nil, fmt.Errorf(ErrParameterConvertFailed, assetTypeParam)
+	}
+
+	startTime, ok := objects.ToTime(args[4])
+	if !ok {
+		return nil, fmt.Errorf(ErrParameterConvertFailed, startTime)
+	}
+
+	endTime, ok := objects.ToTime(args[5])
+	if !ok {
+		return nil, fmt.Errorf(ErrParameterConvertFailed, endTime)
+	}
+
+	intervalStr, ok := objects.ToString(args[6])
+	if !ok {
+		return nil, fmt.Errorf(ErrParameterConvertFailed, endTime)
+	}
+	interval, err := parseInterval(intervalStr)
+	if err != nil {
+		return nil, err
+	}
+	pair, err := currency.NewPairDelimiter(currencyPair, delimiter)
+	if err != nil {
+		return nil, err
+	}
+	assetType, err := asset.New(assetTypeParam)
+	if err != nil {
+		return nil, err
+	}
+
+	ret, err := wrappers.GetWrapper().OHLCV(exchangeName, pair, assetType, startTime, endTime, kline.Interval(interval))
+	if err != nil {
+		return nil, err
+	}
+
+	var candles objects.Array
+	for x := range ret.Candles {
+		candle := &objects.Array{}
+		candle.Value = append(candle.Value, &objects.Int{Value: ret.Candles[x].Time.Unix()},
+			&objects.Float{Value: ret.Candles[x].Open},
+			&objects.Float{Value: ret.Candles[x].High},
+			&objects.Float{Value: ret.Candles[x].Low},
+			&objects.Float{Value: ret.Candles[x].Close},
+			&objects.Float{Value: ret.Candles[x].Volume},
+		)
+
+		candles.Value = append(candles.Value, candle)
+	}
+
+	retValue := make(map[string]objects.Object, 5)
+	retValue["exchange"] = &objects.String{Value: ret.Exchange}
+	retValue["pair"] = &objects.String{Value: ret.Pair.String()}
+	retValue["asset"] = &objects.String{Value: ret.Asset.String()}
+	retValue["intervals"] = &objects.String{Value: ret.Interval.String()}
+	retValue["candles"] = &candles
+
+	c := new(OHLCV)
+	c.Value = retValue
+	return c, nil
+}
+
+// parseInterval will parse the interval param of indictors that have them and convert to time.Duration
+func parseInterval(in string) (time.Duration, error) {
+	if !common.StringDataContainsInsensitive(supportedDurations, in) {
+		return time.Nanosecond, errInvalidInterval
+	}
+	switch in {
+	case "1d":
+		in = "24h"
+	case "3d":
+		in = "72h"
+	case "1w":
+		in = "168h"
+	}
+	return time.ParseDuration(in)
 }

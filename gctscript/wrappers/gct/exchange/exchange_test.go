@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/engine"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 )
 
@@ -58,8 +60,8 @@ func TestExchange_Exchanges(t *testing.T) {
 	t.Parallel()
 	x := exchangeTest.Exchanges(false)
 	y := len(x)
-	if y != 27 {
-		t.Fatalf("expected 27 received %v", y)
+	if y != 28 {
+		t.Fatalf("expected 28 received %v", y)
 	}
 }
 
@@ -89,8 +91,11 @@ func TestExchange_IsEnabled(t *testing.T) {
 
 func TestExchange_Ticker(t *testing.T) {
 	t.Parallel()
-	c := currency.NewPairDelimiter(pairs, delimiter)
-	_, err := exchangeTest.Ticker(exchName, c, assetType)
+	c, err := currency.NewPairDelimiter(pairs, delimiter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = exchangeTest.Ticker(exchName, c, assetType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,8 +103,11 @@ func TestExchange_Ticker(t *testing.T) {
 
 func TestExchange_Orderbook(t *testing.T) {
 	t.Parallel()
-	c := currency.NewPairDelimiter(pairs, delimiter)
-	_, err := exchangeTest.Orderbook(exchName, c, assetType)
+	c, err := currency.NewPairDelimiter(pairs, delimiter)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = exchangeTest.Orderbook(exchName, c, assetType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +139,8 @@ func TestExchange_QueryOrder(t *testing.T) {
 	if !configureExchangeKeys() {
 		t.Skip("no exchange configured test skipped")
 	}
-	_, err := exchangeTest.QueryOrder(exchName, orderID)
+	t.Parallel()
+	_, err := exchangeTest.QueryOrder(exchName, orderID, currency.Pair{}, assetType)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,17 +150,25 @@ func TestExchange_SubmitOrder(t *testing.T) {
 	if !configureExchangeKeys() {
 		t.Skip("no exchange configured test skipped")
 	}
+
+	t.Parallel()
+	c, err := currency.NewPairDelimiter(pairs, delimiter)
+	if err != nil {
+		t.Fatal(err)
+	}
 	tempOrder := &order.Submit{
-		Pair:         currency.NewPairDelimiter(pairs, delimiter),
-		OrderType:    orderType,
-		OrderSide:    orderSide,
+		Pair:         c,
+		Type:         orderType,
+		Side:         orderSide,
 		TriggerPrice: 0,
 		TargetAmount: 0,
 		Price:        orderPrice,
 		Amount:       orderAmount,
 		ClientID:     orderClientID,
+		Exchange:     exchName,
+		AssetType:    asset.Spot,
 	}
-	_, err := exchangeTest.SubmitOrder(exchName, tempOrder)
+	_, err = exchangeTest.SubmitOrder(tempOrder)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,18 +178,35 @@ func TestExchange_CancelOrder(t *testing.T) {
 	if !configureExchangeKeys() {
 		t.Skip("no exchange configured test skipped")
 	}
-	_, err := exchangeTest.CancelOrder(exchName, orderID)
+	t.Parallel()
+	cp := currency.NewPair(currency.BTC, currency.USD)
+	a := asset.Spot
+	_, err := exchangeTest.CancelOrder(exchName, orderID, cp, a)
 	if err != nil {
 		t.Fatal(err)
 	}
 }
 
+func TestOHLCV(t *testing.T) {
+	t.Parallel()
+	cp := currency.NewPair(currency.BTC, currency.AUD)
+	cp.Delimiter = currency.DashDelimiter
+	calvinKline, err := exchangeTest.OHLCV(exchName, cp, assetType, time.Now().Add(-time.Hour*24).UTC(), time.Now().UTC(), kline.OneHour)
+	if err != nil {
+		t.Error(err)
+	}
+	if calvinKline.Exchange != exchName {
+		t.Error("unexpected response")
+	}
+}
+
 func setupEngine() (err error) {
-	engine.Bot, err = engine.NewFromSettings(&settings)
+	engine.Bot, err = engine.NewFromSettings(&settings, nil)
 	if err != nil {
 		return err
 	}
-	return engine.Bot.Start()
+
+	return engine.Bot.LoadExchange(exchName, false, nil)
 }
 
 func cleanup() {
@@ -183,7 +217,7 @@ func cleanup() {
 }
 
 func configureExchangeKeys() bool {
-	ex := engine.GetExchangeByName(exchName).GetBase()
+	ex := engine.Bot.GetExchangeByName(exchName).GetBase()
 	ex.SetAPIKeys(exchAPIKEY, exchAPISECRET, exchClientID)
 	ex.SkipAuthCheck = true
 	return ex.ValidateAPICredentials()

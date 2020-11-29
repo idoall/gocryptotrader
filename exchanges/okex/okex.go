@@ -2,8 +2,6 @@ package okex
 
 import (
 	"fmt"
-	"github.com/idoall/gocryptotrader/currency"
-	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"net/http"
 	"time"
 
@@ -48,11 +46,6 @@ type OKEX struct {
 	okgroup.OKGroup
 }
 
-//GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (o *OKEX) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrFunctionNotSupported
-}
-
 // GetFuturesPostions Get the information of all holding positions in futures trading.
 // Due to high energy consumption, you are advised to capture data with the "Futures Account of a Currency" API instead.
 func (o *OKEX) GetFuturesPostions() (resp okgroup.GetFuturesPositionsResponse, _ error) {
@@ -69,12 +62,12 @@ func (o *OKEX) GetFuturesPostionsForCurrency(instrumentID string) (resp okgroup.
 // Due to high energy consumption, you are advised to capture data with the "Futures Account of a Currency" API instead.
 func (o *OKEX) GetFuturesAccountOfAllCurrencies() (resp okgroup.FuturesAccountForAllCurrenciesResponse, _ error) {
 	var result map[string]map[string]okgroup.FuturesCurrencyData
-	if err := o.SendHTTPRequest(http.MethodGet, okGroupFuturesSubsection, okgroup.OKGroupAccounts, nil, &result, true);err!=nil{
-		return resp,err
+	if err := o.SendHTTPRequest(http.MethodGet, okGroupFuturesSubsection, okgroup.OKGroupAccounts, nil, &result, true); err != nil {
+		return resp, err
 	}
 	resp = okgroup.FuturesAccountForAllCurrenciesResponse{}
 	resp.Info.Currency = make(map[string]okgroup.FuturesCurrencyData)
-	for k,v := range result["info"] {
+	for k, v := range result["info"] {
 		fcd := okgroup.FuturesCurrencyData{}
 		fcd.Equity = v.Equity
 		fcd.Margin = v.Margin
@@ -183,13 +176,7 @@ func (o *OKEX) GetFuturesTokenInfoForCurrency(instrumentID string) (resp okgroup
 // The whole book will be returned for one request. Websocket is recommended here.
 func (o *OKEX) GetFuturesFilledOrder(request okgroup.GetFuturesFilledOrderRequest) (resp []okgroup.GetFuturesFilledOrdersResponse, _ error) {
 	requestURL := fmt.Sprintf("%v/%v/%v%v", okgroup.OKGroupInstruments, request.InstrumentID, okgroup.OKGroupTrades, okgroup.FormatParameters(request))
-	return resp, o.SendHTTPRequest(http.MethodGet, okGroupFuturesSubsection, requestURL, nil, &resp, true)
-}
-
-// GetFuturesMarketData Get the charts of the trading pairs. Charts are returned in grouped buckets based on requested granularity.
-func (o *OKEX) GetFuturesMarketData(request okgroup.GetFuturesMarketDateRequest) (resp okgroup.GetFuturesMarketDataResponse, _ error) {
-	requestURL := fmt.Sprintf("%v/%v/%v%v", okgroup.OKGroupInstruments, request.InstrumentID, okgroup.OKGroupGetSpotMarketData, okgroup.FormatParameters(request))
-	return resp, o.SendHTTPRequest(http.MethodGet, okGroupFuturesSubsection, requestURL, nil, &resp, true)
+	return resp, o.SendHTTPRequest(http.MethodGet, okGroupFuturesSubsection, requestURL, nil, &resp, false)
 }
 
 // GetFuturesHoldAmount Get the number of futures with hold.
@@ -351,12 +338,6 @@ func (o *OKEX) GetSwapTokensInformationForCurrency(instrumentID string) (resp ok
 // GetSwapFilledOrdersData Get details of the recent filled orders
 func (o *OKEX) GetSwapFilledOrdersData(request *okgroup.GetSwapFilledOrdersDataRequest) (resp []okgroup.GetSwapFilledOrdersDataResponse, _ error) {
 	requestURL := fmt.Sprintf("%v/%v/%v%v", okgroup.OKGroupInstruments, request.InstrumentID, okgroup.OKGroupTrades, okgroup.FormatParameters(request))
-	return resp, o.SendHTTPRequest(http.MethodGet, okGroupSwapSubsection, requestURL, nil, &resp, false)
-}
-
-// GetSwapMarketData Get the charts of the trading pairs.
-func (o *OKEX) GetSwapMarketData(request okgroup.GetSwapMarketDataRequest) (resp []okgroup.GetSwapMarketDataResponse, _ error) {
-	requestURL := fmt.Sprintf("%v/%v/%v%v", okgroup.OKGroupInstruments, request.InstrumentID, okgroup.OKGroupGetSpotMarketData, okgroup.FormatParameters(request))
 	return resp, o.SendHTTPRequest(http.MethodGet, okGroupSwapSubsection, requestURL, nil, &resp, false)
 }
 

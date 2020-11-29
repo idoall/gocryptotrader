@@ -13,10 +13,6 @@ const (
 	testExchange = "Bitstamp"
 )
 
-var (
-	configLoaded = false
-)
-
 func addValidEvent() (int64, error) {
 	return Add(testExchange,
 		ItemPrice,
@@ -27,10 +23,7 @@ func addValidEvent() (int64, error) {
 }
 
 func TestAdd(t *testing.T) {
-	if !configLoaded {
-		loadConfig(t)
-	}
-
+	SetupTestHelpers(t)
 	_, err := Add("", "", EventConditionParams{}, currency.Pair{}, "", "")
 	if err == nil {
 		t.Error("should err on invalid params")
@@ -52,10 +45,7 @@ func TestAdd(t *testing.T) {
 }
 
 func TestRemove(t *testing.T) {
-	if !configLoaded {
-		loadConfig(t)
-	}
-
+	SetupTestHelpers(t)
 	id, err := addValidEvent()
 	if err != nil {
 		t.Error("unexpected result", err)
@@ -71,10 +61,7 @@ func TestRemove(t *testing.T) {
 }
 
 func TestGetEventCounter(t *testing.T) {
-	if !configLoaded {
-		loadConfig(t)
-	}
-
+	SetupTestHelpers(t)
 	_, err := addValidEvent()
 	if err != nil {
 		t.Error("unexpected result", err)
@@ -137,7 +124,6 @@ func TestProcessTicker(t *testing.T) {
 	if Bot == nil {
 		Bot = new(Engine)
 	}
-	Bot.Settings.Verbose = true
 
 	e := Event{
 		Exchange: testExchange,
@@ -151,10 +137,11 @@ func TestProcessTicker(t *testing.T) {
 
 	// now populate it with a 0 entry
 	tick := ticker.Price{
-		Pair: currency.NewPair(currency.BTC, currency.USD),
-		Last: 0,
+		Pair:         currency.NewPair(currency.BTC, currency.USD),
+		ExchangeName: e.Exchange,
+		AssetType:    e.Asset,
 	}
-	if err := ticker.ProcessTicker(e.Exchange, &tick, e.Asset); err != nil {
+	if err := ticker.ProcessTicker(&tick); err != nil {
 		t.Fatal("unexpected result:", err)
 	}
 	if r := e.processTicker(); r {
@@ -163,7 +150,7 @@ func TestProcessTicker(t *testing.T) {
 
 	// now populate it with a number > 0
 	tick.Last = 1337
-	if err := ticker.ProcessTicker(e.Exchange, &tick, e.Asset); err != nil {
+	if err := ticker.ProcessTicker(&tick); err != nil {
 		t.Fatal("unexpected result:", err)
 	}
 	if r := e.processTicker(); !r {
@@ -203,7 +190,6 @@ func TestProcessOrderbook(t *testing.T) {
 	if Bot == nil {
 		Bot = new(Engine)
 	}
-	Bot.Settings.Verbose = true
 
 	e := Event{
 		Exchange: testExchange,
@@ -238,7 +224,6 @@ func TestCheckEventCondition(t *testing.T) {
 	if Bot == nil {
 		Bot = new(Engine)
 	}
-	Bot.Settings.Verbose = true
 
 	e := Event{
 		Item: ItemPrice,
@@ -254,10 +239,7 @@ func TestCheckEventCondition(t *testing.T) {
 }
 
 func TestIsValidEvent(t *testing.T) {
-	if !configLoaded {
-		loadConfig(t)
-	}
-
+	SetupTestHelpers(t)
 	// invalid exchange name
 	if err := IsValidEvent("meow", "", EventConditionParams{}, ""); err != errExchangeDisabled {
 		t.Error("unexpected result:", err)
@@ -308,9 +290,7 @@ func TestIsValidExchange(t *testing.T) {
 	if s := IsValidExchange("invalidexchangerino"); s {
 		t.Error("unexpected result")
 	}
-	if !configLoaded {
-		loadConfig(t)
-	}
+	SetupTestHelpers(t)
 	if s := IsValidExchange(testExchange); !s {
 		t.Error("unexpected result")
 	}

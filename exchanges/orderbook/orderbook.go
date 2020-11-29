@@ -31,12 +31,12 @@ func SubscribeOrderbook(exchange string, p currency.Pair, a asset.Item) (dispatc
 	defer service.RUnlock()
 	book, ok := service.Books[exchange][p.Base.Item][p.Quote.Item][a]
 	if !ok {
-		return dispatch.Pipe{}, fmt.Errorf("orderbook item not found for %s %s %s",
-			exchange,
-			p,
-			a)
+		return dispatch.Pipe{},
+			fmt.Errorf("orderbook item not found for %s %s %s",
+				exchange,
+				p,
+				a)
 	}
-
 	return service.mux.Subscribe(book.Main)
 }
 
@@ -50,65 +50,46 @@ func SubscribeToExchangeOrderbooks(exchange string) (dispatch.Pipe, error) {
 		return dispatch.Pipe{}, fmt.Errorf("%s exchange orderbooks not found",
 			exchange)
 	}
-
 	return service.mux.Subscribe(id)
 }
 
 // Update stores orderbook data
 func (s *Service) Update(b *Base) error {
-	var ids []uuid.UUID
-
+	name := strings.ToLower(b.ExchangeName)
 	s.Lock()
-	switch {
-	case s.Books[b.ExchangeName] == nil:
-		s.Books[b.ExchangeName] = make(map[*currency.Item]map[*currency.Item]map[asset.Item]*Book)
-		s.Books[b.ExchangeName][b.Pair.Base.Item] = make(map[*currency.Item]map[asset.Item]*Book)
-		s.Books[b.ExchangeName][b.Pair.Base.Item][b.Pair.Quote.Item] = make(map[asset.Item]*Book)
-		err := s.SetNewData(b)
-		if err != nil {
-			s.Unlock()
-			return err
-		}
-
-	case s.Books[b.ExchangeName][b.Pair.Base.Item] == nil:
-		s.Books[b.ExchangeName][b.Pair.Base.Item] = make(map[*currency.Item]map[asset.Item]*Book)
-		s.Books[b.ExchangeName][b.Pair.Base.Item][b.Pair.Quote.Item] = make(map[asset.Item]*Book)
-		err := s.SetNewData(b)
-		if err != nil {
-			s.Unlock()
-			return err
-		}
-
-	case s.Books[b.ExchangeName][b.Pair.Base.Item][b.Pair.Quote.Item] == nil:
-		s.Books[b.ExchangeName][b.Pair.Base.Item][b.Pair.Quote.Item] = make(map[asset.Item]*Book)
-		err := s.SetNewData(b)
-		if err != nil {
-			s.Unlock()
-			return err
-		}
-
-	case s.Books[b.ExchangeName][b.Pair.Base.Item][b.Pair.Quote.Item][b.AssetType] == nil:
-		err := s.SetNewData(b)
-		if err != nil {
-			s.Unlock()
-			return err
-		}
-
-	default:
-		book := s.Books[b.ExchangeName][b.Pair.Base.Item][b.Pair.Quote.Item][b.AssetType]
+	book, ok := s.Books[name][b.Pair.Base.Item][b.Pair.Quote.Item][b.AssetType]
+	if ok {
 		book.b.Bids = b.Bids
 		book.b.Asks = b.Asks
 		book.b.LastUpdated = b.LastUpdated
-		ids = book.Assoc
-		ids = append(ids, book.Main)
+		ids := append(book.Assoc, book.Main)
+		s.Unlock()
+		return s.mux.Publish(ids, b)
+	}
+
+	switch {
+	case s.Books[name] == nil:
+		s.Books[name] = make(map[*currency.Item]map[*currency.Item]map[asset.Item]*Book)
+		fallthrough
+	case s.Books[name][b.Pair.Base.Item] == nil:
+		s.Books[name][b.Pair.Base.Item] = make(map[*currency.Item]map[asset.Item]*Book)
+		fallthrough
+	case s.Books[name][b.Pair.Base.Item][b.Pair.Quote.Item] == nil:
+		s.Books[name][b.Pair.Base.Item][b.Pair.Quote.Item] = make(map[asset.Item]*Book)
+	}
+
+	err := s.SetNewData(b, name)
+	if err != nil {
+		s.Unlock()
+		return err
 	}
 	s.Unlock()
-	return s.mux.Publish(ids, b)
+	return nil
 }
 
 // SetNewData sets new data
-func (s *Service) SetNewData(b *Base) error {
-	ids, err := s.GetAssociations(b)
+func (s *Service) SetNewData(b *Base, fmtName string) error {
+	ids, err := s.GetAssociations(b, fmtName)
 	if err != nil {
 		return err
 	}
@@ -126,7 +107,7 @@ func (s *Service) SetNewData(b *Base) error {
 	cpyBook.Asks = make([]Item, len(b.Asks))
 	copy(cpyBook.Asks, b.Asks)
 
-	s.Books[b.ExchangeName][b.Pair.Base.Item][b.Pair.Quote.Item][b.AssetType] = &Book{
+	s.Books[fmtName][b.Pair.Base.Item][b.Pair.Quote.Item][b.AssetType] = &Book{
 		b:     &cpyBook,
 		Main:  singleID,
 		Assoc: ids}
@@ -134,20 +115,20 @@ func (s *Service) SetNewData(b *Base) error {
 }
 
 // GetAssociations links a singular book with it's dispatch associations
-func (s *Service) GetAssociations(b *Base) ([]uuid.UUID, error) {
+func (s *Service) GetAssociations(b *Base, fmtName string) ([]uuid.UUID, error) {
 	if b == nil {
 		return nil, errors.New("orderbook is nil")
 	}
 
 	var ids []uuid.UUID
-	exchangeID, ok := s.Exchange[b.ExchangeName]
+	exchangeID, ok := s.Exchange[fmtName]
 	if !ok {
 		var err error
 		exchangeID, err = s.mux.GetID()
 		if err != nil {
 			return nil, err
 		}
-		s.Exchange[b.ExchangeName] = exchangeID
+		s.Exchange[fmtName] = exchangeID
 	}
 
 	ids = append(ids, exchangeID)
@@ -159,26 +140,43 @@ func (s *Service) Retrieve(exchange string, p currency.Pair, a asset.Item) (*Bas
 	exchange = strings.ToLower(exchange)
 	s.RLock()
 	defer s.RUnlock()
-	if s.Books[exchange] == nil {
+	if _, ok := s.Books[exchange]; !ok {
 		return nil, fmt.Errorf("no orderbooks for %s exchange", exchange)
 	}
 
-	if s.Books[exchange][p.Base.Item] == nil {
+	if _, ok := s.Books[exchange][p.Base.Item]; !ok {
 		return nil, fmt.Errorf("no orderbooks associated with base currency %s",
 			p.Base)
 	}
 
-	if s.Books[exchange][p.Base.Item][p.Quote.Item] == nil {
+	if _, ok := s.Books[exchange][p.Base.Item][p.Quote.Item]; !ok {
 		return nil, fmt.Errorf("no orderbooks associated with quote currency %s",
 			p.Quote)
 	}
 
-	if s.Books[exchange][p.Base.Item][p.Quote.Item][a] == nil {
+	var liveOrderBook *Book
+	var ok bool
+	if liveOrderBook, ok = s.Books[exchange][p.Base.Item][p.Quote.Item][a]; !ok {
 		return nil, fmt.Errorf("no orderbooks associated with asset type %s",
 			a)
 	}
 
-	return s.Books[exchange][p.Base.Item][p.Quote.Item][a].b, nil
+	localCopyOfAsks := make([]Item, len(s.Books[exchange][p.Base.Item][p.Quote.Item][a].b.Asks))
+	localCopyOfBids := make([]Item, len(s.Books[exchange][p.Base.Item][p.Quote.Item][a].b.Bids))
+	copy(localCopyOfBids, liveOrderBook.b.Bids)
+	copy(localCopyOfAsks, liveOrderBook.b.Asks)
+
+	ob := Base{
+		Pair:         liveOrderBook.b.Pair,
+		Bids:         localCopyOfBids,
+		Asks:         localCopyOfAsks,
+		LastUpdated:  liveOrderBook.b.LastUpdated,
+		LastUpdateID: liveOrderBook.b.LastUpdateID,
+		AssetType:    liveOrderBook.b.AssetType,
+		ExchangeName: liveOrderBook.b.ExchangeName,
+	}
+
+	return &ob, nil
 }
 
 // TotalBidsAmount returns the total amount of bids and the total orderbook
@@ -246,8 +244,6 @@ func (b *Base) Process() error {
 	if b.ExchangeName == "" {
 		return errors.New(errExchangeNameUnset)
 	}
-
-	b.ExchangeName = strings.ToLower(b.ExchangeName)
 
 	if b.Pair.IsEmpty() {
 		return errors.New(errPairNotSet)

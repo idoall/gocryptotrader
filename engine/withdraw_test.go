@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	exchangeName  = "BTC Markets"
 	bankAccountID = "test-bank-01"
 )
 
@@ -30,14 +29,6 @@ var (
 	}
 )
 
-func setupEngine() (err error) {
-	Bot, err = NewFromSettings(&settings)
-	if err != nil {
-		return err
-	}
-	return Bot.Start()
-}
-
 func cleanup() {
 	err := os.RemoveAll(settings.DataDir)
 	if err != nil {
@@ -46,11 +37,7 @@ func cleanup() {
 }
 
 func TestSubmitWithdrawal(t *testing.T) {
-	err := setupEngine()
-	if err != nil {
-		t.Fatal(err)
-	}
-
+	SetupTestHelpers(t)
 	banking.Accounts = append(banking.Accounts,
 		banking.Account{
 			Enabled:             true,
@@ -66,7 +53,7 @@ func TestSubmitWithdrawal(t *testing.T) {
 			SWIFTCode:           "91272837",
 			IBAN:                "98218738671897",
 			SupportedCurrencies: "AUD,USD",
-			SupportedExchanges:  exchangeName,
+			SupportedExchanges:  testExchange,
 		},
 	)
 
@@ -75,22 +62,22 @@ func TestSubmitWithdrawal(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := &withdraw.Request{
-		Exchange:    exchangeName,
+		Exchange:    testExchange,
 		Currency:    currency.AUD,
-		Description: exchangeName,
+		Description: testExchange,
 		Amount:      1.0,
 		Type:        1,
-		Fiat: &withdraw.FiatRequest{
-			Bank: bank,
+		Fiat: withdraw.FiatRequest{
+			Bank: *bank,
 		},
 	}
 
-	_, err = SubmitWithdrawal(exchangeName, req)
+	_, err = SubmitWithdrawal(req)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	_, err = SubmitWithdrawal(exchangeName, nil)
+	_, err = SubmitWithdrawal(nil)
 	if err != nil {
 		if err.Error() != withdraw.ErrRequestCannotBeNil.Error() {
 			t.Fatal(err)
@@ -122,21 +109,21 @@ func TestWithdrawEventByID(t *testing.T) {
 }
 
 func TestWithdrawalEventByExchange(t *testing.T) {
-	_, err := WithdrawalEventByExchange(exchangeName, 1)
+	_, err := WithdrawalEventByExchange(testExchange, 1)
 	if err == nil {
 		t.Fatal(err)
 	}
 }
 
 func TestWithdrawEventByDate(t *testing.T) {
-	_, err := WithdrawEventByDate(exchangeName, time.Now(), time.Now(), 1)
+	_, err := WithdrawEventByDate(testExchange, time.Now(), time.Now(), 1)
 	if err == nil {
 		t.Fatal(err)
 	}
 }
 
 func TestWithdrawalEventByExchangeID(t *testing.T) {
-	_, err := WithdrawalEventByExchangeID(exchangeName, exchangeName)
+	_, err := WithdrawalEventByExchangeID(testExchange, testExchange)
 	if err == nil {
 		t.Fatal(err)
 	}
@@ -148,12 +135,12 @@ func TestParseEvents(t *testing.T) {
 		test := fmt.Sprintf("test-%v", x)
 		resp := &withdraw.Response{
 			ID: withdraw.DryRunID,
-			Exchange: &withdraw.ExchangeResponse{
+			Exchange: withdraw.ExchangeResponse{
 				Name:   test,
 				ID:     test,
 				Status: test,
 			},
-			RequestDetails: &withdraw.Request{
+			RequestDetails: withdraw.Request{
 				Exchange:    test,
 				Description: test,
 				Amount:      1.0,
@@ -162,12 +149,21 @@ func TestParseEvents(t *testing.T) {
 		if x%2 == 0 {
 			resp.RequestDetails.Currency = currency.AUD
 			resp.RequestDetails.Type = 1
-			resp.RequestDetails.Fiat = new(withdraw.FiatRequest)
-			resp.RequestDetails.Fiat.Bank = new(banking.Account)
+			resp.RequestDetails.Fiat = withdraw.FiatRequest{
+				Bank: banking.Account{
+					Enabled:             false,
+					ID:                  fmt.Sprintf("test-%v", x),
+					BankName:            fmt.Sprintf("test-%v-bank", x),
+					AccountName:         "hello",
+					AccountNumber:       fmt.Sprintf("test-%v", x),
+					BSBNumber:           "123456",
+					SupportedCurrencies: "BTC-AUD",
+					SupportedExchanges:  testExchange,
+				},
+			}
 		} else {
 			resp.RequestDetails.Currency = currency.BTC
 			resp.RequestDetails.Type = 0
-			resp.RequestDetails.Crypto = new(withdraw.CryptoRequest)
 			resp.RequestDetails.Crypto.Address = test
 			resp.RequestDetails.Crypto.FeeAmount = 0
 			resp.RequestDetails.Crypto.AddressTag = test

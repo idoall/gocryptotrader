@@ -2,6 +2,7 @@ package okgroup
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,6 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	"github.com/idoall/gocryptotrader/log"
 )
 
@@ -27,9 +27,11 @@ const (
 	// OKGroupAPIPath const to help with api url formatting
 	OKGroupAPIPath = "api/"
 	// API subsections
-	okGroupAccountSubsection       = "account"
-	okGroupTokenSubsection         = "spot"
-	okGroupMarginTradingSubsection = "margin"
+	okGroupAccountSubsection        = "account"
+	okGroupTokenSubsection          = "spot"
+	okGroupMarginTradingSubsection  = "margin"
+	okGroupFuturesTradingSubSection = "futures"
+	oKGroupSwapTradingSubSection    = "swap"
 	// OKGroupAccounts common api endpoint
 	OKGroupAccounts = "accounts"
 	// OKGroupLedger common api endpoint
@@ -86,8 +88,7 @@ var errMissValue = errors.New("warning - resp value is missing from exchange")
 // OKGroup is the overaching type across the all of OKEx's exchange methods
 type OKGroup struct {
 	exchange.Base
-	ExchangeName  string
-	WebsocketConn *wshandler.WebsocketConnection
+	ExchangeName string
 	// Spot and contract market error codes as per https://www.okex.com/rest_request.html
 	ErrorCodes map[string]error
 	// Stores for corresponding variable checks
@@ -364,10 +365,21 @@ func (o *OKGroup) GetSpotFilledOrdersInformation(request GetSpotFilledOrdersInfo
 	return resp, o.SendHTTPRequest(http.MethodGet, okGroupTokenSubsection, requestURL, nil, &resp, false)
 }
 
-// GetSpotMarketData Get the charts of the trading pairs. Charts are returned in grouped buckets based on requested granularity.
-func (o *OKGroup) GetSpotMarketData(request GetSpotMarketDataRequest) (resp GetSpotMarketDataResponse, _ error) {
+// GetMarketData Get the charts of the trading pairs. Charts are returned in grouped buckets based on requested granularity.
+func (o *OKGroup) GetMarketData(request *GetMarketDataRequest) (resp GetMarketDataResponse, err error) {
 	requestURL := fmt.Sprintf("%v/%v/%v%v", OKGroupInstruments, request.InstrumentID, OKGroupGetSpotMarketData, FormatParameters(request))
-	return resp, o.SendHTTPRequest(http.MethodGet, okGroupTokenSubsection, requestURL, nil, &resp, false)
+	var requestType string
+	switch request.Asset {
+	case asset.Spot, asset.Margin:
+		requestType = okGroupTokenSubsection
+	case asset.Futures:
+		requestType = okGroupFuturesTradingSubSection
+	case asset.PerpetualSwap:
+		requestType = oKGroupSwapTradingSubSection
+	default:
+		return nil, errors.New("asset not supported")
+	}
+	return resp, o.SendHTTPRequest(http.MethodGet, requestType, requestURL, nil, &resp, false)
 }
 
 // GetMarginTradingAccounts List all assets under token margin trading account, including information such as balance, amount on hold and more.
@@ -562,7 +574,8 @@ func (o *OKGroup) SendHTTPRequest(httpMethod, requestType, requestPath string, d
 			o.Name)
 	}
 
-	utcTime := time.Now().UTC().Format(time.RFC3339)
+	now := time.Now()
+	utcTime := now.UTC().Format(time.RFC3339)
 	payload := []byte("")
 
 	if data != nil {
@@ -595,6 +608,9 @@ func (o *OKGroup) SendHTTPRequest(httpMethod, requestType, requestPath string, d
 		headers["OK-ACCESS-PASSPHRASE"] = o.API.Credentials.ClientID
 	}
 
+	// Requests that have a 30+ second difference between the timestamp and the API service time will be considered expired or rejected
+	ctx, cancel := context.WithDeadline(context.Background(), now.Add(30*time.Second))
+	defer cancel()
 	var intermediary json.RawMessage
 	type errCapFormat struct {
 		Error        int64  `json:"error_code,omitempty"`
@@ -604,7 +620,7 @@ func (o *OKGroup) SendHTTPRequest(httpMethod, requestType, requestPath string, d
 
 	errCap := errCapFormat{}
 	errCap.Result = true
-	err = o.SendPayload(&request.Item{
+	err = o.SendPayload(ctx, &request.Item{
 		Method:        strings.ToUpper(httpMethod),
 		Path:          path,
 		Headers:       headers,

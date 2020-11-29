@@ -3,6 +3,7 @@ package gateio
 import (
 	"errors"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,12 +16,14 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/account"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
 	"github.com/idoall/gocryptotrader/exchanges/protocol"
 	"github.com/idoall/gocryptotrader/exchanges/request"
+	"github.com/idoall/gocryptotrader/exchanges/stream"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
+	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/log"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
@@ -56,18 +59,11 @@ func (g *Gateio) SetDefaults() {
 	g.API.CredentialsValidator.RequiresKey = true
 	g.API.CredentialsValidator.RequiresSecret = true
 
-	g.CurrencyPairs = currency.PairsManager{
-		AssetTypes: asset.Items{
-			asset.Spot,
-		},
-		UseGlobalFormat: true,
-		RequestFormat: &currency.PairFormat{
-			Delimiter: "_",
-		},
-		ConfigFormat: &currency.PairFormat{
-			Delimiter: "_",
-			Uppercase: true,
-		},
+	requestFmt := &currency.PairFormat{Delimiter: currency.UnderscoreDelimiter}
+	configFmt := &currency.PairFormat{Delimiter: currency.UnderscoreDelimiter, Uppercase: true}
+	err := g.SetGlobalPairsManager(requestFmt, configFmt, asset.Spot)
+	if err != nil {
+		log.Errorln(log.ExchangeSys, err)
 	}
 
 	g.Features = exchange.Features{
@@ -98,8 +94,7 @@ func (g *Gateio) SetDefaults() {
 				OrderbookFetching:      true,
 				TradeFetching:          true,
 				KlineFetching:          true,
-				Subscribe:              true,
-				Unsubscribe:            true,
+				FullPayloadSubscribe:   true,
 				AuthenticatedEndpoints: true,
 				MessageCorrelation:     true,
 				GetOrder:               true,
@@ -107,22 +102,38 @@ func (g *Gateio) SetDefaults() {
 			},
 			WithdrawPermissions: exchange.AutoWithdrawCrypto |
 				exchange.NoFiatWithdrawals,
+			Kline: kline.ExchangeCapabilitiesSupported{
+				Intervals: true,
+			},
 		},
 		Enabled: exchange.FeaturesEnabled{
 			AutoPairUpdates: true,
+			Kline: kline.ExchangeCapabilitiesEnabled{
+				Intervals: map[string]bool{
+					kline.OneMin.Word():     true,
+					kline.ThreeMin.Word():   true,
+					kline.FiveMin.Word():    true,
+					kline.FifteenMin.Word(): true,
+					kline.ThirtyMin.Word():  true,
+					kline.OneHour.Word():    true,
+					kline.TwoHour.Word():    true,
+					kline.FourHour.Word():   true,
+					kline.SixHour.Word():    true,
+					kline.TwelveHour.Word(): true,
+					kline.OneDay.Word():     true,
+				},
+			},
 		},
 	}
-
 	g.Requester = request.New(g.Name,
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
-		nil)
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
 
 	g.API.Endpoints.URLDefault = gateioTradeURL
 	g.API.Endpoints.URL = g.API.Endpoints.URLDefault
 	g.API.Endpoints.URLSecondaryDefault = gateioMarketURL
 	g.API.Endpoints.URLSecondary = g.API.Endpoints.URLSecondaryDefault
 	g.API.Endpoints.WebsocketURL = gateioWebsocketEndpoint
-	g.Websocket = wshandler.New()
+	g.Websocket = stream.New()
 	g.WebsocketResponseMaxLimit = exchange.DefaultWebsocketResponseMaxLimit
 	g.WebsocketResponseCheckTimeout = exchange.DefaultWebsocketResponseCheckTimeout
 	g.WebsocketOrderbookBufferLimit = exchange.DefaultWebsocketOrderbookBufferLimit
@@ -140,42 +151,30 @@ func (g *Gateio) Setup(exch *config.ExchangeConfig) error {
 		return err
 	}
 
-	err = g.Websocket.Setup(
-		&wshandler.WebsocketSetup{
-			Enabled:                          exch.Features.Enabled.Websocket,
-			Verbose:                          exch.Verbose,
-			AuthenticatedWebsocketAPISupport: exch.API.AuthenticatedWebsocketSupport,
-			WebsocketTimeout:                 exch.WebsocketTrafficTimeout,
-			DefaultURL:                       gateioWebsocketEndpoint,
-			ExchangeName:                     exch.Name,
-			RunningURL:                       exch.API.Endpoints.WebsocketURL,
-			Connector:                        g.WsConnect,
-			Subscriber:                       g.Subscribe,
-			UnSubscriber:                     g.Unsubscribe,
-			Features:                         &g.Features.Supports.WebsocketCapabilities,
-		})
+	err = g.Websocket.Setup(&stream.WebsocketSetup{
+		Enabled:                          exch.Features.Enabled.Websocket,
+		Verbose:                          exch.Verbose,
+		AuthenticatedWebsocketAPISupport: exch.API.AuthenticatedWebsocketSupport,
+		WebsocketTimeout:                 exch.WebsocketTrafficTimeout,
+		DefaultURL:                       gateioWebsocketEndpoint,
+		ExchangeName:                     exch.Name,
+		RunningURL:                       exch.API.Endpoints.WebsocketURL,
+		Connector:                        g.WsConnect,
+		Subscriber:                       g.Subscribe,
+		GenerateSubscriptions:            g.GenerateDefaultSubscriptions,
+		Features:                         &g.Features.Supports.WebsocketCapabilities,
+		OrderbookBufferLimit:             exch.WebsocketOrderbookBufferLimit,
+		BufferEnabled:                    true,
+	})
 	if err != nil {
 		return err
 	}
 
-	g.WebsocketConn = &wshandler.WebsocketConnection{
-		ExchangeName:         g.Name,
-		URL:                  g.Websocket.GetWebsocketURL(),
-		ProxyURL:             g.Websocket.GetProxyAddress(),
-		Verbose:              g.Verbose,
+	return g.Websocket.SetupNewConnection(stream.ConnectionSetup{
+		RateLimit:            gateioWebsocketRateLimit,
 		ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 		ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
-		RateLimit:            gateioWebsocketRateLimit,
-	}
-
-	g.Websocket.Orderbook.Setup(
-		exch.WebsocketOrderbookBufferLimit,
-		true,
-		false,
-		false,
-		false,
-		exch.Name)
-	return nil
+	})
 }
 
 // Start starts the GateIO go routine
@@ -216,35 +215,42 @@ func (g *Gateio) UpdateTradablePairs(forceUpdate bool) error {
 		return err
 	}
 
-	return g.UpdatePairs(currency.NewPairsFromStrings(pairs), asset.Spot, false, forceUpdate)
+	p, err := currency.NewPairsFromStrings(pairs)
+	if err != nil {
+		return err
+	}
+	return g.UpdatePairs(p, asset.Spot, false, forceUpdate)
 }
 
 // UpdateTicker updates and returns the ticker for a currency pair
 func (g *Gateio) UpdateTicker(p currency.Pair, assetType asset.Item) (*ticker.Price, error) {
-	tickerPrice := new(ticker.Price)
 	result, err := g.GetTickers()
 	if err != nil {
-		return tickerPrice, err
+		return nil, err
 	}
-	pairs := g.GetEnabledPairs(assetType)
+	pairs, err := g.GetEnabledPairs(assetType)
+	if err != nil {
+		return nil, err
+	}
 	for i := range pairs {
 		for k := range result {
 			if !strings.EqualFold(k, pairs[i].String()) {
 				continue
 			}
-			tickerPrice = &ticker.Price{
-				Last:        result[k].Last,
-				High:        result[k].High,
-				Low:         result[k].Low,
-				Volume:      result[k].BaseVolume,
-				QuoteVolume: result[k].QuoteVolume,
-				Open:        result[k].Open,
-				Close:       result[k].Close,
-				Pair:        pairs[i],
-			}
-			err = ticker.ProcessTicker(g.Name, tickerPrice, assetType)
+
+			err = ticker.ProcessTicker(&ticker.Price{
+				Last:         result[k].Last,
+				High:         result[k].High,
+				Low:          result[k].Low,
+				Volume:       result[k].BaseVolume,
+				QuoteVolume:  result[k].QuoteVolume,
+				Open:         result[k].Open,
+				Close:        result[k].Close,
+				Pair:         pairs[i],
+				ExchangeName: g.Name,
+				AssetType:    assetType})
 			if err != nil {
-				log.Error(log.Ticker, err)
+				return nil, err
 			}
 		}
 	}
@@ -273,9 +279,12 @@ func (g *Gateio) FetchOrderbook(p currency.Pair, assetType asset.Item) (*orderbo
 // UpdateOrderbook updates and returns the orderbook for a currency pair
 func (g *Gateio) UpdateOrderbook(p currency.Pair, assetType asset.Item) (*orderbook.Base, error) {
 	orderBook := new(orderbook.Base)
-	curr := g.FormatExchangeCurrency(p, assetType).String()
+	curr, err := g.FormatExchangeCurrency(p, assetType)
+	if err != nil {
+		return nil, err
+	}
 
-	orderbookNew, err := g.GetOrderbook(curr)
+	orderbookNew, err := g.GetOrderbook(curr.String())
 	if err != nil {
 		return orderBook, err
 	}
@@ -408,9 +417,49 @@ func (g *Gateio) GetFundingHistory() ([]exchange.FundHistory, error) {
 	return nil, common.ErrFunctionNotSupported
 }
 
-// GetExchangeHistory returns historic trade data since exchange opening.
-func (g *Gateio) GetExchangeHistory(p currency.Pair, assetType asset.Item) ([]exchange.TradeHistory, error) {
-	return nil, common.ErrNotYetImplemented
+// GetRecentTrades returns the most recent trades for a currency and asset
+func (g *Gateio) GetRecentTrades(p currency.Pair, assetType asset.Item) ([]trade.Data, error) {
+	var err error
+	p, err = g.FormatExchangeCurrency(p, assetType)
+	if err != nil {
+		return nil, err
+	}
+	var tradeData TradeHistory
+	tradeData, err = g.GetTrades(p.String())
+	if err != nil {
+		return nil, err
+	}
+	var resp []trade.Data
+	for i := range tradeData.Data {
+		var side order.Side
+		side, err = order.StringToOrderSide(tradeData.Data[i].Type)
+		if err != nil {
+			return nil, err
+		}
+		resp = append(resp, trade.Data{
+			Exchange:     g.Name,
+			TID:          tradeData.Data[i].TradeID,
+			CurrencyPair: p,
+			AssetType:    assetType,
+			Side:         side,
+			Price:        tradeData.Data[i].Rate,
+			Amount:       tradeData.Data[i].Amount,
+			Timestamp:    time.Unix(tradeData.Data[i].Timestamp, 0),
+		})
+	}
+
+	err = g.AddTradesToBuffer(resp...)
+	if err != nil {
+		return nil, err
+	}
+
+	sort.Sort(trade.ByDate(resp))
+	return resp, nil
+}
+
+// GetHistoricTrades returns historic trade data within the timeframe provided
+func (g *Gateio) GetHistoricTrades(_ currency.Pair, _ asset.Item, _, _ time.Time) ([]trade.Data, error) {
+	return nil, common.ErrFunctionNotSupported
 }
 
 // SubmitOrder submits a new order
@@ -422,16 +471,21 @@ func (g *Gateio) SubmitOrder(s *order.Submit) (order.SubmitResponse, error) {
 	}
 
 	var orderTypeFormat string
-	if s.OrderSide == order.Buy {
+	if s.Side == order.Buy {
 		orderTypeFormat = order.Buy.Lower()
 	} else {
 		orderTypeFormat = order.Sell.Lower()
 	}
 
+	fPair, err := g.FormatExchangeCurrency(s.Pair, s.AssetType)
+	if err != nil {
+		return submitOrderResponse, err
+	}
+
 	var spotNewOrderRequestParams = SpotNewOrderRequestParams{
 		Amount: s.Amount,
 		Price:  s.Price,
-		Symbol: s.Pair.String(),
+		Symbol: fPair.String(),
 		Type:   orderTypeFormat,
 	}
 
@@ -457,14 +511,28 @@ func (g *Gateio) ModifyOrder(action *order.Modify) (string, error) {
 }
 
 // CancelOrder cancels an order by its corresponding ID number
-func (g *Gateio) CancelOrder(order *order.Cancel) error {
-	orderIDInt, err := strconv.ParseInt(order.OrderID, 10, 64)
+func (g *Gateio) CancelOrder(o *order.Cancel) error {
+	if err := o.Validate(o.StandardCancel()); err != nil {
+		return err
+	}
+
+	orderIDInt, err := strconv.ParseInt(o.ID, 10, 64)
 	if err != nil {
 		return err
 	}
-	_, err = g.CancelExistingOrder(orderIDInt,
-		g.FormatExchangeCurrency(order.CurrencyPair, order.AssetType).String())
+
+	fpair, err := g.FormatExchangeCurrency(o.Pair, o.AssetType)
+	if err != nil {
+		return err
+	}
+
+	_, err = g.CancelExistingOrder(orderIDInt, fpair.String())
 	return err
+}
+
+// CancelBatchOrders cancels an orders by their corresponding ID numbers
+func (g *Gateio) CancelBatchOrders(o []order.Cancel) (order.CancelBatchResponse, error) {
+	return order.CancelBatchResponse{}, common.ErrNotYetImplemented
 }
 
 // CancelAllOrders cancels all orders associated with a currency pair
@@ -492,13 +560,23 @@ func (g *Gateio) CancelAllOrders(_ *order.Cancel) (order.CancelAllResponse, erro
 	return cancelAllOrdersResponse, nil
 }
 
-// GetOrderInfo returns information on a current open order
-func (g *Gateio) GetOrderInfo(orderID string) (order.Detail, error) {
+// GetOrderInfo returns order information based on order ID
+func (g *Gateio) GetOrderInfo(orderID string, pair currency.Pair, assetType asset.Item) (order.Detail, error) {
 	var orderDetail order.Detail
 	orders, err := g.GetOpenOrders("")
 	if err != nil {
 		return orderDetail, errors.New("failed to get open orders")
 	}
+
+	if assetType == "" {
+		assetType = asset.Spot
+	}
+
+	format, err := g.GetPairFormat(assetType, false)
+	if err != nil {
+		return orderDetail, err
+	}
+
 	for x := range orders.Orders {
 		if orders.Orders[x].OrderNumber != orderID {
 			continue
@@ -508,15 +586,18 @@ func (g *Gateio) GetOrderInfo(orderID string) (order.Detail, error) {
 		orderDetail.RemainingAmount = orders.Orders[x].InitialAmount - orders.Orders[x].FilledAmount
 		orderDetail.ExecutedAmount = orders.Orders[x].FilledAmount
 		orderDetail.Amount = orders.Orders[x].InitialAmount
-		orderDetail.OrderDate = time.Unix(orders.Orders[x].Timestamp, 0)
+		orderDetail.Date = time.Unix(orders.Orders[x].Timestamp, 0)
 		orderDetail.Status = order.Status(orders.Orders[x].Status)
 		orderDetail.Price = orders.Orders[x].Rate
-		orderDetail.CurrencyPair = currency.NewPairDelimiter(orders.Orders[x].CurrencyPair,
-			g.GetPairFormat(asset.Spot, false).Delimiter)
+		orderDetail.Pair, err = currency.NewPairDelimiter(orders.Orders[x].CurrencyPair,
+			format.Delimiter)
+		if err != nil {
+			return orderDetail, err
+		}
 		if strings.EqualFold(orders.Orders[x].Type, order.Ask.String()) {
-			orderDetail.OrderSide = order.Ask
+			orderDetail.Side = order.Ask
 		} else if strings.EqualFold(orders.Orders[x].Type, order.Bid.String()) {
-			orderDetail.OrderSide = order.Buy
+			orderDetail.Side = order.Buy
 		}
 		return orderDetail, nil
 	}
@@ -540,7 +621,12 @@ func (g *Gateio) GetDepositAddress(cryptocurrency currency.Code, _ string) (stri
 // WithdrawCryptocurrencyFunds returns a withdrawal ID when a withdrawal is
 // submitted
 func (g *Gateio) WithdrawCryptocurrencyFunds(withdrawRequest *withdraw.Request) (*withdraw.ExchangeResponse, error) {
-	return g.WithdrawCrypto(withdrawRequest.Currency.String(), withdrawRequest.Crypto.Address, withdrawRequest.Amount)
+	if err := withdrawRequest.Validate(); err != nil {
+		return nil, err
+	}
+	return g.WithdrawCrypto(withdrawRequest.Currency.String(),
+		withdrawRequest.Crypto.Address,
+		withdrawRequest.Amount)
 }
 
 // WithdrawFiatFunds returns a withdrawal ID when a
@@ -555,11 +641,6 @@ func (g *Gateio) WithdrawFiatFundsToInternationalBank(withdrawRequest *withdraw.
 	return nil, common.ErrFunctionNotSupported
 }
 
-// GetWebsocket returns a pointer to the exchange websocket
-func (g *Gateio) GetWebsocket() (*wshandler.Websocket, error) {
-	return g.Websocket, nil
-}
-
 // GetFeeByType returns an estimate of fee based on type of transaction
 func (g *Gateio) GetFeeByType(feeBuilder *exchange.FeeBuilder) (float64, error) {
 	if !g.AllowAuthenticatedRequest() && // Todo check connection status
@@ -571,14 +652,22 @@ func (g *Gateio) GetFeeByType(feeBuilder *exchange.FeeBuilder) (float64, error) 
 
 // GetActiveOrders retrieves any orders that are active/open
 func (g *Gateio) GetActiveOrders(req *order.GetOrdersRequest) ([]order.Detail, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
 	var orders []order.Detail
 	var currPair string
-	if len(req.Currencies) == 1 {
-		currPair = req.Currencies[0].String()
+	if len(req.Pairs) == 1 {
+		fPair, err := g.FormatExchangeCurrency(req.Pairs[0], asset.Spot)
+		if err != nil {
+			return nil, err
+		}
+		currPair = fPair.String()
 	}
 	if g.Websocket.CanUseAuthenticatedWebsocketForWrapper() {
 		for i := 0; ; i += 100 {
-			resp, err := g.wsGetOrderInfo(req.OrderType.String(), i, 100)
+			resp, err := g.wsGetOrderInfo(req.Type.String(), i, 100)
 			if err != nil {
 				return orders, err
 			}
@@ -592,19 +681,18 @@ func (g *Gateio) GetActiveOrders(req *order.GetOrdersRequest) ([]order.Detail, e
 				if resp.WebSocketOrderQueryRecords[j].OrderType == 1 {
 					orderType = order.Limit
 				}
-				firstNum, decNum, err := convert.SplitFloatDecimals(resp.WebSocketOrderQueryRecords[j].Ctime)
+				p, err := currency.NewPairFromString(resp.WebSocketOrderQueryRecords[j].Market)
 				if err != nil {
-					return orders, err
+					return nil, err
 				}
-				orderDate := time.Unix(firstNum, decNum)
 				orders = append(orders, order.Detail{
 					Exchange:        g.Name,
 					AccountID:       strconv.FormatInt(resp.WebSocketOrderQueryRecords[j].User, 10),
 					ID:              strconv.FormatInt(resp.WebSocketOrderQueryRecords[j].ID, 10),
-					CurrencyPair:    currency.NewPairFromString(resp.WebSocketOrderQueryRecords[j].Market),
-					OrderSide:       orderSide,
-					OrderType:       orderType,
-					OrderDate:       orderDate,
+					Pair:            p,
+					Side:            orderSide,
+					Type:            orderType,
+					Date:            convert.TimeFromUnixTimestampDecimal(resp.WebSocketOrderQueryRecords[j].Ctime),
 					Price:           resp.WebSocketOrderQueryRecords[j].Price,
 					Amount:          resp.WebSocketOrderQueryRecords[j].Amount,
 					ExecutedAmount:  resp.WebSocketOrderQueryRecords[j].FilledAmount,
@@ -622,13 +710,21 @@ func (g *Gateio) GetActiveOrders(req *order.GetOrdersRequest) ([]order.Detail, e
 			return nil, err
 		}
 
+		format, err := g.GetPairFormat(asset.Spot, false)
+		if err != nil {
+			return nil, err
+		}
+
 		for i := range resp.Orders {
 			if resp.Orders[i].Status != "open" {
 				continue
 			}
-
-			symbol := currency.NewPairDelimiter(resp.Orders[i].CurrencyPair,
-				g.GetPairFormat(asset.Spot, false).Delimiter)
+			var symbol currency.Pair
+			symbol, err = currency.NewPairDelimiter(resp.Orders[i].CurrencyPair,
+				format.Delimiter)
+			if err != nil {
+				return nil, err
+			}
 			side := order.Side(strings.ToUpper(resp.Orders[i].Type))
 			orderDate := time.Unix(resp.Orders[i].Timestamp, 0)
 			orders = append(orders, order.Detail{
@@ -636,76 +732,68 @@ func (g *Gateio) GetActiveOrders(req *order.GetOrdersRequest) ([]order.Detail, e
 				Amount:          resp.Orders[i].Amount,
 				Price:           resp.Orders[i].Rate,
 				RemainingAmount: resp.Orders[i].FilledAmount,
-				OrderDate:       orderDate,
-				OrderSide:       side,
+				Date:            orderDate,
+				Side:            side,
 				Exchange:        g.Name,
-				CurrencyPair:    symbol,
+				Pair:            symbol,
 				Status:          order.Status(resp.Orders[i].Status),
 			})
 		}
 	}
 	order.FilterOrdersByTickRange(&orders, req.StartTicks, req.EndTicks)
-	order.FilterOrdersBySide(&orders, req.OrderSide)
+	order.FilterOrdersBySide(&orders, req.Side)
 	return orders, nil
 }
 
 // GetOrderHistory retrieves account order information
 // Can Limit response to specific order status
 func (g *Gateio) GetOrderHistory(req *order.GetOrdersRequest) ([]order.Detail, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
 	var trades []TradesResponse
-	for i := range req.Currencies {
-		resp, err := g.GetTradeHistory(req.Currencies[i].String())
+	for i := range req.Pairs {
+		resp, err := g.GetTradeHistory(req.Pairs[i].String())
 		if err != nil {
 			return nil, err
 		}
 		trades = append(trades, resp.Trades...)
 	}
 
+	format, err := g.GetPairFormat(asset.Spot, false)
+	if err != nil {
+		return nil, err
+	}
+
 	var orders []order.Detail
-	for _, trade := range trades {
-		symbol := currency.NewPairDelimiter(trade.Pair,
-			g.GetPairFormat(asset.Spot, false).Delimiter)
-		side := order.Side(strings.ToUpper(trade.Type))
-		orderDate := time.Unix(trade.TimeUnix, 0)
+	for i := range trades {
+		var symbol currency.Pair
+		symbol, err = currency.NewPairDelimiter(trades[i].Pair, format.Delimiter)
+		if err != nil {
+			return nil, err
+		}
+		side := order.Side(strings.ToUpper(trades[i].Type))
+		orderDate := time.Unix(trades[i].TimeUnix, 0)
 		orders = append(orders, order.Detail{
-			ID:           strconv.FormatInt(trade.OrderID, 10),
-			Amount:       trade.Amount,
-			Price:        trade.Rate,
-			OrderDate:    orderDate,
-			OrderSide:    side,
-			Exchange:     g.Name,
-			CurrencyPair: symbol,
+			ID:       strconv.FormatInt(trades[i].OrderID, 10),
+			Amount:   trades[i].Amount,
+			Price:    trades[i].Rate,
+			Date:     orderDate,
+			Side:     side,
+			Exchange: g.Name,
+			Pair:     symbol,
 		})
 	}
 
 	order.FilterOrdersByTickRange(&orders, req.StartTicks, req.EndTicks)
-	order.FilterOrdersBySide(&orders, req.OrderSide)
+	order.FilterOrdersBySide(&orders, req.Side)
 	return orders, nil
-}
-
-// SubscribeToWebsocketChannels appends to ChannelsToSubscribe
-// which lets websocket.manageSubscriptions handle subscribing
-func (g *Gateio) SubscribeToWebsocketChannels(channels []wshandler.WebsocketChannelSubscription) error {
-	g.Websocket.SubscribeToChannels(channels)
-	return nil
-}
-
-// UnsubscribeToWebsocketChannels removes from ChannelsToSubscribe
-// which lets websocket.manageSubscriptions handle unsubscribing
-func (g *Gateio) UnsubscribeToWebsocketChannels(channels []wshandler.WebsocketChannelSubscription) error {
-	g.Websocket.RemoveSubscribedChannels(channels)
-	return nil
-}
-
-// GetSubscriptions returns a copied list of subscriptions
-func (g *Gateio) GetSubscriptions() ([]wshandler.WebsocketChannelSubscription, error) {
-	return g.Websocket.GetSubscriptions(), nil
 }
 
 // AuthenticateWebsocket sends an authentication message to the websocket
 func (g *Gateio) AuthenticateWebsocket() error {
-	_, err := g.wsServerSignIn()
-	return err
+	return g.wsServerSignIn()
 }
 
 // ValidateCredentials validates current credentials used for wrapper
@@ -713,4 +801,44 @@ func (g *Gateio) AuthenticateWebsocket() error {
 func (g *Gateio) ValidateCredentials() error {
 	_, err := g.UpdateAccountInfo()
 	return g.CheckTransientError(err)
+}
+
+// FormatExchangeKlineInterval returns Interval to exchange formatted string
+func (g *Gateio) FormatExchangeKlineInterval(in kline.Interval) string {
+	return strconv.FormatFloat(in.Duration().Seconds(), 'f', 0, 64)
+}
+
+// GetHistoricCandles returns candles between a time period for a set time interval
+func (g *Gateio) GetHistoricCandles(pair currency.Pair, a asset.Item, start, end time.Time, interval kline.Interval) (kline.Item, error) {
+	if err := g.ValidateKline(pair, a, interval); err != nil {
+		return kline.Item{}, err
+	}
+
+	hours := end.Sub(start).Hours()
+	formattedPair, err := g.FormatExchangeCurrency(pair, a)
+	if err != nil {
+		return kline.Item{}, err
+	}
+
+	params := KlinesRequestParams{
+		Symbol:   formattedPair.String(),
+		GroupSec: g.FormatExchangeKlineInterval(interval),
+		HourSize: int(hours),
+	}
+
+	klineData, err := g.GetSpotKline(params)
+	if err != nil {
+		return kline.Item{}, err
+	}
+	klineData.Interval = interval
+	klineData.Pair = pair
+	klineData.Asset = a
+
+	klineData.SortCandlesByTimestamp(false)
+	return klineData, nil
+}
+
+// GetHistoricCandlesExtended returns candles between a time period for a set time interval
+func (g *Gateio) GetHistoricCandlesExtended(pair currency.Pair, a asset.Item, start, end time.Time, interval kline.Interval) (kline.Item, error) {
+	return g.GetHistoricCandles(pair, a, start, end, interval)
 }

@@ -1,6 +1,7 @@
 package bitfinex
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	"github.com/idoall/gocryptotrader/log"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
@@ -57,6 +57,7 @@ const (
 	bitfinexMarginClose        = "funding/close"
 	bitfinexLendbook           = "lendbook/"
 	bitfinexLends              = "lends/"
+	bitfinexLeaderboard        = "rankings"
 
 	// Version 2 API endpoints
 	bitfinexAPIVersion2    = "/v2/"
@@ -81,14 +82,7 @@ const (
 // Bitfinex is the overarching type across the bitfinex package
 type Bitfinex struct {
 	exchange.Base
-	WebsocketConn              *wshandler.WebsocketConnection
-	AuthenticatedWebsocketConn *wshandler.WebsocketConnection
-	WebsocketSubdChannels      map[int]WebsocketChanInfo
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (b *Bitfinex) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
+	WebsocketSubdChannels map[int]WebsocketChanInfo
 }
 
 // GetPlatformStatus returns the Bifinex platform status
@@ -229,10 +223,11 @@ func (b *Bitfinex) GetTrades(currencyPair string, limit, timestampStart, timesta
 	if timestampEnd > 0 {
 		v.Set("end", strconv.FormatInt(timestampEnd, 10))
 	}
-
+	sortVal := "0"
 	if reOrderResp {
-		v.Set("sort", strconv.FormatInt(-1, 10))
+		sortVal = "1"
 	}
+	v.Set("sort", sortVal)
 
 	path := b.API.Endpoints.URL +
 		bitfinexAPIVersion2 +
@@ -243,7 +238,7 @@ func (b *Bitfinex) GetTrades(currencyPair string, limit, timestampStart, timesta
 		v.Encode()
 
 	var resp [][]interface{}
-	err := b.SendHTTPRequest(path, &resp, trade)
+	err := b.SendHTTPRequest(path, &resp, tradeRateLimit)
 	if err != nil {
 		return nil, err
 	}
@@ -411,7 +406,7 @@ func (b *Bitfinex) GetLends(symbol string, values url.Values) ([]Lends, error) {
 // timeFrame values: '1m', '5m', '15m', '30m', '1h', '3h', '6h', '12h', '1D',
 // '7D', '14D', '1M'
 // section values: last or hist
-func (b *Bitfinex) GetCandles(symbol, timeFrame string, start, end, limit int64, historic, ascending bool) ([]Candle, error) {
+func (b *Bitfinex) GetCandles(symbol, timeFrame string, start, end int64, limit uint32, historic bool) ([]Candle, error) {
 	var fundingPeriod string
 	if symbol[0] == 'f' {
 		fundingPeriod = ":p30"
@@ -437,7 +432,7 @@ func (b *Bitfinex) GetCandles(symbol, timeFrame string, start, end, limit int64,
 		}
 
 		if limit > 0 {
-			v.Set("limit", strconv.FormatInt(limit, 10))
+			v.Set("limit", strconv.FormatInt(int64(limit), 10))
 		}
 
 		path += "/hist"
@@ -454,7 +449,7 @@ func (b *Bitfinex) GetCandles(symbol, timeFrame string, start, end, limit int64,
 		var c []Candle
 		for i := range response {
 			c = append(c, Candle{
-				Timestamp: int64(response[i][0].(float64)),
+				Timestamp: time.Unix(int64(response[i][0].(float64)/1000), 0),
 				Open:      response[i][1].(float64),
 				Close:     response[i][2].(float64),
 				High:      response[i][3].(float64),
@@ -479,7 +474,7 @@ func (b *Bitfinex) GetCandles(symbol, timeFrame string, start, end, limit int64,
 	}
 
 	return []Candle{{
-		Timestamp: int64(response[0].(float64)),
+		Timestamp: time.Unix(int64(response[0].(float64))/1000, 0),
 		Open:      response[1].(float64),
 		Close:     response[2].(float64),
 		High:      response[3].(float64),
@@ -506,11 +501,73 @@ func (b *Bitfinex) GetLiquidationFeed() error {
 	return common.ErrNotYetImplemented
 }
 
-// GetLeaderBoard returns leaderboard standings for unrealized
-// profit (period delta), unrealized profit (inception), volume, and realized
-//  profit.
-func (b *Bitfinex) GetLeaderBoard() error {
-	return common.ErrNotYetImplemented
+// GetLeaderboard returns leaderboard standings for unrealized profit (period
+// delta), unrealized profit (inception), volume, and realized profit.
+// Allowed key values: "plu_diff" for unrealized profit (period delta), "plu"
+// for unrealized profit (inception); "vol" for volume; "plr" for realized
+// profit
+// Allowed time frames are 3h, 1w and 1M
+// Allowed symbols are trading pairs (e.g. tBTCUSD, tETHUSD and tGLOBAL:USD)
+func (b *Bitfinex) GetLeaderboard(key, timeframe, symbol string, sort, limit int, start, end string) ([]LeaderboardEntry, error) {
+	validLeaderboardKey := func(input string) bool {
+		switch input {
+		case LeaderboardUnrealisedProfitPeriodDelta,
+			LeaderboardUnrealisedProfitInception,
+			LeaderboardVolume,
+			LeaderbookRealisedProfit:
+			return true
+		default:
+			return false
+		}
+	}
+
+	if !validLeaderboardKey(key) {
+		return nil, errors.New("invalid leaderboard key")
+	}
+
+	path := fmt.Sprintf("%s/%s:%s:%s/hist", b.API.Endpoints.URL+bitfinexAPIVersion2+bitfinexLeaderboard,
+		key,
+		timeframe,
+		symbol)
+	vals := url.Values{}
+	if sort != 0 {
+		vals.Set("sort", strconv.Itoa(sort))
+	}
+	if limit != 0 {
+		vals.Set("limit", strconv.Itoa(limit))
+	}
+	if start != "" {
+		vals.Set("start", start)
+	}
+	if end != "" {
+		vals.Set("end", end)
+	}
+	path = common.EncodeURLValues(path, vals)
+	var resp []interface{}
+	if err := b.SendHTTPRequest(path, &resp, leaderBoardReqRate); err != nil {
+		return nil, err
+	}
+
+	parseTwitterHandle := func(i interface{}) string {
+		r, ok := i.(string)
+		if !ok {
+			return ""
+		}
+		return r
+	}
+
+	var result []LeaderboardEntry
+	for x := range resp {
+		r := resp[x].([]interface{})
+		result = append(result, LeaderboardEntry{
+			Timestamp:     time.Unix(0, int64(r[0].(float64))*int64(time.Millisecond)),
+			Username:      r[2].(string),
+			Ranking:       int(r[3].(float64)),
+			Value:         r[6].(float64),
+			TwitterHandle: parseTwitterHandle(r[9]),
+		})
+	}
+	return result, nil
 }
 
 // GetMarketAveragePrice calculates the average execution price for Trading or
@@ -719,7 +776,7 @@ func (b *Bitfinex) WithdrawFIAT(withdrawalType, walletType string, withdrawReque
 // Major Upgrade needed on this function to include all query params
 func (b *Bitfinex) NewOrder(currencyPair, orderType string, amount, price float64, buy, hidden bool) (Order, error) {
 	if !common.StringDataCompare(AcceptedOrderType, orderType) {
-		return Order{}, errors.New("order type not accepted")
+		return Order{}, fmt.Errorf("order type %s not accepted", orderType)
 	}
 
 	response := Order{}
@@ -1068,7 +1125,7 @@ func (b *Bitfinex) CloseMarginFunding(swapID int64) (Offer, error) {
 
 // SendHTTPRequest sends an unauthenticated request
 func (b *Bitfinex) SendHTTPRequest(path string, result interface{}, e request.EndpointLimit) error {
-	return b.SendPayload(&request.Item{
+	return b.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -1113,7 +1170,7 @@ func (b *Bitfinex) SendAuthenticatedHTTPRequest(method, path string, params map[
 	headers["X-BFX-PAYLOAD"] = PayloadBase64
 	headers["X-BFX-SIGNATURE"] = crypto.HexEncodeToString(hmac)
 
-	return b.SendPayload(&request.Item{
+	return b.SendPayload(context.Background(), &request.Item{
 		Method:        method,
 		Path:          b.API.Endpoints.URL + bitfinexAPIVersion + path,
 		Headers:       headers,

@@ -13,9 +13,6 @@ import (
 	"github.com/thrasher-corp/sqlboiler/queries/qm"
 )
 
-// TableTimeFormat Go Time format conversion
-const TableTimeFormat = "2006-01-02 15:04:05"
-
 // Event inserts a new audit event to database
 func Event(id, msgtype, message string) {
 	if database.DB.SQL == nil {
@@ -59,10 +56,6 @@ func Event(id, msgtype, message string) {
 	err = tx.Commit()
 	if err != nil {
 		log.Errorf(log.Global, "Event Transaction commit failed: %v", err)
-		err = tx.Rollback()
-		if err != nil {
-			log.Errorf(log.Global, "Event Transaction rollback failed: %v", err)
-		}
 		return
 	}
 }

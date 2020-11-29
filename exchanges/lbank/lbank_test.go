@@ -11,6 +11,7 @@ import (
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 )
 
@@ -90,12 +91,11 @@ func TestGetMarketDepths(t *testing.T) {
 
 func TestGetTrades(t *testing.T) {
 	t.Parallel()
-	_, err := l.GetTrades(testCurrencyPair, "600",
-		strconv.FormatInt(time.Now().Unix(), 10))
+	_, err := l.GetTrades(testCurrencyPair, 600, time.Now().Unix())
 	if err != nil {
 		t.Error(err)
 	}
-	a, err := l.GetTrades(testCurrencyPair, "600", "0")
+	a, err := l.GetTrades(testCurrencyPair, 600, 0)
 	if len(a) != 600 && err != nil {
 		t.Error(err)
 	}
@@ -316,11 +316,12 @@ func TestSubmitOrder(t *testing.T) {
 			Quote:     currency.USDT,
 			Delimiter: "_",
 		},
-		OrderSide: order.Buy,
-		OrderType: order.Limit,
+		Side:      order.Buy,
+		Type:      order.Limit,
 		Price:     1,
 		Amount:    1,
 		ClientID:  "meowOrder",
+		AssetType: asset.Spot,
 	}
 	response, err := l.SubmitOrder(orderSubmission)
 	if areTestAPIKeysSet() && (err != nil || !response.IsOrderPlaced) {
@@ -337,8 +338,9 @@ func TestCancelOrder(t *testing.T) {
 	}
 	cp := currency.NewPairWithDelimiter(currency.ETH.String(), currency.BTC.String(), "_")
 	var a order.Cancel
-	a.CurrencyPair = cp
-	a.OrderID = "24f7ce27-af1d-4dca-a8c1-ef1cbeec1b23"
+	a.Pair = cp
+	a.AssetType = asset.Spot
+	a.ID = "24f7ce27-af1d-4dca-a8c1-ef1cbeec1b23"
 	err := l.CancelOrder(&a)
 	if err != nil {
 		t.Error(err)
@@ -350,7 +352,7 @@ func TestGetOrderInfo(t *testing.T) {
 	if !areTestAPIKeysSet() {
 		t.Skip("API keys required but not set, skipping test")
 	}
-	_, err := l.GetOrderInfo("9ead39f5-701a-400b-b635-d7349eb0f6b")
+	_, err := l.GetOrderInfo("9ead39f5-701a-400b-b635-d7349eb0f6b", currency.Pair{}, asset.Spot)
 	if err != nil {
 		t.Error(err)
 	}
@@ -374,12 +376,9 @@ func TestGetFeeByType(t *testing.T) {
 	input.Amount = 2
 	input.FeeType = exchange.CryptocurrencyWithdrawalFee
 	input.Pair = cp
-	a, err := l.GetFeeByType(&input)
+	_, err := l.GetFeeByType(&input)
 	if err != nil {
 		t.Error(err)
-	}
-	if a != 0.0005 {
-		t.Errorf("expected: 0.0005, received: %v", a)
 	}
 }
 
@@ -400,8 +399,115 @@ func TestGetOrderHistory(t *testing.T) {
 		t.Skip("API keys required but not set, skipping test")
 	}
 	var input order.GetOrdersRequest
-	input.OrderSide = order.Buy
+	input.Side = order.Buy
 	_, err := l.GetOrderHistory(&input)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetHistoricCandles(t *testing.T) {
+	t.Parallel()
+	pair, err := currency.NewPairFromString("eth_btc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = l.GetHistoricCandles(pair, asset.Spot, time.Now().Add(-24*time.Hour), time.Now(), kline.OneMin)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	_, err = l.GetHistoricCandles(pair, asset.Spot, time.Now().Add(-24*time.Hour), time.Now(), kline.OneHour)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestGetHistoricCandlesExtended(t *testing.T) {
+	t.Parallel()
+
+	startTime := time.Now().Add(-time.Hour)
+	end := time.Now()
+	pair, err := currency.NewPairFromString("eth_btc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = l.GetHistoricCandlesExtended(pair, asset.Spot, startTime, end, kline.OneMin)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func Test_FormatExchangeKlineInterval(t *testing.T) {
+	testCases := []struct {
+		name     string
+		interval kline.Interval
+		output   string
+	}{
+		{
+			"OneMin",
+			kline.OneMin,
+			"minute1",
+		},
+		{
+			"OneHour",
+			kline.OneHour,
+			"hour1",
+		},
+		{
+			"OneDay",
+			kline.OneDay,
+			"day1",
+		},
+		{
+			"OneWeek",
+			kline.OneWeek,
+			"week1",
+		},
+		{
+			"AllOther",
+			kline.FifteenDay,
+			"",
+		},
+	}
+
+	for x := range testCases {
+		test := testCases[x]
+
+		t.Run(test.name, func(t *testing.T) {
+			ret := l.FormatExchangeKlineInterval(test.interval)
+
+			if ret != test.output {
+				t.Fatalf("unexpected result return expected: %v received: %v", test.output, ret)
+			}
+		})
+	}
+}
+
+func TestGetRecentTrades(t *testing.T) {
+	t.Parallel()
+	currencyPair, err := currency.NewPairFromString(testCurrencyPair)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = l.GetRecentTrades(currencyPair, asset.Spot)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetHistoricTrades(t *testing.T) {
+	t.Parallel()
+	currencyPair, err := currency.NewPairFromString(testCurrencyPair)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = l.GetHistoricTrades(currencyPair, asset.Spot, time.Now().Add(-time.Minute*15), time.Now())
+	if err != nil {
+		t.Error(err)
+	}
+	// longer term
+	_, err = l.GetHistoricTrades(currencyPair, asset.Spot, time.Now().Add(-time.Minute*60*200), time.Now().Add(-time.Minute*60*199))
 	if err != nil {
 		t.Error(err)
 	}

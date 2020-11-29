@@ -27,20 +27,21 @@ Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader 
 | BitMEX | Yes | Yes | NA |
 | Bitstamp | Yes  | Yes       | No  |
 | Bittrex | Yes | No | NA |
-| BTCMarkets | Yes | No       | NA  |
+| BTCMarkets | Yes | Yes       | NA  |
 | BTSE | Yes | Yes | NA |
+| CoinbasePro | Yes | Yes | No|
+| Coinbene | Yes | Yes | No |
 | COINUT | Yes | Yes | NA |
 | Exmo | Yes | NA | NA |
-| CoinbasePro | Yes | Yes | No|
-| Coinbene | Yes | No | No |
+| FTX | Yes | Yes | No |
 | GateIO | Yes | Yes | NA |
 | Gemini | Yes | Yes | No |
 | HitBTC | Yes | Yes | No |
 | Huobi.Pro | Yes | Yes | NA |
 | ItBit | Yes | NA | No |
 | Kraken | Yes | Yes | NA |
+| LakeBTC | Yes | Yes | NA |
 | Lbank | Yes | No | NA |
-| LakeBTC | Yes | No | NA |
 | LocalBitcoins | Yes | NA | NA |
 | OKCoin International | Yes | Yes | No |
 | OKEX | Yes | Yes | No |
@@ -48,9 +49,10 @@ Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader 
 | Yobit | Yes | NA | NA |
 | ZB.COM | Yes | Yes | NA |
 
-We are aiming to support the top 20 highest volume exchanges based off the [CoinMarketCap exchange data](https://coinmarketcap.com/exchanges/volume/24-hour/).
+We are aiming to support the top 30 exchanges sorted by average liquidity as [ranked by CoinMarketCap](https://coinmarketcap.com/rankings/exchanges/). 
+However, we welcome pull requests for any exchange which does not match this criterion. If you need help with this, please join us on [Slack](https://join.slack.com/t/gocryptotrader/shared_invite/enQtNTQ5NDAxMjA2Mjc5LTc5ZDE1ZTNiOGM3ZGMyMmY1NTAxYWZhODE0MWM5N2JlZDk1NDU0YTViYzk4NTk3OTRiMDQzNGQ1YTc4YmRlMTk).
 
-** NA means not applicable as the Exchange does not support the feature.
+** NA means not applicable as the exchange does not support the feature.
 
 ## Current Features
 
@@ -73,7 +75,9 @@ We are aiming to support the top 20 highest volume exchanges based off the [Coin
 + Packages for handling currency pairs, tickers and orderbooks.
 + Portfolio management tool; fetches balances from supported exchanges and allows for custom address tracking.
 + Basic event trigger system.
++ OHLCV/Candle retrieval support. See [OHLCV](/docs/OHLCV.md).
 + Scripting support. See [gctscript](/gctscript/README.md).
++ Recent and historic trade processing. See [trades](/exchanges/trade/README.md).
 + WebGUI (discontinued).
 
 ## Planned Features

@@ -2,6 +2,7 @@ package bitstamp
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,6 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	"github.com/idoall/gocryptotrader/log"
 )
 
@@ -53,6 +53,7 @@ const (
 	bitstampAPIXrpDeposit         = "xrp_address"
 	bitstampAPIReturnType         = "string"
 	bitstampAPITradingPairsInfo   = "trading-pairs-info"
+	bitstampOHLC                  = "ohlc"
 
 	bitstampRateInterval = time.Minute * 10
 	bitstampRequestRate  = 8000
@@ -62,12 +63,6 @@ const (
 // Bitstamp is the overarching type across the bitstamp package
 type Bitstamp struct {
 	exchange.Base
-	WebsocketConn *wshandler.WebsocketConnection
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (b *Bitstamp) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
 }
 
 // GetFee returns an estimate of fee based on type of transaction
@@ -236,21 +231,21 @@ func (b *Bitstamp) GetTradingPairs() ([]TradingPair, error) {
 
 // GetTransactions returns transaction information
 // value paramater ["time"] = "minute", "hour", "day" will collate your
-// response into time intervals. Implementation of value in test code.
-func (b *Bitstamp) GetTransactions(currencyPair string, values url.Values) ([]Transactions, error) {
+// response into time intervals.
+func (b *Bitstamp) GetTransactions(currencyPair, timePeriod string) ([]Transactions, error) {
 	var transactions []Transactions
-	path := common.EncodeURLValues(
-		fmt.Sprintf(
-			"%s/v%s/%s/%s/",
-			b.API.Endpoints.URL,
-			bitstampAPIVersion,
-			bitstampAPITransactions,
-			strings.ToLower(currencyPair),
-		),
-		values,
+	requestURL := fmt.Sprintf(
+		"%s/v%s/%s/%s/",
+		b.API.Endpoints.URL,
+		bitstampAPIVersion,
+		bitstampAPITransactions,
+		strings.ToLower(currencyPair),
 	)
+	if timePeriod != "" {
+		requestURL += "?time=" + url.QueryEscape(timePeriod)
+	}
 
-	return transactions, b.SendHTTPRequest(path, &transactions)
+	return transactions, b.SendHTTPRequest(requestURL, &transactions)
 }
 
 // GetEURUSDConversionRate returns the conversion rate between Euro and USD
@@ -583,6 +578,24 @@ func (b *Bitstamp) GetUnconfirmedBitcoinDeposits() ([]UnconfirmedBTCTransactions
 		b.SendAuthenticatedHTTPRequest(bitstampAPIUnconfirmedBitcoin, false, nil, &response)
 }
 
+// OHLC returns OHLCV data for step (interval)
+func (b *Bitstamp) OHLC(currency string, start, end time.Time, step, limit string) (resp OHLCResponse, err error) {
+	var v = url.Values{}
+	v.Add("limit", limit)
+	v.Add("step", step)
+
+	if start.After(end) && !end.IsZero() {
+		return resp, errors.New("start time cannot be after end time")
+	}
+	if !start.IsZero() {
+		v.Add("start", strconv.FormatInt(start.Unix(), 10))
+	}
+	if !end.IsZero() {
+		v.Add("end", strconv.FormatInt(end.Unix(), 10))
+	}
+	return resp, b.SendHTTPRequest(common.EncodeURLValues(b.API.Endpoints.URL+"/v"+bitstampAPIVersion+"/"+bitstampOHLC+"/"+currency, v), &resp)
+}
+
 // TransferAccountBalance transfers funds from either a main or sub account
 // amount - to transfers
 // currency - which currency to transfer
@@ -613,7 +626,7 @@ func (b *Bitstamp) TransferAccountBalance(amount float64, currency, subAccount s
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (b *Bitstamp) SendHTTPRequest(path string, result interface{}) error {
-	return b.SendPayload(&request.Item{
+	return b.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -666,7 +679,7 @@ func (b *Bitstamp) SendAuthenticatedHTTPRequest(path string, v2 bool, values url
 		Reason interface{} `json:"reason"`
 	}{}
 
-	err := b.SendPayload(&request.Item{
+	err := b.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodPost,
 		Path:          path,
 		Headers:       headers,

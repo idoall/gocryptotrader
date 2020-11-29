@@ -2,6 +2,7 @@ package coinbasepro
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,6 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	"github.com/idoall/gocryptotrader/log"
 )
 
@@ -41,8 +41,6 @@ const (
 	coinbaseproReports                 = "reports"
 	coinbaseproTime                    = "time"
 	coinbaseproMarginTransfer          = "profiles/margin-transfer"
-	coinbaseproFunding                 = "funding"
-	coinbaseproFundingRepay            = "funding/repay"
 	coinbaseproPosition                = "position"
 	coinbaseproPositionClose           = "position/close"
 	coinbaseproPaymentMethod           = "payment-methods"
@@ -58,7 +56,6 @@ const (
 // CoinbasePro is the overarching type across the coinbasepro package
 type CoinbasePro struct {
 	exchange.Base
-	WebsocketConn *wshandler.WebsocketConnection
 }
 
 // GetProducts returns supported currency pairs on the exchange with specific
@@ -489,37 +486,6 @@ func (c *CoinbasePro) GetFills(orderID, currencyPair string) ([]FillResponse, er
 		c.SendAuthenticatedHTTPRequest(http.MethodGet, uri[1:], nil, &resp)
 }
 
-// GetFundingRecords every order placed with a margin profile that draws funding
-// will create a funding record.
-//
-// status - "outstanding", "settled", or "rejected"
-func (c *CoinbasePro) GetFundingRecords(status string) ([]Funding, error) {
-	var resp []Funding
-	params := url.Values{}
-	params.Set("status", status)
-
-	path := common.EncodeURLValues(c.API.Endpoints.URL+coinbaseproFunding, params)
-	uri := common.GetURIPath(path)
-
-	return resp,
-		c.SendAuthenticatedHTTPRequest(http.MethodGet, uri[1:], nil, &resp)
-}
-
-// //////////////////////// Not receiving reply from server /////////////////
-// RepayFunding repays the older funding records first
-//
-// amount - amount of currency to repay
-// currency - currency, example USD
-// func (c *CoinbasePro) RepayFunding(amount, currency string) (Funding, error) {
-// 	resp := Funding{}
-// 	params := make(map[string]interface{})
-// 	params["amount"] = amount
-// 	params["currency"] = currency
-//
-// 	return resp,
-// 		c.SendAuthenticatedHTTPRequest(http.MethodPost, coinbaseproFundingRepay, params, &resp)
-// }
-
 // MarginTransfer sends funds between a standard/default profile and a margin
 // profile.
 // A deposit will transfer funds from the default profile into the margin
@@ -720,7 +686,7 @@ func (c *CoinbasePro) GetTrailingVolume() ([]Volume, error) {
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (c *CoinbasePro) SendHTTPRequest(path string, result interface{}) error {
-	return c.SendPayload(&request.Item{
+	return c.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -750,7 +716,8 @@ func (c *CoinbasePro) SendAuthenticatedHTTPRequest(method, path string, params m
 		}
 	}
 
-	n := strconv.FormatInt(time.Now().Unix(), 10)
+	now := time.Now()
+	n := strconv.FormatInt(now.Unix(), 10)
 	message := n + method + "/" + path + string(payload)
 	hmac := crypto.GetHMAC(crypto.HashSHA256, []byte(message), []byte(c.API.Credentials.Secret))
 	headers := make(map[string]string)
@@ -760,7 +727,10 @@ func (c *CoinbasePro) SendAuthenticatedHTTPRequest(method, path string, params m
 	headers["CB-ACCESS-PASSPHRASE"] = c.API.Credentials.ClientID
 	headers["Content-Type"] = "application/json"
 
-	return c.SendPayload(&request.Item{
+	// Timestamp must be within 30 seconds of the api service time
+	ctx, cancel := context.WithDeadline(context.Background(), now.Add(30*time.Second))
+	defer cancel()
+	return c.SendPayload(ctx, &request.Item{
 		Method:        method,
 		Path:          c.API.Endpoints.URL + path,
 		Headers:       headers,

@@ -1,6 +1,7 @@
 package gemini
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,10 +12,9 @@ import (
 
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
-	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
+	"github.com/idoall/gocryptotrader/exchanges/stream"
 	"github.com/idoall/gocryptotrader/log"
 )
 
@@ -58,11 +58,10 @@ const (
 // AddSession, if sandbox test is needed append a new session with with the same
 // API keys and change the IsSandbox variable to true.
 type Gemini struct {
-	WebsocketConn              *wshandler.WebsocketConnection
-	AuthenticatedWebsocketConn *wshandler.WebsocketConnection
 	exchange.Base
 	Role              string
 	RequiresHeartBeat bool
+	connections       []stream.Connection
 }
 
 // GetSymbols returns all available symbols for trading
@@ -108,7 +107,7 @@ func (g *Gemini) GetOrderbook(currencyPair string, params url.Values) (Orderbook
 	return orderbook, g.SendHTTPRequest(path, &orderbook)
 }
 
-// GetTrades eturn the trades that have executed since the specified timestamp.
+// GetTrades return the trades that have executed since the specified timestamp.
 // Timestamps are either seconds or milliseconds since the epoch (1970-01-01).
 //
 // currencyPair - example "btcusd"
@@ -117,7 +116,17 @@ func (g *Gemini) GetOrderbook(currencyPair string, params url.Values) (Orderbook
 // limit_trades	integer	Optional. The maximum number of trades to return.
 // include_breaks	boolean	Optional. Whether to display broken trades. False by
 // default. Can be '1' or 'true' to activate
-func (g *Gemini) GetTrades(currencyPair string, params url.Values) ([]Trade, error) {
+func (g *Gemini) GetTrades(currencyPair string, since, limit int64, includeBreaks bool) ([]Trade, error) {
+	params := url.Values{}
+	if since > 0 {
+		params.Add("since", strconv.FormatInt(since, 10))
+	}
+	if limit > 0 {
+		params.Add("limit_trades", strconv.FormatInt(limit, 10))
+	}
+	if includeBreaks {
+		params.Add("include_breaks", strconv.FormatBool(true))
+	}
 	path := common.EncodeURLValues(fmt.Sprintf("%s/v%s/%s/%s", g.API.Endpoints.URL, geminiAPIVersion, geminiTrades, currencyPair), params)
 	var trades []Trade
 
@@ -343,7 +352,7 @@ func (g *Gemini) PostHeartbeat() (string, error) {
 
 // SendHTTPRequest sends an unauthenticated request
 func (g *Gemini) SendHTTPRequest(path string, result interface{}) error {
-	return g.SendPayload(&request.Item{
+	return g.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -388,7 +397,7 @@ func (g *Gemini) SendAuthenticatedHTTPRequest(method, path string, params map[st
 	headers["X-GEMINI-SIGNATURE"] = crypto.HexEncodeToString(hmac)
 	headers["Cache-Control"] = "no-cache"
 
-	return g.SendPayload(&request.Item{
+	return g.SendPayload(context.Background(), &request.Item{
 		Method:        method,
 		Path:          g.API.Endpoints.URL + "/v1/" + path,
 		Headers:       headers,
@@ -441,9 +450,4 @@ func calculateTradingFee(notionVolume *NotionalVolume, purchasePrice, amount flo
 	}
 
 	return volumeFee * amount * purchasePrice
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (g *Gemini) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrFunctionNotSupported
 }

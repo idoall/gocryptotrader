@@ -113,11 +113,11 @@ type Execution struct {
 
 // Funding Swap Funding History
 type Funding struct {
-	FundingInterval  string  `json:"fundingInterval"`
-	FundingRate      float64 `json:"fundingRate"`
-	FundingRateDaily float64 `json:"fundingRateDaily"`
-	Symbol           string  `json:"symbol"`
-	Timestamp        string  `json:"timestamp"`
+	FundingInterval  string    `json:"fundingInterval"`
+	FundingRate      float64   `json:"fundingRate"`
+	FundingRateDaily float64   `json:"fundingRateDaily"`
+	Symbol           string    `json:"symbol"`
+	Timestamp        time.Time `json:"timestamp"`
 }
 
 // Instrument Tradeable Contracts, Indices, and History
@@ -129,7 +129,7 @@ type Instrument struct {
 	BuyLeg                         string        `json:"buyLeg"`
 	CalcInterval                   string        `json:"calcInterval"`
 	Capped                         bool          `json:"capped"`
-	ClosingTimestamp               string        `json:"closingTimestamp"`
+	ClosingTimestamp               time.Time     `json:"closingTimestamp"`
 	Deleverage                     bool          `json:"deleverage"`
 	Expiry                         string        `json:"expiry"`
 	FairBasis                      float64       `json:"fairBasis"`
@@ -142,7 +142,7 @@ type Instrument struct {
 	FundingPremiumSymbol           string        `json:"fundingPremiumSymbol"`
 	FundingQuoteSymbol             string        `json:"fundingQuoteSymbol"`
 	FundingRate                    float64       `json:"fundingRate"`
-	FundingTimestamp               string        `json:"fundingTimestamp"`
+	FundingTimestamp               time.Time     `json:"fundingTimestamp"`
 	HasLiquidity                   bool          `json:"hasLiquidity"`
 	HighPrice                      float64       `json:"highPrice"`
 	ImpactAskPrice                 float64       `json:"impactAskPrice"`
@@ -176,7 +176,7 @@ type Instrument struct {
 	Multiplier                     int64         `json:"multiplier"`
 	OpenInterest                   int64         `json:"openInterest"`
 	OpenValue                      int64         `json:"openValue"`
-	OpeningTimestamp               string        `json:"openingTimestamp"`
+	OpeningTimestamp               time.Time     `json:"openingTimestamp"`
 	OptionMultiplier               float64       `json:"optionMultiplier"`
 	OptionStrikePcnt               float64       `json:"optionStrikePcnt"`
 	OptionStrikePrice              float64       `json:"optionStrikePrice"`
@@ -192,7 +192,7 @@ type Instrument struct {
 	QuoteCurrency                  string        `json:"quoteCurrency"`
 	QuoteToSettleMultiplier        int64         `json:"quoteToSettleMultiplier"`
 	RebalanceInterval              string        `json:"rebalanceInterval"`
-	RebalanceTimestamp             string        `json:"rebalanceTimestamp"`
+	RebalanceTimestamp             time.Time     `json:"rebalanceTimestamp"`
 	Reference                      string        `json:"reference"`
 	ReferenceSymbol                string        `json:"referenceSymbol"`
 	RelistInterval                 string        `json:"relistInterval"`
@@ -233,20 +233,20 @@ type InstrumentInterval struct {
 
 // IndexComposite index composite
 type IndexComposite struct {
-	IndexSymbol string  `json:"indexSymbol"`
-	LastPrice   float64 `json:"lastPrice"`
-	Logged      string  `json:"logged"`
-	Reference   string  `json:"reference"`
-	Symbol      string  `json:"symbol"`
-	Timestamp   string  `json:"timestamp"`
-	Weight      float64 `json:"weight"`
+	IndexSymbol string    `json:"indexSymbol"`
+	LastPrice   float64   `json:"lastPrice"`
+	Logged      string    `json:"logged"`
+	Reference   string    `json:"reference"`
+	Symbol      string    `json:"symbol"`
+	Timestamp   time.Time `json:"timestamp"`
+	Weight      float64   `json:"weight"`
 }
 
 // Insurance Insurance Fund Data
 type Insurance struct {
-	Currency      string `json:"currency"`
-	Timestamp     string `json:"timestamp"`
-	WalletBalance int64  `json:"walletBalance"`
+	Currency      string    `json:"currency"`
+	Timestamp     time.Time `json:"timestamp"`
+	WalletBalance int64     `json:"walletBalance"`
 }
 
 // Leaderboard Information on Top Users
@@ -428,25 +428,25 @@ type Position struct {
 
 // Quote Best Bid/Offer Snapshots & Historical Bins
 type Quote struct {
-	AskPrice  float64 `json:"askPrice"`
-	AskSize   int64   `json:"askSize"`
-	BidPrice  float64 `json:"bidPrice"`
-	BidSize   int64   `json:"bidSize"`
-	Symbol    string  `json:"symbol"`
-	Timestamp string  `json:"timestamp"`
+	AskPrice  float64   `json:"askPrice"`
+	AskSize   int64     `json:"askSize"`
+	BidPrice  float64   `json:"bidPrice"`
+	BidSize   int64     `json:"bidSize"`
+	Symbol    string    `json:"symbol"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 // Settlement Historical Settlement Data
 type Settlement struct {
-	Bankrupt              int64   `json:"bankrupt"`
-	OptionStrikePrice     float64 `json:"optionStrikePrice"`
-	OptionUnderlyingPrice float64 `json:"optionUnderlyingPrice"`
-	SettledPrice          float64 `json:"settledPrice"`
-	SettlementType        string  `json:"settlementType"`
-	Symbol                string  `json:"symbol"`
-	TaxBase               int64   `json:"taxBase"`
-	TaxRate               float64 `json:"taxRate"`
-	Timestamp             string  `json:"timestamp"`
+	Bankrupt              int64     `json:"bankrupt"`
+	OptionStrikePrice     float64   `json:"optionStrikePrice"`
+	OptionUnderlyingPrice float64   `json:"optionUnderlyingPrice"`
+	SettledPrice          float64   `json:"settledPrice"`
+	SettlementType        string    `json:"settlementType"`
+	Symbol                string    `json:"symbol"`
+	TaxBase               int64     `json:"taxBase"`
+	TaxRate               float64   `json:"taxRate"`
+	Timestamp             time.Time `json:"timestamp"`
 }
 
 // Stats Exchange Statistics
@@ -480,16 +480,16 @@ type StatsUSD struct {
 
 // Trade Individual & Bucketed Trades
 type Trade struct {
-	ForeignNotional float64 `json:"foreignNotional"`
-	GrossValue      int64   `json:"grossValue"`
-	HomeNotional    float64 `json:"homeNotional"`
-	Price           float64 `json:"price"`
-	Side            string  `json:"side"`
-	Size            int64   `json:"size"`
-	Symbol          string  `json:"symbol"`
-	TickDirection   string  `json:"tickDirection"`
-	Timestamp       string  `json:"timestamp"`
-	TrdMatchID      string  `json:"trdMatchID"`
+	ForeignNotional float64   `json:"foreignNotional"`
+	GrossValue      int64     `json:"grossValue"`
+	HomeNotional    float64   `json:"homeNotional"`
+	Price           float64   `json:"price"`
+	Side            string    `json:"side"`
+	Size            int64     `json:"size"`
+	Symbol          string    `json:"symbol"`
+	TickDirection   string    `json:"tickDirection"`
+	Timestamp       time.Time `json:"timestamp"`
+	TrdMatchID      string    `json:"trdMatchID"`
 }
 
 // TradeBucket K线相关
@@ -571,37 +571,37 @@ type UserPreferences struct {
 
 // AffiliateStatus affiliate Status details
 type AffiliateStatus struct {
-	Account         int64   `json:"account"`
-	Currency        string  `json:"currency"`
-	ExecComm        int64   `json:"execComm"`
-	ExecTurnover    int64   `json:"execTurnover"`
-	PayoutPcnt      float64 `json:"payoutPcnt"`
-	PendingPayout   int64   `json:"pendingPayout"`
-	PrevComm        int64   `json:"prevComm"`
-	PrevPayout      int64   `json:"prevPayout"`
-	PrevTimestamp   string  `json:"prevTimestamp"`
-	PrevTurnover    int64   `json:"prevTurnover"`
-	ReferrerAccount float64 `json:"referrerAccount"`
-	Timestamp       string  `json:"timestamp"`
-	TotalComm       int64   `json:"totalComm"`
-	TotalReferrals  int64   `json:"totalReferrals"`
-	TotalTurnover   int64   `json:"totalTurnover"`
+	Account         int64     `json:"account"`
+	Currency        string    `json:"currency"`
+	ExecComm        int64     `json:"execComm"`
+	ExecTurnover    int64     `json:"execTurnover"`
+	PayoutPcnt      float64   `json:"payoutPcnt"`
+	PendingPayout   int64     `json:"pendingPayout"`
+	PrevComm        int64     `json:"prevComm"`
+	PrevPayout      int64     `json:"prevPayout"`
+	PrevTimestamp   time.Time `json:"prevTimestamp"`
+	PrevTurnover    int64     `json:"prevTurnover"`
+	ReferrerAccount float64   `json:"referrerAccount"`
+	Timestamp       time.Time `json:"timestamp"`
+	TotalComm       int64     `json:"totalComm"`
+	TotalReferrals  int64     `json:"totalReferrals"`
+	TotalTurnover   int64     `json:"totalTurnover"`
 }
 
 // TransactionInfo Information
 type TransactionInfo struct {
-	Account        int64  `json:"account"`
-	Address        string `json:"address"`
-	Amount         int64  `json:"amount"`
-	Currency       string `json:"currency"`
-	Fee            int64  `json:"fee"`
-	Text           string `json:"text"`
-	Timestamp      string `json:"timestamp"`
-	TransactID     string `json:"transactID"`
-	TransactStatus string `json:"transactStatus"`
-	TransactTime   string `json:"transactTime"`
-	TransactType   string `json:"transactType"`
-	Tx             string `json:"tx"`
+	Account        int64     `json:"account"`
+	Address        string    `json:"address"`
+	Amount         int64     `json:"amount"`
+	Currency       string    `json:"currency"`
+	Fee            int64     `json:"fee"`
+	Text           string    `json:"text"`
+	Timestamp      time.Time `json:"timestamp"`
+	TransactID     string    `json:"transactID"`
+	TransactStatus string    `json:"transactStatus"`
+	TransactTime   string    `json:"transactTime"`
+	TransactType   string    `json:"transactType"`
+	Tx             string    `json:"tx"`
 }
 
 // UserCommission user commission
@@ -622,47 +622,47 @@ type ConfirmEmail struct {
 
 // UserMargin margin information
 type UserMargin struct {
-	Account            int64   `json:"account"`
-	Action             string  `json:"action"`
-	Amount             int64   `json:"amount"`
-	AvailableMargin    int64   `json:"availableMargin"`
-	Commission         float64 `json:"commission"`
-	ConfirmedDebit     int64   `json:"confirmedDebit"`
-	Currency           string  `json:"currency"`
-	ExcessMargin       int64   `json:"excessMargin"`
-	ExcessMarginPcnt   float64 `json:"excessMarginPcnt"`
-	GrossComm          int64   `json:"grossComm"`
-	GrossExecCost      int64   `json:"grossExecCost"`
-	GrossLastValue     int64   `json:"grossLastValue"`
-	GrossMarkValue     int64   `json:"grossMarkValue"`
-	GrossOpenCost      int64   `json:"grossOpenCost"`
-	GrossOpenPremium   int64   `json:"grossOpenPremium"`
-	IndicativeTax      int64   `json:"indicativeTax"`
-	InitMargin         int64   `json:"initMargin"`
-	MaintMargin        int64   `json:"maintMargin"`
-	MarginBalance      int64   `json:"marginBalance"`
-	MarginBalancePcnt  float64 `json:"marginBalancePcnt"`
-	MarginLeverage     float64 `json:"marginLeverage"`
-	MarginUsedPcnt     float64 `json:"marginUsedPcnt"`
-	PendingCredit      int64   `json:"pendingCredit"`
-	PendingDebit       int64   `json:"pendingDebit"`
-	PrevRealisedPnl    int64   `json:"prevRealisedPnl"`
-	PrevState          string  `json:"prevState"`
-	PrevUnrealisedPnl  int64   `json:"prevUnrealisedPnl"`
-	RealisedPnl        int64   `json:"realisedPnl"`
-	RiskLimit          int64   `json:"riskLimit"`
-	RiskValue          int64   `json:"riskValue"`
-	SessionMargin      int64   `json:"sessionMargin"`
-	State              string  `json:"state"`
-	SyntheticMargin    int64   `json:"syntheticMargin"`
-	TargetExcessMargin int64   `json:"targetExcessMargin"`
-	TaxableMargin      int64   `json:"taxableMargin"`
-	Timestamp          string  `json:"timestamp"`
-	UnrealisedPnl      int64   `json:"unrealisedPnl"`
-	UnrealisedProfit   int64   `json:"unrealisedProfit"`
-	VarMargin          int64   `json:"varMargin"`
-	WalletBalance      int64   `json:"walletBalance"`
-	WithdrawableMargin int64   `json:"withdrawableMargin"`
+	Account            int64     `json:"account"`
+	Action             string    `json:"action"`
+	Amount             int64     `json:"amount"`
+	AvailableMargin    int64     `json:"availableMargin"`
+	Commission         float64   `json:"commission"`
+	ConfirmedDebit     int64     `json:"confirmedDebit"`
+	Currency           string    `json:"currency"`
+	ExcessMargin       int64     `json:"excessMargin"`
+	ExcessMarginPcnt   float64   `json:"excessMarginPcnt"`
+	GrossComm          int64     `json:"grossComm"`
+	GrossExecCost      int64     `json:"grossExecCost"`
+	GrossLastValue     int64     `json:"grossLastValue"`
+	GrossMarkValue     int64     `json:"grossMarkValue"`
+	GrossOpenCost      int64     `json:"grossOpenCost"`
+	GrossOpenPremium   int64     `json:"grossOpenPremium"`
+	IndicativeTax      int64     `json:"indicativeTax"`
+	InitMargin         int64     `json:"initMargin"`
+	MaintMargin        int64     `json:"maintMargin"`
+	MarginBalance      int64     `json:"marginBalance"`
+	MarginBalancePcnt  float64   `json:"marginBalancePcnt"`
+	MarginLeverage     float64   `json:"marginLeverage"`
+	MarginUsedPcnt     float64   `json:"marginUsedPcnt"`
+	PendingCredit      int64     `json:"pendingCredit"`
+	PendingDebit       int64     `json:"pendingDebit"`
+	PrevRealisedPnl    int64     `json:"prevRealisedPnl"`
+	PrevState          string    `json:"prevState"`
+	PrevUnrealisedPnl  int64     `json:"prevUnrealisedPnl"`
+	RealisedPnl        int64     `json:"realisedPnl"`
+	RiskLimit          int64     `json:"riskLimit"`
+	RiskValue          int64     `json:"riskValue"`
+	SessionMargin      int64     `json:"sessionMargin"`
+	State              string    `json:"state"`
+	SyntheticMargin    int64     `json:"syntheticMargin"`
+	TargetExcessMargin int64     `json:"targetExcessMargin"`
+	TaxableMargin      int64     `json:"taxableMargin"`
+	Timestamp          time.Time `json:"timestamp"`
+	UnrealisedPnl      int64     `json:"unrealisedPnl"`
+	UnrealisedProfit   int64     `json:"unrealisedProfit"`
+	VarMargin          int64     `json:"varMargin"`
+	WalletBalance      int64     `json:"walletBalance"`
+	WithdrawableMargin int64     `json:"withdrawableMargin"`
 }
 
 // MinWithdrawalFee minimum withdrawal fee information
@@ -674,31 +674,31 @@ type MinWithdrawalFee struct {
 
 // WalletInfo wallet information
 type WalletInfo struct {
-	Account          int64    `json:"account"`
-	Addr             string   `json:"addr"`
-	Amount           int64    `json:"amount"`
-	ConfirmedDebit   int64    `json:"confirmedDebit"`
-	Currency         string   `json:"currency"`
-	DeltaAmount      int64    `json:"deltaAmount"`
-	DeltaDeposited   int64    `json:"deltaDeposited"`
-	DeltaTransferIn  int64    `json:"deltaTransferIn"`
-	DeltaTransferOut int64    `json:"deltaTransferOut"`
-	DeltaWithdrawn   int64    `json:"deltaWithdrawn"`
-	Deposited        int64    `json:"deposited"`
-	PendingCredit    int64    `json:"pendingCredit"`
-	PendingDebit     int64    `json:"pendingDebit"`
-	PrevAmount       int64    `json:"prevAmount"`
-	PrevDeposited    int64    `json:"prevDeposited"`
-	PrevTimestamp    string   `json:"prevTimestamp"`
-	PrevTransferIn   int64    `json:"prevTransferIn"`
-	PrevTransferOut  int64    `json:"prevTransferOut"`
-	PrevWithdrawn    int64    `json:"prevWithdrawn"`
-	Script           string   `json:"script"`
-	Timestamp        string   `json:"timestamp"`
-	TransferIn       int64    `json:"transferIn"`
-	TransferOut      int64    `json:"transferOut"`
-	WithdrawalLock   []string `json:"withdrawalLock"`
-	Withdrawn        int64    `json:"withdrawn"`
+	Account          int64     `json:"account"`
+	Addr             string    `json:"addr"`
+	Amount           int64     `json:"amount"`
+	ConfirmedDebit   int64     `json:"confirmedDebit"`
+	Currency         string    `json:"currency"`
+	DeltaAmount      int64     `json:"deltaAmount"`
+	DeltaDeposited   int64     `json:"deltaDeposited"`
+	DeltaTransferIn  int64     `json:"deltaTransferIn"`
+	DeltaTransferOut int64     `json:"deltaTransferOut"`
+	DeltaWithdrawn   int64     `json:"deltaWithdrawn"`
+	Deposited        int64     `json:"deposited"`
+	PendingCredit    int64     `json:"pendingCredit"`
+	PendingDebit     int64     `json:"pendingDebit"`
+	PrevAmount       int64     `json:"prevAmount"`
+	PrevDeposited    int64     `json:"prevDeposited"`
+	PrevTimestamp    time.Time `json:"prevTimestamp"`
+	PrevTransferIn   int64     `json:"prevTransferIn"`
+	PrevTransferOut  int64     `json:"prevTransferOut"`
+	PrevWithdrawn    int64     `json:"prevWithdrawn"`
+	Script           string    `json:"script"`
+	Timestamp        time.Time `json:"timestamp"`
+	TransferIn       int64     `json:"transferIn"`
+	TransferOut      int64     `json:"transferOut"`
+	WithdrawalLock   []string  `json:"withdrawalLock"`
+	Withdrawn        int64     `json:"withdrawn"`
 }
 
 // TimeInterval represents interval enum.

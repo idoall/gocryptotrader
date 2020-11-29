@@ -2,6 +2,7 @@ package btcmarkets
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,7 +18,6 @@ import (
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 )
 
 const (
@@ -65,24 +65,18 @@ const (
 	stop       = "Stop"
 	takeProfit = "Take Profit"
 
-	subscribe   = "subscribe"
-	fundChange  = "fundChange"
-	orderChange = "orderChange"
-	heartbeat   = "heartbeat"
-	tick        = "tick"
-	wsOB        = "orderbook"
-	trade       = "trade"
+	subscribe     = "subscribe"
+	fundChange    = "fundChange"
+	orderChange   = "orderChange"
+	heartbeat     = "heartbeat"
+	tick          = "tick"
+	wsOB          = "orderbookUpdate"
+	tradeEndPoint = "trade"
 )
 
 // BTCMarkets is the overarching type across the BTCMarkets package
 type BTCMarkets struct {
 	exchange.Base
-	WebsocketConn *wshandler.WebsocketConnection
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (b *BTCMarkets) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
 }
 
 // GetMarkets returns the BTCMarkets instruments
@@ -108,7 +102,7 @@ func (b *BTCMarkets) GetTrades(marketID string, before, after, limit int64) ([]T
 	if before > 0 {
 		params.Set("before", strconv.FormatInt(before, 10))
 	}
-	if after >= 0 {
+	if after > 0 {
 		params.Set("after", strconv.FormatInt(after, 10))
 	}
 	if limit > 0 {
@@ -166,21 +160,21 @@ func (b *BTCMarkets) GetOrderbook(marketID string, level int64) (Orderbook, erro
 }
 
 // GetMarketCandles gets candles for specified currency pair
-func (b *BTCMarkets) GetMarketCandles(marketID, timeWindow, from, to string, before, after, limit int64) ([]MarketCandle, error) {
+func (b *BTCMarkets) GetMarketCandles(marketID, timeWindow string, from, to time.Time, before, after, limit int64) (out CandleResponse, err error) {
 	if (before > 0) && (after >= 0) {
-		return nil, errors.New("BTCMarkets only supports either before or after, not both")
+		return out, errors.New("BTCMarkets only supports either before or after, not both")
 	}
-	var marketCandles []MarketCandle
-	var temp [][]string
 	params := url.Values{}
-	if timeWindow != "" {
-		params.Set("timeWindow", timeWindow)
+	params.Set("timeWindow", timeWindow)
+
+	if from.After(to) && !to.IsZero() {
+		return out, errors.New("start time cannot be after end time")
 	}
-	if from != "" {
-		params.Set("from", from)
+	if !from.IsZero() {
+		params.Set("from", from.UTC().Format(time.RFC3339))
 	}
-	if to != "" {
-		params.Set("to", to)
+	if !to.IsZero() {
+		params.Set("to", to.UTC().Format(time.RFC3339))
 	}
 	if before > 0 {
 		params.Set("before", strconv.FormatInt(before, 10))
@@ -191,46 +185,11 @@ func (b *BTCMarkets) GetMarketCandles(marketID, timeWindow, from, to string, bef
 	if limit > 0 {
 		params.Set("limit", strconv.FormatInt(limit, 10))
 	}
-	err := b.SendHTTPRequest(btcMarketsUnauthPath+marketID+btcMarketsCandles+params.Encode(),
-		&temp)
-	if err != nil {
-		return marketCandles, err
-	}
-	var tempData MarketCandle
-	var tempTime time.Time
-	for x := range temp {
-		tempTime, err = time.Parse(time.RFC3339, temp[x][0])
-		if err != nil {
-			return marketCandles, err
-		}
-		tempData.Time = tempTime
-		tempData.Open, err = strconv.ParseFloat(temp[x][1], 64)
-		if err != nil {
-			return marketCandles, err
-		}
-		tempData.High, err = strconv.ParseFloat(temp[x][2], 64)
-		if err != nil {
-			return marketCandles, err
-		}
-		tempData.Low, err = strconv.ParseFloat(temp[x][3], 64)
-		if err != nil {
-			return marketCandles, err
-		}
-		tempData.Close, err = strconv.ParseFloat(temp[x][4], 64)
-		if err != nil {
-			return marketCandles, err
-		}
-		tempData.Volume, err = strconv.ParseFloat(temp[x][5], 64)
-		if err != nil {
-			return marketCandles, err
-		}
-		marketCandles = append(marketCandles, tempData)
-	}
-	return marketCandles, nil
+	return out, b.SendHTTPRequest(btcMarketsUnauthPath+marketID+btcMarketsCandles+params.Encode(), &out)
 }
 
 // GetTickers gets multiple tickers
-func (b *BTCMarkets) GetTickers(marketIDs []currency.Pair) ([]Ticker, error) {
+func (b *BTCMarkets) GetTickers(marketIDs currency.Pairs) ([]Ticker, error) {
 	var tickers []Ticker
 	params := url.Values{}
 	for x := range marketIDs {
@@ -712,7 +671,7 @@ func (b *BTCMarkets) GetBatchTrades(ids []string) (BatchTradeResponse, error) {
 }
 
 // CancelBatchOrders cancels given ids
-func (b *BTCMarkets) CancelBatchOrders(ids []string) (BatchCancelResponse, error) {
+func (b *BTCMarkets) CancelBatch(ids []string) (BatchCancelResponse, error) {
 	var resp BatchCancelResponse
 	marketIDs := strings.Join(ids, ",")
 	return resp, b.SendAuthenticatedRequest(http.MethodDelete,
@@ -724,7 +683,7 @@ func (b *BTCMarkets) CancelBatchOrders(ids []string) (BatchCancelResponse, error
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (b *BTCMarkets) SendHTTPRequest(path string, result interface{}) error {
-	return b.SendPayload(&request.Item{
+	return b.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -741,7 +700,8 @@ func (b *BTCMarkets) SendAuthenticatedRequest(method, path string, data, result 
 			b.Name)
 	}
 
-	strTime := strconv.FormatInt(time.Now().UTC().UnixNano()/1000000, 10)
+	now := time.Now()
+	strTime := strconv.FormatInt(now.UTC().UnixNano()/1000000, 10)
 
 	var body io.Reader
 	var payload, hmac []byte
@@ -770,7 +730,10 @@ func (b *BTCMarkets) SendAuthenticatedRequest(method, path string, data, result 
 	headers["BM-AUTH-TIMESTAMP"] = strTime
 	headers["BM-AUTH-SIGNATURE"] = crypto.Base64Encode(hmac)
 
-	return b.SendPayload(&request.Item{
+	// The timestamp included with an authenticated request must be within +/- 30 seconds of the server timestamp
+	ctx, cancel := context.WithDeadline(context.Background(), now.Add(30*time.Second))
+	defer cancel()
+	return b.SendPayload(ctx, &request.Item{
 		Method:        method,
 		Path:          btcMarketsAPIURL + btcMarketsAPIVersion + path,
 		Headers:       headers,
@@ -796,7 +759,11 @@ func (b *BTCMarkets) GetFee(feeBuilder *exchange.FeeBuilder) (float64, error) {
 			return fee, err
 		}
 		for x := range temp.FeeByMarkets {
-			if currency.NewPairFromString(temp.FeeByMarkets[x].MarketID) == feeBuilder.Pair {
+			p, err := currency.NewPairFromString(temp.FeeByMarkets[x].MarketID)
+			if err != nil {
+				return 0, err
+			}
+			if p == feeBuilder.Pair {
 				fee = temp.FeeByMarkets[x].MakerFeeRate
 				if !feeBuilder.IsMaker {
 					fee = temp.FeeByMarkets[x].TakerFeeRate

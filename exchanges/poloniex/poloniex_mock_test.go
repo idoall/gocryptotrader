@@ -33,6 +33,7 @@ func TestMain(m *testing.M) {
 	poloniexConfig.API.Credentials.Key = apiKey
 	poloniexConfig.API.Credentials.Secret = apiSecret
 	p.SetDefaults()
+	p.Websocket = sharedtestvalues.NewTestWebsocket()
 	err = p.Setup(poloniexConfig)
 	if err != nil {
 		log.Fatal("Poloniex setup error", err)
@@ -45,7 +46,6 @@ func TestMain(m *testing.M) {
 
 	p.HTTPClient = newClient
 	p.API.Endpoints.URL = serverDetails
-
 	log.Printf(sharedtestvalues.MockTesting, p.Name, p.API.Endpoints.URL)
 	os.Exit(m.Run())
 }

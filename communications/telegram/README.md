@@ -14,7 +14,7 @@ This telegram package is part of the GoCryptoTrader codebase.
 
 ## This is still in active development
 
-You can track ideas, planned features and what's in progresss on this Trello board: [https://trello.com/b/ZAhMhpOy/gocryptotrader](https://trello.com/b/ZAhMhpOy/gocryptotrader).
+You can track ideas, planned features and what's in progress on this Trello board: [https://trello.com/b/ZAhMhpOy/gocryptotrader](https://trello.com/b/ZAhMhpOy/gocryptotrader).
 
 Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader Slack](https://join.slack.com/t/gocryptotrader/shared_invite/enQtNTQ5NDAxMjA2Mjc5LTc5ZDE1ZTNiOGM3ZGMyMmY1NTAxYWZhODE0MWM5N2JlZDk1NDU0YTViYzk4NTk3OTRiMDQzNGQ1YTc4YmRlMTk)
 
@@ -29,38 +29,42 @@ developed by Telegram Messenger LLP
 ### Current Features
 
 + Creation of bot that can retrieve
-  - Bot status
+	- Bot status
 
-  ### How to enable
+	### How to enable
 
-  ```go
-  "github.com/idoall/gocryptotrader/communications/telegram"
-  "github.com/idoall/gocryptotrader/config"
-  )
+	+ [Enable via configuration](https://github.com/idoall/gocryptotrader/tree/master/config#enable-communications-via-config-example)
 
-  t := new(telegram.Telegram)
+	+ Individual package example below:
+	```go
+	import (
+	"github.com/idoall/gocryptotrader/communications/telegram"
+	"github.com/idoall/gocryptotrader/config"
+	)
 
-  // Define Telegram configuration
-  commsConfig := config.CommunicationsConfig{TelegramConfig: config.TelegramConfig{
-    Name: "Telegram",
-  	Enabled: true,
-  	Verbose: false,
-    VerificationToken: "token",
-  }}
+	t := new(telegram.Telegram)
 
-  t.Setup(commsConfig)
-  err := t.Connect
-  // Handle error
-  ```
+	// Define Telegram configuration
+	commsConfig := config.CommunicationsConfig{TelegramConfig: config.TelegramConfig{
+	Name: "Telegram",
+		Enabled: true,
+		Verbose: false,
+	VerificationToken: "token",
+	}}
+
+	t.Setup(commsConfig)
+	err := t.Connect
+	// Handle error
+	```
 
 + Once the bot has started you can interact with the bot using these commands
 via Telegram:
 
 ```
-/start  		- Will authenticate your ID
-/status 		- Displays the status of the bot
-/help 			- Displays current command list
-/settings 	- Displays current bot settings
+/start			- Will authenticate your ID
+/status			- Displays the status of the bot
+/help			- Displays current command list
+/settings		- Displays current bot settings
 ```
 
 ### Please click GoDocs chevron above to view current GoDoc information for this package

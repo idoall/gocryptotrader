@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/config"
@@ -25,7 +26,6 @@ const (
 var b Bitflyer
 
 func TestMain(m *testing.M) {
-	b.SetDefaults()
 	cfg := config.GetConfig()
 	err := cfg.LoadConfig("../../testdata/configtest.json", true)
 	if err != nil {
@@ -39,7 +39,7 @@ func TestMain(m *testing.M) {
 	bitflyerConfig.API.AuthenticatedSupport = true
 	bitflyerConfig.API.Credentials.Key = apiKey
 	bitflyerConfig.API.Credentials.Secret = apiSecret
-
+	b.SetDefaults()
 	err = b.Setup(bitflyerConfig)
 	if err != nil {
 		log.Fatal("Bitflyer setup error", err)
@@ -93,9 +93,17 @@ func TestGetAddressInfoCA(t *testing.T) {
 
 func TestGetMarkets(t *testing.T) {
 	t.Parallel()
-	_, err := b.GetMarkets()
+	markets, err := b.GetMarkets()
 	if err != nil {
 		t.Error("Bitflyer - GetMarkets() error:", err)
+	}
+	for _, market := range markets {
+		if market.ProductCode == "" {
+			t.Error("Bitflyer - ProductCode is empty in GetMarkets()")
+		}
+		if market.MarketType == "" {
+			t.Error("Bitflyer - MarketType is empty in GetMarkets()")
+		}
 	}
 }
 
@@ -133,7 +141,10 @@ func TestGetExchangeStatus(t *testing.T) {
 
 func TestCheckFXString(t *testing.T) {
 	t.Parallel()
-	p := currency.NewPairDelimiter("FXBTC_JPY", "_")
+	p, err := currency.NewPairDelimiter("FXBTC_JPY", "_")
+	if err != nil {
+		t.Fatal(err)
+	}
 	p = b.CheckFXString(p)
 	if p.Base.String() != "FX_BTC" {
 		t.Error("Bitflyer - CheckFXString() error")
@@ -144,15 +155,19 @@ func TestFetchTicker(t *testing.T) {
 	t.Parallel()
 	var p currency.Pair
 
-	currencies := b.GetAvailablePairs(asset.Spot)
-	for _, pair := range currencies {
-		if pair.String() == "FXBTC_JPY" {
-			p = pair
+	currencies, err := b.GetAvailablePairs(asset.Spot)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	for i := range currencies {
+		if currencies[i].String() == "FXBTC_JPY" {
+			p = currencies[i]
 			break
 		}
 	}
 
-	_, err := b.FetchTicker(p, asset.Spot)
+	_, err = b.FetchTicker(p, asset.Spot)
 	if err != nil {
 		t.Error("Bitflyer - FetchTicker() error", err)
 	}
@@ -268,7 +283,7 @@ func TestFormatWithdrawPermissions(t *testing.T) {
 func TestGetActiveOrders(t *testing.T) {
 	t.Parallel()
 	var getOrdersRequest = order.GetOrdersRequest{
-		OrderType: order.AnyType,
+		Type: order.AnyType,
 	}
 
 	_, err := b.GetActiveOrders(&getOrdersRequest)
@@ -282,7 +297,7 @@ func TestGetActiveOrders(t *testing.T) {
 func TestGetOrderHistory(t *testing.T) {
 	t.Parallel()
 	var getOrdersRequest = order.GetOrdersRequest{
-		OrderType: order.AnyType,
+		Type: order.AnyType,
 	}
 
 	_, err := b.GetOrderHistory(&getOrdersRequest)
@@ -308,11 +323,12 @@ func TestSubmitOrder(t *testing.T) {
 			Base:  currency.BTC,
 			Quote: currency.LTC,
 		},
-		OrderSide: order.Buy,
-		OrderType: order.Limit,
+		Side:      order.Buy,
+		Type:      order.Limit,
 		Price:     1,
 		Amount:    1,
 		ClientID:  "meowOrder",
+		AssetType: asset.Spot,
 	}
 	_, err := b.SubmitOrder(orderSubmission)
 	if err != common.ErrNotYetImplemented {
@@ -328,10 +344,11 @@ func TestCancelExchangeOrder(t *testing.T) {
 
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = &order.Cancel{
-		OrderID:       "1",
+		ID:            "1",
 		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
-		CurrencyPair:  currencyPair,
+		Pair:          currencyPair,
+		AssetType:     asset.Spot,
 	}
 
 	err := b.CancelOrder(orderCancellation)
@@ -349,10 +366,11 @@ func TestCancelAllExchangeOrders(t *testing.T) {
 
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = &order.Cancel{
-		OrderID:       "1",
+		ID:            "1",
 		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
-		CurrencyPair:  currencyPair,
+		Pair:          currencyPair,
+		AssetType:     asset.Spot,
 	}
 
 	_, err := b.CancelAllOrders(orderCancellation)
@@ -372,7 +390,7 @@ func TestWithdraw(t *testing.T) {
 		Amount:      -1,
 		Currency:    currency.BTC,
 		Description: "WITHDRAW IT ALL",
-		Crypto: &withdraw.CryptoRequest{
+		Crypto: withdraw.CryptoRequest{
 			Address: core.BitcoinDonationAddress,
 		},
 	}
@@ -388,7 +406,7 @@ func TestModifyOrder(t *testing.T) {
 	if areTestAPIKeysSet() && !canManipulateRealOrders {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
-	_, err := b.ModifyOrder(&order.Modify{})
+	_, err := b.ModifyOrder(&order.Modify{AssetType: asset.Spot})
 	if err == nil {
 		t.Error("ModifyOrder() Expected error")
 	}
@@ -419,5 +437,29 @@ func TestWithdrawInternationalBank(t *testing.T) {
 	_, err := b.WithdrawFiatFundsToInternationalBank(&withdrawFiatRequest)
 	if err != common.ErrNotYetImplemented {
 		t.Errorf("Expected '%v', received: '%v'", common.ErrNotYetImplemented, err)
+	}
+}
+
+func TestGetRecentTrades(t *testing.T) {
+	t.Parallel()
+	currencyPair, err := currency.NewPairFromString("BTC_JPY")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = b.GetRecentTrades(currencyPair, asset.Spot)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetHistoricTrades(t *testing.T) {
+	t.Parallel()
+	currencyPair, err := currency.NewPairFromString("BTC_JPY")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = b.GetHistoricTrades(currencyPair, asset.Spot, time.Now().Add(-time.Minute*15), time.Now())
+	if err != nil && err != common.ErrFunctionNotSupported {
+		t.Fatal(err)
 	}
 }

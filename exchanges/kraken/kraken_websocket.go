@@ -4,20 +4,24 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/http"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/convert"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
+	"github.com/idoall/gocryptotrader/exchanges/stream"
+	"github.com/idoall/gocryptotrader/exchanges/stream/buffer"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wsorderbook"
+	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/log"
 )
 
@@ -26,128 +30,339 @@ const (
 	krakenWSURL              = "wss://ws.kraken.com"
 	krakenAuthWSURL          = "wss://ws-auth.kraken.com"
 	krakenWSSandboxURL       = "wss://sandbox.kraken.com"
-	krakenWSSupportedVersion = "0.3.0"
+	krakenWSSupportedVersion = "1.4.0"
 	// WS endpoints
-	krakenWsHeartbeat          = "heartbeat"
-	krakenWsSystemStatus       = "systemStatus"
-	krakenWsSubscribe          = "subscribe"
-	krakenWsSubscriptionStatus = "subscriptionStatus"
-	krakenWsUnsubscribe        = "unsubscribe"
-	krakenWsTicker             = "ticker"
-	krakenWsOHLC               = "ohlc"
-	krakenWsTrade              = "trade"
-	krakenWsSpread             = "spread"
-	krakenWsOrderbook          = "book"
-	krakenWsOwnTrades          = "ownTrades"
-	krakenWsOpenOrders         = "openOrders"
-	krakenWsAddOrder           = "addOrder"
-	krakenWsCancelOrder        = "cancelOrder"
-	krakenWsRateLimit          = 50
-	krakenWsPingDelay          = time.Second * 27
+	krakenWsHeartbeat            = "heartbeat"
+	krakenWsSystemStatus         = "systemStatus"
+	krakenWsSubscribe            = "subscribe"
+	krakenWsSubscriptionStatus   = "subscriptionStatus"
+	krakenWsUnsubscribe          = "unsubscribe"
+	krakenWsTicker               = "ticker"
+	krakenWsOHLC                 = "ohlc"
+	krakenWsTrade                = "trade"
+	krakenWsSpread               = "spread"
+	krakenWsOrderbook            = "book"
+	krakenWsOwnTrades            = "ownTrades"
+	krakenWsOpenOrders           = "openOrders"
+	krakenWsAddOrder             = "addOrder"
+	krakenWsCancelOrder          = "cancelOrder"
+	krakenWsCancelAll            = "cancelAll"
+	krakenWsAddOrderStatus       = "addOrderStatus"
+	krakenWsCancelOrderStatus    = "cancelOrderStatus"
+	krakenWsCancelAllOrderStatus = "cancelAllStatus"
+	krakenWsRateLimit            = 50
+	krakenWsPingDelay            = time.Second * 27
 )
 
-// orderbookMutex Ensures if two entries arrive at once, only one can be processed at a time
+// orderbookMutex Ensures if two entries arrive at once, only one can be
+// processed at a time
 var subscriptionChannelPair []WebsocketChannelData
-var comms = make(chan wshandler.WebsocketResponse)
 var authToken string
-var pingRequest = WebsocketBaseEventRequest{Event: wshandler.Ping}
+var pingRequest = WebsocketBaseEventRequest{Event: stream.Ping}
 
 // Channels require a topic and a currency
 // Format [[ticker,but-t4u],[orderbook,nce-btt]]
-var defaultSubscribedChannels = []string{krakenWsTicker, krakenWsTrade, krakenWsOrderbook, krakenWsOHLC, krakenWsSpread}
+var defaultSubscribedChannels = []string{krakenWsTicker,
+	krakenWsTrade,
+	krakenWsOrderbook,
+	krakenWsOHLC,
+	krakenWsSpread}
 var authenticatedChannels = []string{krakenWsOwnTrades, krakenWsOpenOrders}
+
+var cancelOrdersStatusMutex sync.Mutex
+var cancelOrdersStatus = make(map[int64]*struct {
+	Total        int    // total count of orders in wsCancelOrders request
+	Successful   int    // numbers of Successfully canceled orders in wsCancelOrders request
+	Unsuccessful int    // numbers of Unsuccessfully canceled orders in wsCancelOrders request
+	Error        string // if at least one of requested order return fail, store error here
+})
 
 // WsConnect initiates a websocket connection
 func (k *Kraken) WsConnect() error {
 	if !k.Websocket.IsEnabled() || !k.IsEnabled() {
-		return errors.New(wshandler.WebsocketNotEnabled)
+		return errors.New(stream.WebsocketNotEnabled)
 	}
+
 	var dialer websocket.Dialer
-	err := k.WebsocketConn.Dial(&dialer, http.Header{})
+	err := k.Websocket.Conn.Dial(&dialer, http.Header{})
 	if err != nil {
 		return err
 	}
+
+	comms := make(chan stream.Response)
+	go k.wsReadData(comms)
+	go k.wsFunnelConnectionData(k.Websocket.Conn, comms)
+
 	if k.GetAuthenticatedAPISupport(exchange.WebsocketAuthentication) {
 		authToken, err = k.GetWebsocketToken()
 		if err != nil {
 			k.Websocket.SetCanUseAuthenticatedEndpoints(false)
-			log.Errorf(log.ExchangeSys, "%v - authentication failed: %v\n", k.Name, err)
+			log.Errorf(log.ExchangeSys,
+				"%v - authentication failed: %v\n",
+				k.Name,
+				err)
+		} else {
+			err = k.Websocket.AuthConn.Dial(&dialer, http.Header{})
+			if err != nil {
+				k.Websocket.SetCanUseAuthenticatedEndpoints(false)
+				log.Errorf(log.ExchangeSys,
+					"%v - failed to connect to authenticated endpoint: %v\n",
+					k.Name,
+					err)
+			} else {
+				go k.wsFunnelConnectionData(k.Websocket.AuthConn, comms)
+				var authsubs []stream.ChannelSubscription
+				authsubs, err = k.GenerateAuthenticatedSubscriptions()
+				if err != nil {
+					return err
+				}
+				err = k.Websocket.SubscribeToChannels(authsubs)
+				if err != nil {
+					return err
+				}
+			}
 		}
-		err = k.AuthenticatedWebsocketConn.Dial(&dialer, http.Header{})
-		if err != nil {
-			k.Websocket.SetCanUseAuthenticatedEndpoints(false)
-			log.Errorf(log.ExchangeSys, "%v - failed to connect to authenticated endpoint: %v\n", k.Name, err)
-		}
-		go k.WsReadData(k.AuthenticatedWebsocketConn)
-		k.GenerateAuthenticatedSubscriptions()
 	}
 
-	go k.WsReadData(k.WebsocketConn)
-	go k.WsHandleData()
 	err = k.wsPingHandler()
 	if err != nil {
-		log.Errorf(log.ExchangeSys, "%v - failed setup ping handler. Websocket may disconnect unexpectedly. %v\n", k.Name, err)
+		log.Errorf(log.ExchangeSys,
+			"%v - failed setup ping handler. Websocket may disconnect unexpectedly. %v\n",
+			k.Name,
+			err)
 	}
-	k.GenerateDefaultSubscriptions()
-
-	return nil
+	gensubs, err := k.GenerateDefaultSubscriptions()
+	if err != nil {
+		return err
+	}
+	return k.Websocket.SubscribeToChannels(gensubs)
 }
 
-// WsReadData funnels both auth and public ws data into one manageable place
-func (k *Kraken) WsReadData(ws *wshandler.WebsocketConnection) {
+// wsFunnelConnectionData funnels both auth and public ws data into one manageable place
+func (k *Kraken) wsFunnelConnectionData(ws stream.Connection, comms chan stream.Response) {
 	k.Websocket.Wg.Add(1)
 	defer k.Websocket.Wg.Done()
 	for {
-		select {
-		case <-k.Websocket.ShutdownC:
+		resp := ws.ReadMessage()
+		if resp.Raw == nil {
 			return
-		default:
-			resp, err := ws.ReadMessage()
-			if err != nil {
-				k.Websocket.DataHandler <- err
-				return
-			}
-			k.Websocket.TrafficAlert <- struct{}{}
-			comms <- resp
 		}
+		comms <- resp
 	}
 }
 
-// WsHandleData handles the read data from the websocket connection
-func (k *Kraken) WsHandleData() {
+// wsReadData receives and passes on websocket messages for processing
+func (k *Kraken) wsReadData(comms chan stream.Response) {
 	k.Websocket.Wg.Add(1)
-	defer func() {
-		k.Websocket.Wg.Done()
-	}()
+	defer k.Websocket.Wg.Done()
 
 	for {
 		select {
 		case <-k.Websocket.ShutdownC:
 			return
-		default:
-			resp := <-comms
-			// event response handling
-			var eventResponse WebsocketEventResponse
-			err := json.Unmarshal(resp.Raw, &eventResponse)
-			if err == nil && eventResponse.Event != "" {
-				k.WsHandleEventResponse(&eventResponse, resp.Raw)
-				continue
-			}
-			// Data response handling
-			var dataResponse WebsocketDataResponse
-			err = json.Unmarshal(resp.Raw, &dataResponse)
+		case resp := <-comms:
+			err := k.wsHandleData(resp.Raw)
 			if err != nil {
-				log.Error(log.WebsocketMgr, fmt.Errorf("%s - unhandled websocket data: %v", k.Name, err))
-				continue
-			}
-			if _, ok := dataResponse[0].(float64); ok {
-				k.WsHandleDataResponse(dataResponse)
-			}
-			if _, ok := dataResponse[1].(string); ok {
-				k.wsHandleAuthDataResponse(dataResponse)
+				k.Websocket.DataHandler <- fmt.Errorf("%s - unhandled websocket data: %v",
+					k.Name,
+					err)
 			}
 		}
 	}
+}
+
+// awaitForCancelOrderResponses used to wait until all responses will received for appropriate CancelOrder request
+// success param = was the response from Kraken successful or not
+func isAwaitingCancelOrderResponses(requestID int64, success bool) bool {
+	cancelOrdersStatusMutex.Lock()
+	if stat, ok := cancelOrdersStatus[requestID]; ok {
+		if success {
+			cancelOrdersStatus[requestID].Successful++
+		} else {
+			cancelOrdersStatus[requestID].Unsuccessful++
+		}
+
+		if stat.Successful+stat.Unsuccessful != stat.Total {
+			cancelOrdersStatusMutex.Unlock()
+			return true
+		}
+	}
+	cancelOrdersStatusMutex.Unlock()
+	return false
+}
+
+func (k *Kraken) wsHandleData(respRaw []byte) error {
+	if strings.HasPrefix(string(respRaw), "[") {
+		var dataResponse WebsocketDataResponse
+		err := json.Unmarshal(respRaw, &dataResponse)
+		if err != nil {
+			return err
+		}
+		if _, ok := dataResponse[0].(float64); ok {
+			err = k.wsReadDataResponse(dataResponse)
+			if err != nil {
+				return err
+			}
+		}
+		if _, ok := dataResponse[1].(string); ok {
+			err = k.wsHandleAuthDataResponse(dataResponse)
+			if err != nil {
+				return err
+			}
+		}
+	} else {
+		var eventResponse map[string]interface{}
+		err := json.Unmarshal(respRaw, &eventResponse)
+		if err != nil {
+			return fmt.Errorf("%s - err %s could not parse websocket data: %s",
+				k.Name,
+				err,
+				respRaw)
+		}
+		if event, ok := eventResponse["event"]; ok {
+			switch event {
+			case stream.Pong, krakenWsHeartbeat:
+				return nil
+			case krakenWsCancelOrderStatus:
+				var status WsCancelOrderResponse
+				err := json.Unmarshal(respRaw, &status)
+				if err != nil {
+					return fmt.Errorf("%s - err %s unable to parse WsCancelOrderResponse: %s",
+						k.Name,
+						err,
+						respRaw)
+				}
+
+				success := true
+				if status.Status == "error" {
+					success = false
+					cancelOrdersStatusMutex.Lock()
+					if _, ok := cancelOrdersStatus[status.RequestID]; ok {
+						if cancelOrdersStatus[status.RequestID].Error == "" { // save the first error, if any
+							cancelOrdersStatus[status.RequestID].Error = status.ErrorMessage
+						}
+					}
+					cancelOrdersStatusMutex.Unlock()
+				}
+
+				if isAwaitingCancelOrderResponses(status.RequestID, success) {
+					return nil
+				}
+
+				// all responses handled, return results stored in cancelOrdersStatus
+				if status.RequestID > 0 && !k.Websocket.Match.IncomingWithData(status.RequestID, respRaw) {
+					return fmt.Errorf("can't send ws incoming data to Matched channel with RequestID: %d",
+						status.RequestID)
+				}
+			case krakenWsCancelAllOrderStatus:
+				var status WsCancelOrderResponse
+				err := json.Unmarshal(respRaw, &status)
+				if err != nil {
+					return fmt.Errorf("%s - err %s unable to parse WsCancelOrderResponse: %s",
+						k.Name,
+						err,
+						respRaw)
+				}
+
+				var isChannelExist bool
+				if status.RequestID > 0 {
+					isChannelExist = k.Websocket.Match.IncomingWithData(status.RequestID, respRaw)
+				}
+
+				if status.Status == "error" {
+					return fmt.Errorf("%v Websocket status for RequestID %d: '%v'",
+						k.Name,
+						status.RequestID,
+						status.ErrorMessage)
+				}
+
+				if !isChannelExist && status.RequestID > 0 {
+					return fmt.Errorf("can't send ws incoming data to Matched channel with RequestID: %d",
+						status.RequestID)
+				}
+			case krakenWsSystemStatus:
+				var systemStatus wsSystemStatus
+				err := json.Unmarshal(respRaw, &systemStatus)
+				if err != nil {
+					return fmt.Errorf("%s - err %s unable to parse system status response: %s",
+						k.Name,
+						err,
+						respRaw)
+				}
+				if systemStatus.Status != "online" {
+					k.Websocket.DataHandler <- fmt.Errorf("%v Websocket status '%v'",
+						k.Name,
+						systemStatus.Status)
+				}
+				if systemStatus.Version > krakenWSSupportedVersion {
+					log.Warnf(log.ExchangeSys,
+						"%v New version of Websocket API released. Was %v Now %v",
+						k.Name,
+						krakenWSSupportedVersion,
+						systemStatus.Version)
+				}
+			case krakenWsAddOrderStatus:
+				var status WsAddOrderResponse
+				err := json.Unmarshal(respRaw, &status)
+				if err != nil {
+					return fmt.Errorf("%s - err %s unable to parse add order response: %s",
+						k.Name,
+						err,
+						respRaw)
+				}
+
+				var isChannelExist bool
+				if status.RequestID > 0 {
+					isChannelExist = k.Websocket.Match.IncomingWithData(status.RequestID, respRaw)
+				}
+
+				if status.Status == "error" {
+					return fmt.Errorf("%v Websocket status for RequestID %d: '%v'",
+						k.Name,
+						status.RequestID,
+						status.ErrorMessage)
+				}
+
+				k.Websocket.DataHandler <- &order.Detail{
+					Exchange: k.Name,
+					ID:       status.TransactionID,
+					Status:   order.New,
+				}
+
+				if !isChannelExist && status.RequestID > 0 {
+					return fmt.Errorf("can't send ws incoming data to Matched channel with RequestID: %d",
+						status.RequestID)
+				}
+			case krakenWsSubscriptionStatus:
+				var sub wsSubscription
+				err := json.Unmarshal(respRaw, &sub)
+				if err != nil {
+					return fmt.Errorf("%s - err %s unable to parse subscription response: %s",
+						k.Name,
+						err,
+						respRaw)
+				}
+				if sub.Status != "subscribed" && sub.Status != "unsubscribed" {
+					return fmt.Errorf("%v %v %v",
+						k.Name,
+						sub.RequestID,
+						sub.ErrorMessage)
+				}
+				k.addNewSubscriptionChannelData(&sub)
+				if sub.RequestID > 0 {
+					if k.Websocket.Match.IncomingWithData(sub.RequestID, respRaw) {
+						return nil
+					}
+				}
+			default:
+				k.Websocket.DataHandler <- stream.UnhandledMessageWarning{
+					Message: k.Name + stream.UnhandledMessage + string(respRaw),
+				}
+			}
+			return nil
+		}
+	}
+	return nil
 }
 
 // wsPingHandler sends a message "ping" every 27 to maintain the connection to the websocket
@@ -156,7 +371,7 @@ func (k *Kraken) wsPingHandler() error {
 	if err != nil {
 		return err
 	}
-	k.WebsocketConn.SetupPingHandler(wshandler.WebsocketPingHandler{
+	k.Websocket.Conn.SetupPingHandler(stream.PingHandler{
 		Message:     message,
 		Delay:       krakenWsPingDelay,
 		MessageType: websocket.TextMessage,
@@ -164,278 +379,220 @@ func (k *Kraken) wsPingHandler() error {
 	return nil
 }
 
-// WsHandleDataResponse classifies the WS response and sends to appropriate handler
-func (k *Kraken) WsHandleDataResponse(response WebsocketDataResponse) {
+// wsReadDataResponse classifies the WS response and sends to appropriate handler
+func (k *Kraken) wsReadDataResponse(response WebsocketDataResponse) error {
 	if cID, ok := response[0].(float64); ok {
 		channelID := int64(cID)
 		channelData := getSubscriptionChannelData(channelID)
 		switch channelData.Subscription {
 		case krakenWsTicker:
-			if k.Verbose {
-				log.Debugf(log.ExchangeSys, "%v Websocket ticker data received",
-					k.Name)
+			t, ok := response[1].(map[string]interface{})
+			if !ok {
+				return errors.New("received invalid ticker data")
 			}
-			k.wsProcessTickers(&channelData, response[1].(map[string]interface{}))
+			return k.wsProcessTickers(&channelData, t)
 		case krakenWsOHLC:
-			if k.Verbose {
-				log.Debugf(log.ExchangeSys, "%v Websocket OHLC data received",
-					k.Name)
+			o, ok := response[1].([]interface{})
+			if !ok {
+				return errors.New("received invalid OHLCV data")
 			}
-			k.wsProcessCandles(&channelData, response[1].([]interface{}))
+			return k.wsProcessCandles(&channelData, o)
 		case krakenWsOrderbook:
-			if k.Verbose {
-				log.Debugf(log.ExchangeSys, "%v Websocket Orderbook data received",
-					k.Name)
+			ob, ok := response[1].(map[string]interface{})
+			if !ok {
+				return errors.New("received invalid orderbook data")
 			}
-			k.wsProcessOrderBook(&channelData, response[1].(map[string]interface{}))
+			return k.wsProcessOrderBook(&channelData, ob)
 		case krakenWsSpread:
-			if k.Verbose {
-				log.Debugf(log.ExchangeSys, "%v Websocket Spread data received",
-					k.Name)
+			s, ok := response[1].([]interface{})
+			if !ok {
+				return errors.New("received invalid spread data")
 			}
-			k.wsProcessSpread(&channelData, response[1].([]interface{}))
+			k.wsProcessSpread(&channelData, s)
 		case krakenWsTrade:
-			if k.Verbose {
-				log.Debugf(log.ExchangeSys, "%v Websocket Trade data received",
-					k.Name)
+			t, ok := response[1].([]interface{})
+			if !ok {
+				return errors.New("received invalid trade data")
 			}
-			k.wsProcessTrades(&channelData, response[1].([]interface{}))
+			return k.wsProcessTrades(&channelData, t)
 		default:
-			log.Errorf(log.ExchangeSys, "%v Unidentified websocket data received: %v",
+			return fmt.Errorf("%s received unidentified data: %+v",
 				k.Name,
 				response)
 		}
 	}
+
+	return nil
 }
 
-// WsHandleEventResponse classifies the WS response and sends to appropriate handler
-func (k *Kraken) WsHandleEventResponse(response *WebsocketEventResponse, rawResponse []byte) {
-	switch response.Event {
-	case wshandler.Pong:
-		break
-	case krakenWsHeartbeat:
-		if k.Verbose {
-			log.Debugf(log.ExchangeSys, "%v Websocket heartbeat data received",
-				k.Name)
-		}
-	case krakenWsSystemStatus:
-		if k.Verbose {
-			log.Debugf(log.ExchangeSys, "%v Websocket status data received",
-				k.Name)
-		}
-		if response.Status != "online" {
-			k.Websocket.DataHandler <- fmt.Errorf("%v Websocket status '%v'",
-				k.Name, response.Status)
-		}
-		if response.WebsocketStatusResponse.Version > krakenWSSupportedVersion {
-			log.Warnf(log.ExchangeSys, "%v New version of Websocket API released. Was %v Now %v",
-				k.Name, krakenWSSupportedVersion, response.WebsocketStatusResponse.Version)
-		}
-	case krakenWsSubscriptionStatus:
-		k.WebsocketConn.AddResponseWithID(response.RequestID, rawResponse)
-		if response.Status != "subscribed" {
-			k.Websocket.DataHandler <- fmt.Errorf("%v %v %v", k.Name, response.RequestID, response.WebsocketErrorResponse.ErrorMessage)
-			return
-		}
-		addNewSubscriptionChannelData(response)
-	default:
-		log.Errorf(log.ExchangeSys, "%v Unidentified websocket data received: %v",
-			k.Name, response)
-	}
-}
-
-func (k *Kraken) wsHandleAuthDataResponse(response WebsocketDataResponse) {
+func (k *Kraken) wsHandleAuthDataResponse(response WebsocketDataResponse) error {
 	if chName, ok := response[1].(string); ok {
 		switch chName {
 		case krakenWsOwnTrades:
-			if k.Verbose {
-				log.Debugf(log.ExchangeSys, "%v Websocket auth own trade data received",
-					k.Name)
-			}
-			k.wsProcessOwnTrades(&response[0])
+			return k.wsProcessOwnTrades(response[0])
 		case krakenWsOpenOrders:
-			if k.Verbose {
-				log.Debugf(log.ExchangeSys, "%v Websocket auth open order data received",
-					k.Name)
-			}
-			k.wsProcessOpenOrders(&response[0])
+			return k.wsProcessOpenOrders(response[0])
+		default:
+			return fmt.Errorf("%v Unidentified websocket data received: %+v",
+				k.Name, response)
 		}
 	}
+	return nil
 }
 
-func (k *Kraken) wsProcessOwnTrades(ownOrders interface{}) {
+func (k *Kraken) wsProcessOwnTrades(ownOrders interface{}) error {
 	if data, ok := ownOrders.([]interface{}); ok {
 		for i := range data {
-			ownTrade := data[i].(map[string]interface{})
-			for _, val := range ownTrade {
-				tradeData := val.(map[string]interface{})
-				cost, err := strconv.ParseFloat(tradeData["cost"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				fee, err := strconv.ParseFloat(tradeData["fee"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				margin, err := strconv.ParseFloat(tradeData["margin"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				vol, err := strconv.ParseFloat(tradeData["vol"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				price, err := strconv.ParseFloat(tradeData["price"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				timeTogether, err := strconv.ParseFloat(tradeData["time"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				first, second, err := convert.SplitFloatDecimals(timeTogether)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				k.Websocket.DataHandler <- WsOwnTrade{
-					Cost:               cost,
-					Fee:                fee,
-					Margin:             margin,
-					OrderTransactionID: tradeData["ordertxid"].(string),
-					OrderType:          tradeData["ordertype"].(string),
-					Pair:               tradeData["pair"].(string),
-					PostTransactionID:  tradeData["postxid"].(string),
-					Price:              price,
-					Time:               time.Unix(first, second),
-					Type:               tradeData["type"].(string),
-					Vol:                vol,
-				}
+			trades, err := json.Marshal(data[i])
+			if err != nil {
+				return err
 			}
-		}
-	} else {
-		k.Websocket.DataHandler <- errors.New(k.Name + " - Invalid own trades data")
-	}
-}
-
-func (k *Kraken) wsProcessOpenOrders(ownOrders interface{}) {
-	if data, ok := ownOrders.([]interface{}); ok {
-		for i := range data {
-			ownTrade := data[i].(map[string]interface{})
-			for key, val := range ownTrade {
-				tradeData := val.(map[string]interface{})
-				if len(tradeData) == 1 {
-					// just a status update
-					if status, ok := tradeData["status"].(string); ok {
-						k.Websocket.DataHandler <- k.Name + " - Order " + key + " " + status
+			var result map[string]*WsOwnTrade
+			err = json.Unmarshal(trades, &result)
+			if err != nil {
+				return err
+			}
+			for key, val := range result {
+				oSide, err := order.StringToOrderSide(val.Type)
+				if err != nil {
+					k.Websocket.DataHandler <- order.ClassificationError{
+						Exchange: k.Name,
+						OrderID:  key,
+						Err:      err,
 					}
 				}
-				startTimeConv, err := strconv.ParseFloat(tradeData["starttm"].(string), 64)
+				oType, err := order.StringToOrderType(val.OrderType)
 				if err != nil {
-					k.Websocket.DataHandler <- err
+					k.Websocket.DataHandler <- order.ClassificationError{
+						Exchange: k.Name,
+						OrderID:  key,
+						Err:      err,
+					}
 				}
-				startTime, startTimeNano, err := convert.SplitFloatDecimals(startTimeConv)
-				if err != nil {
-					k.Websocket.DataHandler <- err
+				trade := order.TradeHistory{
+					Price:     val.Price,
+					Amount:    val.Vol,
+					Fee:       val.Fee,
+					Exchange:  k.Name,
+					TID:       key,
+					Type:      oType,
+					Side:      oSide,
+					Timestamp: convert.TimeFromUnixTimestampDecimal(val.Time),
 				}
-				openTimeConv, err := strconv.ParseFloat(tradeData["opentm"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				openTime, openTimeNano, err := convert.SplitFloatDecimals(openTimeConv)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				expireTimeConv, err := strconv.ParseFloat(tradeData["expiretm"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				expireTime, expireTimeNano, err := convert.SplitFloatDecimals(expireTimeConv)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				cost, err := strconv.ParseFloat(tradeData["cost"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				executedVolume, err := strconv.ParseFloat(tradeData["vol_exec"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				volume, err := strconv.ParseFloat(tradeData["vol"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				userReference, err := strconv.ParseFloat(tradeData["userref"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				stopPrice, err := strconv.ParseFloat(tradeData["stopprice"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				price, err := strconv.ParseFloat(tradeData["price"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				limitPrice, err := strconv.ParseFloat(tradeData["limitprice"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				fee, err := strconv.ParseFloat(tradeData["fee"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				descriptionSubData := tradeData["description"].(map[string]interface{})
-				descriptionPrice, err := strconv.ParseFloat(descriptionSubData["price"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				descriptionPrice2, err := strconv.ParseFloat(descriptionSubData["price2"].(string), 64)
-				if err != nil {
-					k.Websocket.DataHandler <- err
-				}
-				description := WsOpenOrderDescription{
-					Close:     descriptionSubData["close"].(string),
-					Leverage:  descriptionSubData["leverage"].(string),
-					Order:     descriptionSubData["order"].(string),
-					OrderType: descriptionSubData["ordertype"].(string),
-					Pair:      descriptionSubData["pair"].(string),
-					Price:     descriptionPrice,
-					Price2:    descriptionPrice2,
-					Type:      descriptionSubData["type"].(string),
-				}
-
-				k.Websocket.DataHandler <- WsOpenOrders{
-					Cost:           cost,
-					ExpireTime:     time.Unix(expireTime, expireTimeNano),
-					Description:    description,
-					Fee:            fee,
-					LimitPrice:     limitPrice,
-					Misc:           tradeData["misc"].(string),
-					OFlags:         tradeData["oflags"].(string),
-					OpenTime:       time.Unix(openTime, openTimeNano),
-					Price:          price,
-					RefID:          tradeData["refid"].(string),
-					StartTime:      time.Unix(startTime, startTimeNano),
-					Status:         tradeData["status"].(string),
-					StopPrice:      stopPrice,
-					UserReference:  userReference,
-					Volume:         volume,
-					ExecutedVolume: executedVolume,
+				k.Websocket.DataHandler <- &order.Detail{
+					Exchange: k.Name,
+					ID:       val.OrderTransactionID,
+					Trades:   []order.TradeHistory{trade},
 				}
 			}
 		}
-	} else {
-		k.Websocket.DataHandler <- errors.New(k.Name + " - Invalid own trades data")
+		return nil
 	}
+	return errors.New(k.Name + " - Invalid own trades data")
+}
+
+func (k *Kraken) wsProcessOpenOrders(ownOrders interface{}) error {
+	if data, ok := ownOrders.([]interface{}); ok {
+		for i := range data {
+			orders, err := json.Marshal(data[i])
+			if err != nil {
+				return err
+			}
+			var result map[string]*WsOpenOrder
+			err = json.Unmarshal(orders, &result)
+			if err != nil {
+				return err
+			}
+			for key, val := range result {
+				var oStatus order.Status
+				oStatus, err = order.StringToOrderStatus(val.Status)
+				if err != nil {
+					k.Websocket.DataHandler <- order.ClassificationError{
+						Exchange: k.Name,
+						OrderID:  key,
+						Err:      err,
+					}
+				}
+				if val.Description.Price > 0 {
+					oSide, err := order.StringToOrderSide(val.Description.Type)
+					if err != nil {
+						k.Websocket.DataHandler <- order.ClassificationError{
+							Exchange: k.Name,
+							OrderID:  key,
+							Err:      err,
+						}
+					}
+					if strings.Contains(val.Description.Order, "sell") {
+						oSide = order.Sell
+					}
+					oType, err := order.StringToOrderType(val.Description.Type)
+					if err != nil {
+						k.Websocket.DataHandler <- order.ClassificationError{
+							Exchange: k.Name,
+							OrderID:  key,
+							Err:      err,
+						}
+					}
+
+					p, err := currency.NewPairFromString(val.Description.Pair)
+					if err != nil {
+						k.Websocket.DataHandler <- order.ClassificationError{
+							Exchange: k.Name,
+							OrderID:  key,
+							Err:      err,
+						}
+					}
+
+					var a asset.Item
+					a, err = k.GetPairAssetType(p)
+					if err != nil {
+						return err
+					}
+					k.Websocket.DataHandler <- &order.Modify{
+						Leverage:        val.Description.Leverage,
+						Price:           val.Price,
+						Amount:          val.Volume,
+						LimitPriceUpper: val.LimitPrice,
+						ExecutedAmount:  val.ExecutedVolume,
+						RemainingAmount: val.Volume - val.ExecutedVolume,
+						Fee:             val.Fee,
+						Exchange:        k.Name,
+						ID:              key,
+						Type:            oType,
+						Side:            oSide,
+						Status:          oStatus,
+						AssetType:       a,
+						Date:            convert.TimeFromUnixTimestampDecimal(val.OpenTime),
+						Pair:            p,
+					}
+				} else {
+					k.Websocket.DataHandler <- &order.Modify{
+						Exchange: k.Name,
+						ID:       key,
+						Status:   oStatus,
+					}
+				}
+			}
+		}
+		return nil
+	}
+	return errors.New(k.Name + " - Invalid own trades data")
 }
 
 // addNewSubscriptionChannelData stores channel ids, pairs and subscription types to an array
 // allowing correlation between subscriptions and returned data
-func addNewSubscriptionChannelData(response *WebsocketEventResponse) {
+func (k *Kraken) addNewSubscriptionChannelData(response *wsSubscription) {
 	// We change the / to - to maintain compatibility with REST/config
-	pair := currency.NewPairWithDelimiter(response.Pair.Base.String(),
-		response.Pair.Quote.String(), "-")
+	var pair currency.Pair
+	if response.Pair != "" {
+		var err error
+		pair, err = currency.NewPairFromString(response.Pair)
+		if err != nil {
+			log.Errorf(log.ExchangeSys, "%s exchange error: %s", k.Name, err)
+			return
+		}
+		pair.Delimiter = k.CurrencyPairs.RequestFormat.Delimiter
+	}
 	subscriptionChannelPair = append(subscriptionChannelPair, WebsocketChannelData{
 		Subscription: response.Subscription.Name,
 		Pair:         pair,
@@ -454,47 +611,34 @@ func getSubscriptionChannelData(id int64) WebsocketChannelData {
 }
 
 // wsProcessTickers converts ticker data and sends it to the datahandler
-func (k *Kraken) wsProcessTickers(channelData *WebsocketChannelData, data map[string]interface{}) {
+func (k *Kraken) wsProcessTickers(channelData *WebsocketChannelData, data map[string]interface{}) error {
 	closePrice, err := strconv.ParseFloat(data["c"].([]interface{})[0].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
-
 	openPrice, err := strconv.ParseFloat(data["o"].([]interface{})[0].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
-
 	highPrice, err := strconv.ParseFloat(data["h"].([]interface{})[0].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
-
 	lowPrice, err := strconv.ParseFloat(data["l"].([]interface{})[0].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
-
 	quantity, err := strconv.ParseFloat(data["v"].([]interface{})[0].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
-
 	ask, err := strconv.ParseFloat(data["a"].([]interface{})[0].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
-
 	bid, err := strconv.ParseFloat(data["b"].([]interface{})[0].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
 
 	k.Websocket.DataHandler <- &ticker.Price{
@@ -509,9 +653,10 @@ func (k *Kraken) wsProcessTickers(channelData *WebsocketChannelData, data map[st
 		AssetType:    asset.Spot,
 		Pair:         channelData.Pair,
 	}
+	return nil
 }
 
-// wsProcessTickers converts ticker data and sends it to the datahandler
+// wsProcessSpread converts spread/orderbook data and sends it to the datahandler
 func (k *Kraken) wsProcessSpread(channelData *WebsocketChannelData, data []interface{}) {
 	bestBid := data[0].(string)
 	bestAsk := data[1].(string)
@@ -523,8 +668,6 @@ func (k *Kraken) wsProcessSpread(channelData *WebsocketChannelData, data []inter
 
 	bidVolume := data[3].(string)
 	askVolume := data[4].(string)
-	sec, dec := math.Modf(timeData)
-	spreadTimestamp := time.Unix(int64(sec), int64(dec*(1e9)))
 	if k.Verbose {
 		log.Debugf(log.ExchangeSys,
 			"%v Spread data for '%v' received. Best bid: '%v' Best ask: '%v' Time: '%v', Bid volume '%v', Ask volume '%v'",
@@ -532,54 +675,65 @@ func (k *Kraken) wsProcessSpread(channelData *WebsocketChannelData, data []inter
 			channelData.Pair,
 			bestBid,
 			bestAsk,
-			spreadTimestamp,
+			convert.TimeFromUnixTimestampDecimal(timeData),
 			bidVolume,
 			askVolume)
 	}
 }
 
 // wsProcessTrades converts trade data and sends it to the datahandler
-func (k *Kraken) wsProcessTrades(channelData *WebsocketChannelData, data []interface{}) {
+func (k *Kraken) wsProcessTrades(channelData *WebsocketChannelData, data []interface{}) error {
+	if !k.IsSaveTradeDataEnabled() {
+		return nil
+	}
+	var trades []trade.Data
 	for i := range data {
-		trade := data[i].([]interface{})
-		timeData, err := strconv.ParseFloat(trade[2].(string), 64)
-		if err != nil {
-			k.Websocket.DataHandler <- err
-			return
+		t, ok := data[i].([]interface{})
+		if !ok {
+			return errors.New("unidentified trade data received")
 		}
-		sec, dec := math.Modf(timeData)
-		timeUnix := time.Unix(int64(sec), int64(dec*(1e9)))
-
-		price, err := strconv.ParseFloat(trade[0].(string), 64)
+		timeData, err := strconv.ParseFloat(t[2].(string), 64)
 		if err != nil {
-			k.Websocket.DataHandler <- err
-			return
+			return err
 		}
 
-		amount, err := strconv.ParseFloat(trade[1].(string), 64)
+		price, err := strconv.ParseFloat(t[0].(string), 64)
 		if err != nil {
-			k.Websocket.DataHandler <- err
-			return
+			return err
 		}
 
-		k.Websocket.DataHandler <- wshandler.TradeData{
+		amount, err := strconv.ParseFloat(t[1].(string), 64)
+		if err != nil {
+			return err
+		}
+		var tSide = order.Buy
+		if t[3].(string) == "s" {
+			tSide = order.Sell
+		}
+
+		trades = append(trades, trade.Data{
 			AssetType:    asset.Spot,
 			CurrencyPair: channelData.Pair,
 			Exchange:     k.Name,
 			Price:        price,
 			Amount:       amount,
-			Timestamp:    timeUnix,
-			Side:         trade[3].(string),
-		}
+			Timestamp:    convert.TimeFromUnixTimestampDecimal(timeData),
+			Side:         tSide,
+		})
 	}
+	return trade.AddTradesToBuffer(k.Name, trades...)
 }
 
 // wsProcessOrderBook determines if the orderbook data is partial or update
 // Then sends to appropriate fun
-func (k *Kraken) wsProcessOrderBook(channelData *WebsocketChannelData, data map[string]interface{}) {
-	if fullAsk, ok := data["as"].([]interface{}); ok {
-		fullBids := data["as"].([]interface{})
-		k.wsProcessOrderBookPartial(channelData, fullAsk, fullBids)
+func (k *Kraken) wsProcessOrderBook(channelData *WebsocketChannelData, data map[string]interface{}) error {
+	askSnapshot, askSnapshotExists := data["as"].([]interface{})
+	bidSnapshot, bidSnapshotExists := data["bs"].([]interface{})
+	if askSnapshotExists || bidSnapshotExists {
+		err := k.wsProcessOrderBookPartial(channelData, askSnapshot, bidSnapshot)
+		if err != nil {
+			return err
+		}
 	} else {
 		askData, asksExist := data["a"].([]interface{})
 		bidData, bidsExist := data["b"].([]interface{})
@@ -588,18 +742,21 @@ func (k *Kraken) wsProcessOrderBook(channelData *WebsocketChannelData, data map[
 			defer k.wsRequestMtx.Unlock()
 			err := k.wsProcessOrderBookUpdate(channelData, askData, bidData)
 			if err != nil {
-				subscriptionToRemove := wshandler.WebsocketChannelSubscription{
+				subscriptionToRemove := &stream.ChannelSubscription{
 					Channel:  krakenWsOrderbook,
 					Currency: channelData.Pair,
+					Asset:    asset.Spot,
 				}
 				k.Websocket.ResubscribeToChannel(subscriptionToRemove)
+				return err
 			}
 		}
 	}
+	return nil
 }
 
 // wsProcessOrderBookPartial creates a new orderbook entry for a given currency pair
-func (k *Kraken) wsProcessOrderBookPartial(channelData *WebsocketChannelData, askData, bidData []interface{}) {
+func (k *Kraken) wsProcessOrderBookPartial(channelData *WebsocketChannelData, askData, bidData []interface{}) error {
 	base := orderbook.Base{
 		Pair:      channelData.Pair,
 		AssetType: asset.Spot,
@@ -612,13 +769,11 @@ func (k *Kraken) wsProcessOrderBookPartial(channelData *WebsocketChannelData, as
 		asks := askData[i].([]interface{})
 		price, err := strconv.ParseFloat(asks[0].(string), 64)
 		if err != nil {
-			k.Websocket.DataHandler <- err
-			return
+			return err
 		}
 		amount, err := strconv.ParseFloat(asks[1].(string), 64)
 		if err != nil {
-			k.Websocket.DataHandler <- err
-			return
+			return err
 		}
 		base.Asks = append(base.Asks, orderbook.Item{
 			Amount: amount,
@@ -626,11 +781,9 @@ func (k *Kraken) wsProcessOrderBookPartial(channelData *WebsocketChannelData, as
 		})
 		timeData, err := strconv.ParseFloat(asks[2].(string), 64)
 		if err != nil {
-			k.Websocket.DataHandler <- err
-			return
+			return err
 		}
-		sec, dec := math.Modf(timeData)
-		askUpdatedTime := time.Unix(int64(sec), int64(dec*(1e9)))
+		askUpdatedTime := convert.TimeFromUnixTimestampDecimal(timeData)
 		if highestLastUpdate.Before(askUpdatedTime) {
 			highestLastUpdate = askUpdatedTime
 		}
@@ -640,13 +793,11 @@ func (k *Kraken) wsProcessOrderBookPartial(channelData *WebsocketChannelData, as
 		bids := bidData[i].([]interface{})
 		price, err := strconv.ParseFloat(bids[0].(string), 64)
 		if err != nil {
-			k.Websocket.DataHandler <- err
-			return
+			return err
 		}
 		amount, err := strconv.ParseFloat(bids[1].(string), 64)
 		if err != nil {
-			k.Websocket.DataHandler <- err
-			return
+			return err
 		}
 		base.Bids = append(base.Bids, orderbook.Item{
 			Amount: amount,
@@ -654,32 +805,21 @@ func (k *Kraken) wsProcessOrderBookPartial(channelData *WebsocketChannelData, as
 		})
 		timeData, err := strconv.ParseFloat(bids[2].(string), 64)
 		if err != nil {
-			k.Websocket.DataHandler <- err
-			return
+			return err
 		}
-		sec, dec := math.Modf(timeData)
-		bidUpdateTime := time.Unix(int64(sec), int64(dec*(1e9)))
+		bidUpdateTime := convert.TimeFromUnixTimestampDecimal(timeData)
 		if highestLastUpdate.Before(bidUpdateTime) {
 			highestLastUpdate = bidUpdateTime
 		}
 	}
 	base.LastUpdated = highestLastUpdate
 	base.ExchangeName = k.Name
-	err := k.Websocket.Orderbook.LoadSnapshot(&base)
-	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
-	}
-	k.Websocket.DataHandler <- wshandler.WebsocketOrderbookUpdate{
-		Exchange: k.Name,
-		Asset:    asset.Spot,
-		Pair:     channelData.Pair,
-	}
+	return k.Websocket.Orderbook.LoadSnapshot(&base)
 }
 
 // wsProcessOrderBookUpdate updates an orderbook entry for a given currency pair
 func (k *Kraken) wsProcessOrderBookUpdate(channelData *WebsocketChannelData, askData, bidData []interface{}) error {
-	update := wsorderbook.WebsocketOrderbookUpdate{
+	update := buffer.Update{
 		Asset: asset.Spot,
 		Pair:  channelData.Pair,
 	}
@@ -707,8 +847,7 @@ func (k *Kraken) wsProcessOrderBookUpdate(channelData *WebsocketChannelData, ask
 			return err
 		}
 
-		sec, dec := math.Modf(timeData)
-		askUpdatedTime := time.Unix(int64(sec), int64(dec*(1e9)))
+		askUpdatedTime := convert.TimeFromUnixTimestampDecimal(timeData)
 		if highestLastUpdate.Before(askUpdatedTime) {
 			highestLastUpdate = askUpdatedTime
 		}
@@ -736,81 +875,59 @@ func (k *Kraken) wsProcessOrderBookUpdate(channelData *WebsocketChannelData, ask
 			return err
 		}
 
-		sec, dec := math.Modf(timeData)
-		bidUpdatedTime := time.Unix(int64(sec), int64(dec*(1e9)))
+		bidUpdatedTime := convert.TimeFromUnixTimestampDecimal(timeData)
 		if highestLastUpdate.Before(bidUpdatedTime) {
 			highestLastUpdate = bidUpdatedTime
 		}
 	}
 	update.UpdateTime = highestLastUpdate
-	err := k.Websocket.Orderbook.Update(&update)
-	if err != nil {
-		k.Websocket.DataHandler <- err
-		return err
-	}
-	k.Websocket.DataHandler <- wshandler.WebsocketOrderbookUpdate{
-		Exchange: k.Name,
-		Asset:    asset.Spot,
-		Pair:     channelData.Pair,
-	}
-	return nil
+	return k.Websocket.Orderbook.Update(&update)
 }
 
 // wsProcessCandles converts candle data and sends it to the data handler
-func (k *Kraken) wsProcessCandles(channelData *WebsocketChannelData, data []interface{}) {
+func (k *Kraken) wsProcessCandles(channelData *WebsocketChannelData, data []interface{}) error {
 	startTime, err := strconv.ParseFloat(data[0].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
-	sec, dec := math.Modf(startTime)
-	startTimeUnix := time.Unix(int64(sec), int64(dec*(1e9)))
 
 	endTime, err := strconv.ParseFloat(data[1].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
-	sec, dec = math.Modf(endTime)
-	endTimeUnix := time.Unix(int64(sec), int64(dec*(1e9)))
 
 	openPrice, err := strconv.ParseFloat(data[2].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
 
 	highPrice, err := strconv.ParseFloat(data[3].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
 
 	lowPrice, err := strconv.ParseFloat(data[4].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
 
 	closePrice, err := strconv.ParseFloat(data[5].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
 
 	volume, err := strconv.ParseFloat(data[7].(string), 64)
 	if err != nil {
-		k.Websocket.DataHandler <- err
-		return
+		return err
 	}
 
-	k.Websocket.DataHandler <- wshandler.KlineData{
+	k.Websocket.DataHandler <- stream.KlineData{
 		AssetType: asset.Spot,
 		Pair:      channelData.Pair,
 		Timestamp: time.Now(),
 		Exchange:  k.Name,
-		StartTime: startTimeUnix,
-		CloseTime: endTimeUnix,
+		StartTime: convert.TimeFromUnixTimestampDecimal(startTime),
+		CloseTime: convert.TimeFromUnixTimestampDecimal(endTime),
 		// Candles are sent every 60 seconds
 		Interval:   "60",
 		HighPrice:  highPrice,
@@ -819,81 +936,182 @@ func (k *Kraken) wsProcessCandles(channelData *WebsocketChannelData, data []inte
 		ClosePrice: closePrice,
 		Volume:     volume,
 	}
+	return nil
 }
 
 // GenerateDefaultSubscriptions Adds default subscriptions to websocket to be handled by ManageSubscriptions()
-func (k *Kraken) GenerateDefaultSubscriptions() {
-	enabledCurrencies := k.GetEnabledPairs(asset.Spot)
-	var subscriptions []wshandler.WebsocketChannelSubscription
+func (k *Kraken) GenerateDefaultSubscriptions() ([]stream.ChannelSubscription, error) {
+	enabledCurrencies, err := k.GetEnabledPairs(asset.Spot)
+	if err != nil {
+		return nil, err
+	}
+	var subscriptions []stream.ChannelSubscription
 	for i := range defaultSubscribedChannels {
 		for j := range enabledCurrencies {
 			enabledCurrencies[j].Delimiter = "/"
-			subscriptions = append(subscriptions, wshandler.WebsocketChannelSubscription{
+			subscriptions = append(subscriptions, stream.ChannelSubscription{
 				Channel:  defaultSubscribedChannels[i],
 				Currency: enabledCurrencies[j],
+				Asset:    asset.Spot,
 			})
 		}
 	}
-	k.Websocket.SubscribeToChannels(subscriptions)
+	return subscriptions, nil
 }
 
 // GenerateAuthenticatedSubscriptions Adds default subscriptions to websocket to be handled by ManageSubscriptions()
-func (k *Kraken) GenerateAuthenticatedSubscriptions() {
-	var subscriptions []wshandler.WebsocketChannelSubscription
+func (k *Kraken) GenerateAuthenticatedSubscriptions() ([]stream.ChannelSubscription, error) {
+	var subscriptions []stream.ChannelSubscription
 	for i := range authenticatedChannels {
 		params := make(map[string]interface{})
-		subscriptions = append(subscriptions, wshandler.WebsocketChannelSubscription{
+		subscriptions = append(subscriptions, stream.ChannelSubscription{
 			Channel: authenticatedChannels[i],
 			Params:  params,
 		})
 	}
-	k.Websocket.SubscribeToChannels(subscriptions)
+	return subscriptions, nil
 }
 
 // Subscribe sends a websocket message to receive data from the channel
-func (k *Kraken) Subscribe(channelToSubscribe wshandler.WebsocketChannelSubscription) error {
-	resp := WebsocketSubscriptionEventRequest{
-		Event: krakenWsSubscribe,
-		Subscription: WebsocketSubscriptionData{
-			Name: channelToSubscribe.Channel,
-		},
-		RequestID: k.WebsocketConn.GenerateMessageID(false),
-	}
-	if channelToSubscribe.Channel == "book" {
-		// TODO: Add ability to make depth customisable
-		resp.Subscription.Depth = 1000
-	}
-	if !channelToSubscribe.Currency.IsEmpty() {
-		resp.Pairs = []string{channelToSubscribe.Currency.String()}
-	}
-	if channelToSubscribe.Params != nil {
-		resp.Subscription.Token = authToken
+func (k *Kraken) Subscribe(channelsToSubscribe []stream.ChannelSubscription) error {
+	var subs []WebsocketSubscriptionEventRequest
+channels:
+	for x := range channelsToSubscribe {
+		for y := range subs {
+			if subs[y].Subscription.Name == channelsToSubscribe[x].Channel {
+				subs[y].Pairs = append(subs[y].Pairs,
+					channelsToSubscribe[x].Currency.String())
+				subs[y].Channels = append(subs[y].Channels, channelsToSubscribe[x])
+				continue channels
+			}
+		}
+
+		var id int64
+		if common.StringDataContains(authenticatedChannels, channelsToSubscribe[x].Channel) {
+			id = k.Websocket.AuthConn.GenerateMessageID(false)
+		} else {
+			id = k.Websocket.Conn.GenerateMessageID(false)
+		}
+
+		resp := WebsocketSubscriptionEventRequest{
+			Event: krakenWsSubscribe,
+			Subscription: WebsocketSubscriptionData{
+				Name: channelsToSubscribe[x].Channel,
+			},
+			RequestID: id,
+		}
+		if channelsToSubscribe[x].Channel == "book" {
+			// TODO: Add ability to make depth customisable
+			resp.Subscription.Depth = 1000
+		}
+		if !channelsToSubscribe[x].Currency.IsEmpty() {
+			resp.Pairs = []string{channelsToSubscribe[x].Currency.String()}
+		}
+		if channelsToSubscribe[x].Params != nil {
+			resp.Subscription.Token = authToken
+		}
+
+		resp.Channels = append(resp.Channels, channelsToSubscribe[x])
+		subs = append(subs, resp)
 	}
 
-	_, err := k.WebsocketConn.SendMessageReturnResponse(resp.RequestID, resp)
-	return err
+	var errs common.Errors
+	for i := range subs {
+		if common.StringDataContains(authenticatedChannels, subs[i].Subscription.Name) {
+			_, err := k.Websocket.AuthConn.SendMessageReturnResponse(subs[i].RequestID, subs[i])
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			k.Websocket.AddSuccessfulSubscriptions(subs[i].Channels...)
+			continue
+		}
+
+		_, err := k.Websocket.Conn.SendMessageReturnResponse(subs[i].RequestID, subs[i])
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		k.Websocket.AddSuccessfulSubscriptions(subs[i].Channels...)
+	}
+	if errs != nil {
+		return errs
+	}
+	return nil
 }
 
 // Unsubscribe sends a websocket message to stop receiving data from the channel
-func (k *Kraken) Unsubscribe(channelToSubscribe wshandler.WebsocketChannelSubscription) error {
-	resp := WebsocketSubscriptionEventRequest{
-		Event: krakenWsUnsubscribe,
-		Pairs: []string{channelToSubscribe.Currency.String()},
-		Subscription: WebsocketSubscriptionData{
-			Name: channelToSubscribe.Channel,
-		},
-		RequestID: k.WebsocketConn.GenerateMessageID(false),
+func (k *Kraken) Unsubscribe(channelsToUnsubscribe []stream.ChannelSubscription) error {
+	var unsubs []WebsocketSubscriptionEventRequest
+channels:
+	for x := range channelsToUnsubscribe {
+		for y := range unsubs {
+			if unsubs[y].Subscription.Name == channelsToUnsubscribe[x].Channel {
+				unsubs[y].Pairs = append(unsubs[y].Pairs,
+					channelsToUnsubscribe[x].Currency.String())
+				unsubs[y].Channels = append(unsubs[y].Channels,
+					channelsToUnsubscribe[x])
+				continue channels
+			}
+		}
+		var depth int64
+		if channelsToUnsubscribe[x].Channel == "book" {
+			// TODO: Add ability to make depth customisable
+			depth = 1000
+		}
+
+		var id int64
+		if common.StringDataContains(authenticatedChannels, channelsToUnsubscribe[x].Channel) {
+			id = k.Websocket.AuthConn.GenerateMessageID(false)
+		} else {
+			id = k.Websocket.Conn.GenerateMessageID(false)
+		}
+
+		unsub := WebsocketSubscriptionEventRequest{
+			Event: krakenWsUnsubscribe,
+			Pairs: []string{channelsToUnsubscribe[x].Currency.String()},
+			Subscription: WebsocketSubscriptionData{
+				Name:  channelsToUnsubscribe[x].Channel,
+				Depth: depth,
+			},
+			RequestID: id,
+		}
+		unsub.Channels = append(unsub.Channels, channelsToUnsubscribe[x])
+		unsubs = append(unsubs, unsub)
 	}
-	_, err := k.WebsocketConn.SendMessageReturnResponse(resp.RequestID, resp)
-	return err
+
+	var errs common.Errors
+	for i := range unsubs {
+		if common.StringDataContains(authenticatedChannels, unsubs[i].Subscription.Name) {
+			_, err := k.Websocket.AuthConn.SendMessageReturnResponse(unsubs[i].RequestID, unsubs[i])
+			if err != nil {
+				errs = append(errs, err)
+				continue
+			}
+			k.Websocket.RemoveSuccessfulUnsubscriptions(unsubs[i].Channels...)
+			continue
+		}
+
+		_, err := k.Websocket.Conn.SendMessageReturnResponse(unsubs[i].RequestID, unsubs[i])
+		if err != nil {
+			errs = append(errs, err)
+			continue
+		}
+		k.Websocket.RemoveSuccessfulUnsubscriptions(unsubs[i].Channels...)
+	}
+	if errs != nil {
+		return errs
+	}
+	return nil
 }
 
+// wsAddOrder creates an order, returned order ID if success
 func (k *Kraken) wsAddOrder(request *WsAddOrderRequest) (string, error) {
-	id := k.AuthenticatedWebsocketConn.GenerateMessageID(false)
-	request.UserReferenceID = strconv.FormatInt(id, 10)
+	id := k.Websocket.AuthConn.GenerateMessageID(false)
+	request.RequestID = id
 	request.Event = krakenWsAddOrder
 	request.Token = authToken
-	jsonResp, err := k.AuthenticatedWebsocketConn.SendMessageReturnResponse(id, request)
+	jsonResp, err := k.Websocket.AuthConn.SendMessageReturnResponse(id, request)
 	if err != nil {
 		return "", err
 	}
@@ -908,11 +1126,66 @@ func (k *Kraken) wsAddOrder(request *WsAddOrderRequest) (string, error) {
 	return resp.TransactionID, nil
 }
 
+// wsCancelOrders cancels one or more open orders passed in orderIDs param
 func (k *Kraken) wsCancelOrders(orderIDs []string) error {
+	id := k.Websocket.AuthConn.GenerateMessageID(false)
 	request := WsCancelOrderRequest{
 		Event:          krakenWsCancelOrder,
 		Token:          authToken,
 		TransactionIDs: orderIDs,
+		RequestID:      id,
 	}
-	return k.AuthenticatedWebsocketConn.SendJSONMessage(request)
+
+	cancelOrdersStatus[id] = &struct {
+		Total        int
+		Successful   int
+		Unsuccessful int
+		Error        string
+	}{
+		Total: len(orderIDs),
+	}
+
+	defer delete(cancelOrdersStatus, id)
+
+	_, err := k.Websocket.AuthConn.SendMessageReturnResponse(id, request)
+	if err != nil {
+		return err
+	}
+
+	successful := cancelOrdersStatus[id].Successful
+
+	if cancelOrdersStatus[id].Error != "" || len(orderIDs) != successful { // strange Kraken logic ...
+		var reason string
+		if cancelOrdersStatus[id].Error != "" {
+			reason = fmt.Sprintf(" Reason: %s", cancelOrdersStatus[id].Error)
+		}
+		return fmt.Errorf("%s cancelled %d out of %d orders.%s",
+			k.Name, successful, len(orderIDs), reason)
+	}
+	return nil
+}
+
+// wsCancelAllOrders cancels all opened orders
+// Returns number (count param) of affected orders or 0 if no open orders found
+func (k *Kraken) wsCancelAllOrders() (*WsCancelOrderResponse, error) {
+	id := k.Websocket.AuthConn.GenerateMessageID(false)
+	request := WsCancelOrderRequest{
+		Event:     krakenWsCancelAll,
+		Token:     authToken,
+		RequestID: id,
+	}
+
+	jsonResp, err := k.Websocket.AuthConn.SendMessageReturnResponse(id, request)
+	if err != nil {
+		return &WsCancelOrderResponse{}, err
+	}
+	var resp WsCancelOrderResponse
+	err = json.Unmarshal(jsonResp, &resp)
+	if err != nil {
+		return &WsCancelOrderResponse{}, err
+	}
+	if resp.ErrorMessage != "" {
+		return &WsCancelOrderResponse{}, fmt.Errorf(k.Name + " - " + resp.ErrorMessage)
+	}
+	return &resp, nil
 }

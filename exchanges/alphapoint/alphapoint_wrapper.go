@@ -16,7 +16,7 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/protocol"
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
+	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
 
@@ -34,10 +34,6 @@ func (a *Alphapoint) SetDefaults() {
 	a.API.Endpoints.WebsocketURL = alphapointDefaultWebsocketURL
 	a.API.CredentialsValidator.RequiresKey = true
 	a.API.CredentialsValidator.RequiresSecret = true
-
-	a.CurrencyPairs.AssetTypes = asset.Items{
-		asset.Spot,
-	}
 
 	a.Features = exchange.Features{
 		Supports: exchange.FeaturesSupported{
@@ -70,8 +66,7 @@ func (a *Alphapoint) SetDefaults() {
 	}
 
 	a.Requester = request.New(a.Name,
-		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout),
-		nil)
+		common.NewHTTPClientWithTimeout(exchange.DefaultHTTPTimeout))
 }
 
 // FetchTradablePairs returns a list of the exchanges tradable pairs
@@ -130,23 +125,24 @@ func (a *Alphapoint) FetchAccountInfo() (account.Holdings, error) {
 
 // UpdateTicker updates and returns the ticker for a currency pair
 func (a *Alphapoint) UpdateTicker(p currency.Pair, assetType asset.Item) (*ticker.Price, error) {
-	tickerPrice := new(ticker.Price)
 	tick, err := a.GetTicker(p.String())
 	if err != nil {
-		return tickerPrice, err
+		return nil, err
 	}
 
-	tickerPrice.Pair = p
-	tickerPrice.Ask = tick.Ask
-	tickerPrice.Bid = tick.Bid
-	tickerPrice.Low = tick.Low
-	tickerPrice.High = tick.High
-	tickerPrice.Volume = tick.Volume
-	tickerPrice.Last = tick.Last
-
-	err = ticker.ProcessTicker(a.Name, tickerPrice, assetType)
+	err = ticker.ProcessTicker(&ticker.Price{
+		Pair:         p,
+		Ask:          tick.Ask,
+		Bid:          tick.Bid,
+		Low:          tick.Low,
+		High:         tick.High,
+		Volume:       tick.Volume,
+		Last:         tick.Last,
+		ExchangeName: a.Name,
+		AssetType:    assetType,
+	})
 	if err != nil {
-		return tickerPrice, err
+		return nil, err
 	}
 
 	return ticker.GetTicker(a.Name, p, assetType)
@@ -211,8 +207,13 @@ func (a *Alphapoint) GetFundingHistory() ([]exchange.FundHistory, error) {
 	return nil, common.ErrNotYetImplemented
 }
 
-// GetExchangeHistory returns historic trade data since exchange opening.
-func (a *Alphapoint) GetExchangeHistory(p currency.Pair, assetType asset.Item) ([]exchange.TradeHistory, error) {
+// GetRecentTrades returns the most recent trades for a currency and asset
+func (a *Alphapoint) GetRecentTrades(_ currency.Pair, _ asset.Item) ([]trade.Data, error) {
+	return nil, common.ErrNotYetImplemented
+}
+
+// GetHistoricTrades returns historic trade data within the timeframe provided
+func (a *Alphapoint) GetHistoricTrades(_ currency.Pair, _ asset.Item, _, _ time.Time) ([]trade.Data, error) {
 	return nil, common.ErrNotYetImplemented
 }
 
@@ -224,9 +225,14 @@ func (a *Alphapoint) SubmitOrder(s *order.Submit) (order.SubmitResponse, error) 
 		return submitOrderResponse, err
 	}
 
-	response, err := a.CreateOrder(s.Pair.String(),
-		s.OrderSide.String(),
-		s.OrderSide.String(),
+	fPair, err := a.FormatExchangeCurrency(s.Pair, s.AssetType)
+	if err != nil {
+		return submitOrderResponse, err
+	}
+
+	response, err := a.CreateOrder(fPair.String(),
+		s.Side.String(),
+		s.Type.String(),
 		s.Amount,
 		s.Price)
 	if err != nil {
@@ -235,7 +241,7 @@ func (a *Alphapoint) SubmitOrder(s *order.Submit) (order.SubmitResponse, error) 
 	if response > 0 {
 		submitOrderResponse.OrderID = strconv.FormatInt(response, 10)
 	}
-	if s.OrderType == order.Market {
+	if s.Type == order.Market {
 		submitOrderResponse.FullyMatched = true
 	}
 	submitOrderResponse.IsOrderPlaced = true
@@ -250,23 +256,34 @@ func (a *Alphapoint) ModifyOrder(_ *order.Modify) (string, error) {
 }
 
 // CancelOrder cancels an order by its corresponding ID number
-func (a *Alphapoint) CancelOrder(order *order.Cancel) error {
-	orderIDInt, err := strconv.ParseInt(order.OrderID, 10, 64)
+func (a *Alphapoint) CancelOrder(o *order.Cancel) error {
+	if err := o.Validate(o.StandardCancel()); err != nil {
+		return err
+	}
+	orderIDInt, err := strconv.ParseInt(o.ID, 10, 64)
 	if err != nil {
 		return err
 	}
-	_, err = a.CancelExistingOrder(orderIDInt, order.AccountID)
+	_, err = a.CancelExistingOrder(orderIDInt, o.AccountID)
 	return err
+}
+
+// CancelBatchOrders cancels an orders by their corresponding ID numbers
+func (a *Alphapoint) CancelBatchOrders(o []order.Cancel) (order.CancelBatchResponse, error) {
+	return order.CancelBatchResponse{}, common.ErrNotYetImplemented
 }
 
 // CancelAllOrders cancels all orders for a given account
 func (a *Alphapoint) CancelAllOrders(orderCancellation *order.Cancel) (order.CancelAllResponse, error) {
+	if err := orderCancellation.Validate(); err != nil {
+		return order.CancelAllResponse{}, err
+	}
 	return order.CancelAllResponse{},
 		a.CancelAllExistingOrders(orderCancellation.AccountID)
 }
 
-// GetOrderInfo returns information on a current open order
-func (a *Alphapoint) GetOrderInfo(orderID string) (float64, error) {
+// GetOrderInfo returns order information based on order ID
+func (a *Alphapoint) GetOrderInfo(orderID string, pair currency.Pair, assetType asset.Item) (float64, error) {
 	orders, err := a.GetOrders()
 	if err != nil {
 		return 0, err
@@ -314,11 +331,6 @@ func (a *Alphapoint) WithdrawFiatFundsToInternationalBank(withdrawRequest *withd
 	return "", common.ErrNotYetImplemented
 }
 
-// GetWebsocket returns a pointer to the exchange websocket
-func (a *Alphapoint) GetWebsocket() (*wshandler.Websocket, error) {
-	return nil, common.ErrNotYetImplemented
-}
-
 // GetFeeByType returns an estimate of fee based on type of transaction
 func (a *Alphapoint) GetFeeByType(feeBuilder *exchange.FeeBuilder) (float64, error) {
 	return 0, common.ErrFunctionNotSupported
@@ -327,6 +339,9 @@ func (a *Alphapoint) GetFeeByType(feeBuilder *exchange.FeeBuilder) (float64, err
 // GetActiveOrders retrieves any orders that are active/open
 // This function is not concurrency safe due to orderSide/orderType maps
 func (a *Alphapoint) GetActiveOrders(req *order.GetOrdersRequest) ([]order.Detail, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
 	resp, err := a.GetOrders()
 	if err != nil {
 		return nil, err
@@ -348,19 +363,19 @@ func (a *Alphapoint) GetActiveOrders(req *order.GetOrdersRequest) ([]order.Detai
 				RemainingAmount: resp[x].OpenOrders[y].QtyRemaining,
 			}
 
-			orderDetail.OrderSide = orderSideMap[resp[x].OpenOrders[y].Side]
-			orderDetail.OrderDate = time.Unix(resp[x].OpenOrders[y].ReceiveTime, 0)
-			orderDetail.OrderType = orderTypeMap[resp[x].OpenOrders[y].OrderType]
-			if orderDetail.OrderType == "" {
-				orderDetail.OrderType = order.Unknown
+			orderDetail.Side = orderSideMap[resp[x].OpenOrders[y].Side]
+			orderDetail.Date = time.Unix(resp[x].OpenOrders[y].ReceiveTime, 0)
+			orderDetail.Type = orderTypeMap[resp[x].OpenOrders[y].OrderType]
+			if orderDetail.Type == "" {
+				orderDetail.Type = order.UnknownType
 			}
 
 			orders = append(orders, orderDetail)
 		}
 	}
 
-	order.FilterOrdersByType(&orders, req.OrderType)
-	order.FilterOrdersBySide(&orders, req.OrderSide)
+	order.FilterOrdersByType(&orders, req.Type)
+	order.FilterOrdersBySide(&orders, req.Side)
 	order.FilterOrdersByTickRange(&orders, req.StartTicks, req.EndTicks)
 	return orders, nil
 }
@@ -369,6 +384,10 @@ func (a *Alphapoint) GetActiveOrders(req *order.GetOrdersRequest) ([]order.Detai
 // Can Limit response to specific order status
 // This function is not concurrency safe due to orderSide/orderType maps
 func (a *Alphapoint) GetOrderHistory(req *order.GetOrdersRequest) ([]order.Detail, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
 	resp, err := a.GetOrders()
 	if err != nil {
 		return nil, err
@@ -390,43 +409,21 @@ func (a *Alphapoint) GetOrderHistory(req *order.GetOrdersRequest) ([]order.Detai
 				RemainingAmount: resp[x].OpenOrders[y].QtyRemaining,
 			}
 
-			orderDetail.OrderSide = orderSideMap[resp[x].OpenOrders[y].Side]
-			orderDetail.OrderDate = time.Unix(resp[x].OpenOrders[y].ReceiveTime, 0)
-			orderDetail.OrderType = orderTypeMap[resp[x].OpenOrders[y].OrderType]
-			if orderDetail.OrderType == "" {
-				orderDetail.OrderType = order.Unknown
+			orderDetail.Side = orderSideMap[resp[x].OpenOrders[y].Side]
+			orderDetail.Date = time.Unix(resp[x].OpenOrders[y].ReceiveTime, 0)
+			orderDetail.Type = orderTypeMap[resp[x].OpenOrders[y].OrderType]
+			if orderDetail.Type == "" {
+				orderDetail.Type = order.UnknownType
 			}
 
 			orders = append(orders, orderDetail)
 		}
 	}
 
-	order.FilterOrdersByType(&orders, req.OrderType)
-	order.FilterOrdersBySide(&orders, req.OrderSide)
+	order.FilterOrdersByType(&orders, req.Type)
+	order.FilterOrdersBySide(&orders, req.Side)
 	order.FilterOrdersByTickRange(&orders, req.StartTicks, req.EndTicks)
 	return orders, nil
-}
-
-// SubscribeToWebsocketChannels appends to ChannelsToSubscribe
-// which lets websocket.manageSubscriptions handle subscribing
-func (a *Alphapoint) SubscribeToWebsocketChannels(channels []wshandler.WebsocketChannelSubscription) error {
-	return common.ErrFunctionNotSupported
-}
-
-// UnsubscribeToWebsocketChannels removes from ChannelsToSubscribe
-// which lets websocket.manageSubscriptions handle unsubscribing
-func (a *Alphapoint) UnsubscribeToWebsocketChannels(channels []wshandler.WebsocketChannelSubscription) error {
-	return common.ErrFunctionNotSupported
-}
-
-// GetSubscriptions returns a copied list of subscriptions
-func (a *Alphapoint) GetSubscriptions() ([]wshandler.WebsocketChannelSubscription, error) {
-	return nil, common.ErrFunctionNotSupported
-}
-
-// AuthenticateWebsocket sends an authentication message to the websocket
-func (a *Alphapoint) AuthenticateWebsocket() error {
-	return common.ErrFunctionNotSupported
 }
 
 // ValidateCredentials validates current credentials used for wrapper

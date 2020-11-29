@@ -11,12 +11,11 @@ import (
 	"github.com/idoall/gocryptotrader/engine"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
-	"github.com/idoall/gocryptotrader/exchanges/order"
-	"github.com/idoall/gocryptotrader/portfolio/withdraw"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 )
 
 const (
-	totalWrappers = 20
+	totalWrappers = 25
 )
 
 func main() {
@@ -33,10 +32,11 @@ func main() {
 	log.Printf("Loading exchanges..")
 	var wg sync.WaitGroup
 	for x := range exchange.Exchanges {
-		name := exchange.Exchanges[x]
-		err := engine.LoadExchange(name, true, &wg)
+		err := engine.Bot.LoadExchange(exchange.Exchanges[x], true, &wg)
 		if err != nil {
-			log.Printf("Failed to load exchange %s. Err: %s", name, err)
+			log.Printf("Failed to load exchange %s. Err: %s",
+				exchange.Exchanges[x],
+				err)
 			continue
 		}
 	}
@@ -46,14 +46,14 @@ func main() {
 	log.Printf("Testing exchange wrappers..")
 	results := make(map[string][]string)
 	wg = sync.WaitGroup{}
-	exchanges := engine.GetExchanges()
+	exchanges := engine.Bot.GetExchanges()
 	for x := range exchanges {
+		exch := exchanges[x]
 		wg.Add(1)
-		go func(num int) {
-			name := exchanges[num].GetName()
-			results[name] = testWrappers(exchanges[num])
+		go func(e exchange.IBotExchange) {
+			results[e.GetName()] = testWrappers(e)
 			wg.Done()
-		}(x)
+		}(exch)
 	}
 	wg.Wait()
 	log.Println("Done.")
@@ -77,7 +77,7 @@ func testWrappers(e exchange.IBotExchange) []string {
 	if !e.SupportsAsset(assetType) {
 		assets := e.GetAssetTypes()
 		rand.Seed(time.Now().Unix())
-		assetType = assets[rand.Intn(len(assets))]
+		assetType = assets[rand.Intn(len(assets))] // nolint:gosec // basic number generation required, no need for crypo/rand
 	}
 
 	var funcs []string
@@ -117,9 +117,14 @@ func testWrappers(e exchange.IBotExchange) []string {
 		funcs = append(funcs, "GetAccountInfo")
 	}
 
-	_, err = e.GetExchangeHistory(p, assetType)
+	_, err = e.GetRecentTrades(p, assetType)
 	if err == common.ErrNotYetImplemented {
-		funcs = append(funcs, "GetExchangeHistory")
+		funcs = append(funcs, "GetRecentTrades")
+	}
+
+	_, err = e.GetHistoricTrades(p, assetType, time.Time{}, time.Time{})
+	if err == common.ErrNotYetImplemented {
+		funcs = append(funcs, "GetHistoricTrades")
 	}
 
 	_, err = e.GetFundingHistory()
@@ -127,45 +132,42 @@ func testWrappers(e exchange.IBotExchange) []string {
 		funcs = append(funcs, "GetFundingHistory")
 	}
 
-	s := &order.Submit{
-		Pair:      p,
-		OrderSide: order.Buy,
-		OrderType: order.Limit,
-		Amount:    1000000,
-		Price:     10000000000,
-		ClientID:  "meow",
-	}
-	_, err = e.SubmitOrder(s)
+	_, err = e.SubmitOrder(nil)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "SubmitOrder")
 	}
 
-	_, err = e.ModifyOrder(&order.Modify{})
+	_, err = e.ModifyOrder(nil)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "ModifyOrder")
 	}
 
-	err = e.CancelOrder(&order.Cancel{})
+	err = e.CancelOrder(nil)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "CancelOrder")
 	}
 
-	_, err = e.CancelAllOrders(&order.Cancel{})
+	_, err = e.CancelBatchOrders(nil)
+	if err == common.ErrNotYetImplemented {
+		funcs = append(funcs, "CancelBatchOrders")
+	}
+
+	_, err = e.CancelAllOrders(nil)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "CancelAllOrders")
 	}
 
-	_, err = e.GetOrderInfo("1")
+	_, err = e.GetOrderInfo("1", p, assetType)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "GetOrderInfo")
 	}
 
-	_, err = e.GetOrderHistory(&order.GetOrdersRequest{})
+	_, err = e.GetOrderHistory(nil)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "GetOrderHistory")
 	}
 
-	_, err = e.GetActiveOrders(&order.GetOrdersRequest{})
+	_, err = e.GetActiveOrders(nil)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "GetActiveOrders")
 	}
@@ -175,18 +177,38 @@ func testWrappers(e exchange.IBotExchange) []string {
 		funcs = append(funcs, "GetDepositAddress")
 	}
 
-	_, err = e.WithdrawCryptocurrencyFunds(&withdraw.Request{})
+	_, err = e.WithdrawCryptocurrencyFunds(nil)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "WithdrawCryptocurrencyFunds")
 	}
 
-	_, err = e.WithdrawFiatFunds(&withdraw.Request{})
+	_, err = e.WithdrawFiatFunds(nil)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "WithdrawFiatFunds")
 	}
-	_, err = e.WithdrawFiatFundsToInternationalBank(&withdraw.Request{})
+	_, err = e.WithdrawFiatFundsToInternationalBank(nil)
 	if err == common.ErrNotYetImplemented {
 		funcs = append(funcs, "WithdrawFiatFundsToInternationalBank")
+	}
+
+	_, err = e.GetHistoricCandles(currency.Pair{}, asset.Spot, time.Unix(0, 0), time.Unix(0, 0), kline.OneDay)
+	if err == common.ErrNotYetImplemented {
+		funcs = append(funcs, "GetHistoricCandles")
+	}
+
+	_, err = e.GetHistoricCandlesExtended(currency.Pair{}, asset.Spot, time.Unix(0, 0), time.Unix(0, 0), kline.OneDay)
+	if err == common.ErrNotYetImplemented {
+		funcs = append(funcs, "GetHistoricCandlesExtended")
+	}
+
+	_, err = e.UpdateAccountInfo()
+	if err == common.ErrNotYetImplemented {
+		funcs = append(funcs, "UpdateAccountInfo")
+	}
+
+	_, err = e.GetFeeByType(&exchange.FeeBuilder{})
+	if err == common.ErrNotYetImplemented {
+		funcs = append(funcs, "GetFeeByType")
 	}
 
 	return funcs

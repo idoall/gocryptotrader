@@ -1,15 +1,20 @@
 package request
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -22,7 +27,9 @@ var testURL string
 var serverLimit *rate.Limiter
 
 func TestMain(m *testing.M) {
-	serverLimit = NewRateLimit(time.Millisecond*500, 1)
+	serverLimitInterval := time.Millisecond * 500
+	serverLimit = NewRateLimit(serverLimitInterval, 1)
+	serverLimitRetry := NewRateLimit(serverLimitInterval, 1)
 	sm := http.NewServeMux()
 	sm.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -45,6 +52,22 @@ func TestMain(m *testing.M) {
 			return
 		}
 		io.WriteString(w, `{"response":true}`)
+	})
+	sm.HandleFunc("/rate-retry", func(w http.ResponseWriter, req *http.Request) {
+		if !serverLimitRetry.Allow() {
+			w.Header().Add("Retry-After", strconv.Itoa(int(math.Round(serverLimitInterval.Seconds()))))
+			http.Error(w,
+				http.StatusText(http.StatusTooManyRequests),
+				http.StatusTooManyRequests)
+			io.WriteString(w, `{"response":false}`)
+			return
+		}
+		io.WriteString(w, `{"response":true}`)
+	})
+	sm.HandleFunc("/always-retry", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Add("Retry-After", time.Now().Format(time.RFC1123))
+		w.WriteHeader(http.StatusTooManyRequests)
+		io.WriteString(w, `{"response":false}`)
 	})
 
 	server := httptest.NewServer(sm)
@@ -83,43 +106,51 @@ func TestCheckRequest(t *testing.T) {
 	t.Parallel()
 
 	r := New("TestRequest",
-		new(http.Client),
-		nil)
+		new(http.Client))
+	ctx := context.Background()
 
 	var check *Item
-	_, err := check.validateRequest(&Requester{})
+	_, err := check.validateRequest(ctx, &Requester{})
 	if err == nil {
 		t.Fatal(unexpected)
 	}
 
-	_, err = check.validateRequest(nil)
+	_, err = check.validateRequest(ctx, nil)
 	if err == nil {
 		t.Fatal(unexpected)
 	}
 
-	_, err = check.validateRequest(r)
+	_, err = check.validateRequest(ctx, r)
 	if err == nil {
 		t.Fatal(unexpected)
 	}
 
 	check = &Item{}
-	_, err = check.validateRequest(r)
+	_, err = check.validateRequest(ctx, r)
 	if err == nil {
 		t.Fatal(unexpected)
 	}
 
 	check.Path = testURL
 	check.Method = " " // Forces method check; "" automatically converts to GET
-	_, err = check.validateRequest(r)
+	_, err = check.validateRequest(ctx, r)
 	if err == nil {
 		t.Fatal(unexpected)
 	}
 
 	check.Method = http.MethodPost
-	_, err = check.validateRequest(r)
+	_, err = check.validateRequest(ctx, r)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	var passback http.Header
+	check.HeaderResponse = &passback
+	_, err = check.validateRequest(ctx, r)
+	if err == nil {
+		t.Fatal("expected error when underlying memory is not allocated")
+	}
+	passback = http.Header{}
 
 	// Test setting headers
 	check.Headers = map[string]string{
@@ -128,7 +159,7 @@ func TestCheckRequest(t *testing.T) {
 
 	// Test user agent set
 	r.UserAgent = "r00t axxs"
-	req, err := check.validateRequest(r)
+	req, err := check.validateRequest(ctx, r)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -174,28 +205,39 @@ func TestDoRequest(t *testing.T) {
 	t.Parallel()
 	r := New("test",
 		new(http.Client),
-		&globalshell)
+		WithLimiter(&globalshell))
+	ctx := context.Background()
 
-	err := r.SendPayload(&Item{})
+	err := r.SendPayload(ctx, &Item{})
 	if err == nil {
 		t.Fatal(unexpected)
 	}
+	if !strings.Contains(err.Error(), "invalid path") {
+		t.Fatal(err)
+	}
 
-	err = r.SendPayload(&Item{Method: http.MethodGet})
+	err = r.SendPayload(ctx, &Item{Method: http.MethodGet})
 	if err == nil {
 		t.Fatal(unexpected)
 	}
+	if !strings.Contains(err.Error(), "invalid path") {
+		t.Fatal(err)
+	}
 
-	err = r.SendPayload(&Item{
+	// Invalid/missing endpoint limit
+	err = r.SendPayload(ctx, &Item{
 		Method: http.MethodGet,
 		Path:   testURL,
 	})
 	if err == nil {
 		t.Fatal(unexpected)
 	}
+	if !strings.Contains(err.Error(), "cannot execute functionality") {
+		t.Fatal(err)
+	}
 
 	// force debug
-	err = r.SendPayload(&Item{
+	err = r.SendPayload(ctx, &Item{
 		Method:        http.MethodGet,
 		Path:          testURL,
 		HTTPDebugging: true,
@@ -204,27 +246,38 @@ func TestDoRequest(t *testing.T) {
 	if err == nil {
 		t.Fatal(unexpected)
 	}
+	if !strings.Contains(err.Error(), "cannot execute functionality") {
+		t.Fatal(err)
+	}
 
 	// max request job ceiling
 	r.jobs = MaxRequestJobs
-	err = r.SendPayload(&Item{
-		Method: http.MethodGet,
-		Path:   testURL,
+	err = r.SendPayload(ctx, &Item{
+		Method:   http.MethodGet,
+		Path:     testURL,
+		Endpoint: UnAuth,
 	})
 	if err == nil {
 		t.Fatal(unexpected)
+	}
+	if !strings.Contains(err.Error(), "max request jobs reached") {
+		t.Fatal(err)
 	}
 	// reset jobs
 	r.jobs = 0
 
 	// timeout checker
 	r.HTTPClient.Timeout = time.Millisecond * 50
-	err = r.SendPayload(&Item{
-		Method: http.MethodGet,
-		Path:   testURL + "/timeout",
+	err = r.SendPayload(ctx, &Item{
+		Method:   http.MethodGet,
+		Path:     testURL + "/timeout",
+		Endpoint: UnAuth,
 	})
 	if err == nil {
 		t.Fatal(unexpected)
+	}
+	if !strings.Contains(err.Error(), "failed to retry request") {
+		t.Fatal(err)
 	}
 	// reset timeout
 	r.HTTPClient.Timeout = 0
@@ -233,11 +286,15 @@ func TestDoRequest(t *testing.T) {
 	var resp struct {
 		Response bool `json:"response"`
 	}
-	err = r.SendPayload(&Item{
-		Method:   http.MethodGet,
-		Path:     testURL,
-		Result:   &resp,
-		Endpoint: UnAuth,
+
+	// Check header contents
+	var passback = http.Header{}
+	err = r.SendPayload(ctx, &Item{
+		Method:         http.MethodGet,
+		Path:           testURL,
+		Result:         &resp,
+		Endpoint:       UnAuth,
+		HeaderResponse: &passback,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -246,11 +303,19 @@ func TestDoRequest(t *testing.T) {
 		t.Fatal(unexpected)
 	}
 
+	if passback.Get("Content-Length") != "17" {
+		t.Fatal("incorrect header value")
+	}
+
+	if passback.Get("Content-Type") != "application/json" {
+		t.Fatal("incorrect header value")
+	}
+
 	// Check error
 	var respErr struct {
 		Error bool `json:"error"`
 	}
-	err = r.SendPayload(&Item{
+	err = r.SendPayload(ctx, &Item{
 		Method:   http.MethodGet,
 		Path:     testURL,
 		Result:   &respErr,
@@ -263,7 +328,8 @@ func TestDoRequest(t *testing.T) {
 		t.Fatal(unexpected)
 	}
 
-	// Check rate limit
+	// Check client side rate limit
+	var failed int32
 	var wg sync.WaitGroup
 	wg.Add(5)
 	for i := 0; i < 5; i++ {
@@ -271,7 +337,7 @@ func TestDoRequest(t *testing.T) {
 			var resp struct {
 				Response bool `json:"response"`
 			}
-			payloadError := r.SendPayload(&Item{
+			payloadError := r.SendPayload(ctx, &Item{
 				Method:      http.MethodGet,
 				Path:        testURL + "/rate",
 				Result:      &resp,
@@ -280,21 +346,102 @@ func TestDoRequest(t *testing.T) {
 			})
 			wg.Done()
 			if payloadError != nil {
+				atomic.StoreInt32(&failed, 1)
 				log.Fatal(payloadError)
 			}
 			if !resp.Response {
+				atomic.StoreInt32(&failed, 1)
 				log.Fatal(unexpected)
 			}
 		}(&wg)
 	}
 	wg.Wait()
+
+	if failed != 0 {
+		t.Fatal("request failed")
+	}
+}
+
+func TestDoRequest_Retries(t *testing.T) {
+	t.Parallel()
+
+	backoff := func(n int) time.Duration {
+		return 0
+	}
+	r := New("test", new(http.Client), WithBackoff(backoff))
+	var failed int32
+	var wg sync.WaitGroup
+	wg.Add(4)
+	for i := 0; i < 4; i++ {
+		go func(wg *sync.WaitGroup) {
+			defer wg.Done()
+			var resp struct {
+				Response bool `json:"response"`
+			}
+			payloadError := r.SendPayload(context.Background(), &Item{
+				Method:      http.MethodGet,
+				Path:        testURL + "/rate-retry",
+				Result:      &resp,
+				AuthRequest: true,
+				Endpoint:    Auth,
+			})
+			if payloadError != nil {
+				atomic.StoreInt32(&failed, 1)
+				log.Fatal(payloadError)
+			}
+			if !resp.Response {
+				atomic.StoreInt32(&failed, 1)
+				log.Fatal(unexpected)
+			}
+		}(&wg)
+	}
+	wg.Wait()
+
+	if failed != 0 {
+		t.Fatal("request failed")
+	}
+}
+
+func TestDoRequest_RetryNonRecoverable(t *testing.T) {
+	t.Parallel()
+
+	backoff := func(n int) time.Duration {
+		return 0
+	}
+	r := New("test", new(http.Client), WithBackoff(backoff))
+	payloadError := r.SendPayload(context.Background(), &Item{
+		Method: http.MethodGet,
+		Path:   testURL + "/always-retry",
+	})
+	if payloadError == nil {
+		t.Fatal("expected an error")
+	}
+}
+
+func TestDoRequest_NotRetryable(t *testing.T) {
+	t.Parallel()
+
+	retry := func(resp *http.Response, err error) (bool, error) {
+		return false, errors.New("not retryable")
+	}
+	backoff := func(n int) time.Duration {
+		return time.Duration(n) * time.Millisecond
+	}
+	r := New("test", new(http.Client), WithRetryPolicy(retry), WithBackoff(backoff))
+	payloadError := r.SendPayload(context.Background(), &Item{
+		Method: http.MethodGet,
+		Path:   testURL + "/always-retry",
+	})
+	if payloadError == nil {
+		t.Fatal("expected an error")
+	}
 }
 
 func TestGetNonce(t *testing.T) {
 	t.Parallel()
 	r := New("test",
 		new(http.Client),
-		&globalshell)
+		WithLimiter(&globalshell))
 
 	n1 := r.GetNonce(false)
 	n2 := r.GetNonce(false)
@@ -304,7 +451,7 @@ func TestGetNonce(t *testing.T) {
 
 	r2 := New("test",
 		new(http.Client),
-		&globalshell)
+		WithLimiter(&globalshell))
 	n3 := r2.GetNonce(true)
 	n4 := r2.GetNonce(true)
 	if n3 == n4 {
@@ -316,7 +463,7 @@ func TestGetNonceMillis(t *testing.T) {
 	t.Parallel()
 	r := New("test",
 		new(http.Client),
-		&globalshell)
+		WithLimiter(&globalshell))
 	m1 := r.GetNonceMilli()
 	m2 := r.GetNonceMilli()
 	if m1 == m2 {
@@ -327,8 +474,8 @@ func TestGetNonceMillis(t *testing.T) {
 func TestSetProxy(t *testing.T) {
 	t.Parallel()
 	r := New("test",
-		new(http.Client),
-		&globalshell)
+		&http.Client{Transport: new(http.Transport)},
+		WithLimiter(&globalshell))
 	u, err := url.Parse("http://www.google.com")
 	if err != nil {
 		t.Fatal(err)
@@ -350,15 +497,16 @@ func TestSetProxy(t *testing.T) {
 func TestBasicLimiter(t *testing.T) {
 	r := New("test",
 		new(http.Client),
-		NewBasicRateLimit(time.Second, 1))
+		WithLimiter(NewBasicRateLimit(time.Second, 1)))
 	i := Item{
 		Path:   "http://www.google.com",
 		Method: http.MethodGet,
 	}
+	ctx := context.Background()
 
 	tn := time.Now()
-	_ = r.SendPayload(&i)
-	_ = r.SendPayload(&i)
+	_ = r.SendPayload(ctx, &i)
+	_ = r.SendPayload(ctx, &i)
 	if time.Since(tn) < time.Second {
 		t.Error("rate limit issues")
 	}
@@ -367,10 +515,11 @@ func TestBasicLimiter(t *testing.T) {
 func TestEnableDisableRateLimit(t *testing.T) {
 	r := New("TestRequest",
 		new(http.Client),
-		NewBasicRateLimit(time.Minute, 1))
+		WithLimiter(NewBasicRateLimit(time.Minute, 1)))
+	ctx := context.Background()
 
 	var resp interface{}
-	err := r.SendPayload(&Item{
+	err := r.SendPayload(ctx, &Item{
 		Method:      http.MethodGet,
 		Path:        testURL,
 		Result:      &resp,
@@ -391,7 +540,7 @@ func TestEnableDisableRateLimit(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = r.SendPayload(&Item{
+	err = r.SendPayload(ctx, &Item{
 		Method:      http.MethodGet,
 		Path:        testURL,
 		Result:      &resp,
@@ -415,7 +564,7 @@ func TestEnableDisableRateLimit(t *testing.T) {
 	ti := time.NewTicker(time.Second)
 	c := make(chan struct{})
 	go func(c chan struct{}) {
-		err = r.SendPayload(&Item{
+		err = r.SendPayload(ctx, &Item{
 			Method:      http.MethodGet,
 			Path:        testURL,
 			Result:      &resp,

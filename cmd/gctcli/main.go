@@ -21,6 +21,7 @@ var (
 	username      string
 	password      string
 	pairDelimiter string
+	certPath      string
 )
 
 func jsonOutput(in interface{}) {
@@ -32,8 +33,7 @@ func jsonOutput(in interface{}) {
 }
 
 func setupClient() (*grpc.ClientConn, error) {
-	targetPath := filepath.Join(common.GetDefaultDataDir(runtime.GOOS), "tls", "cert.pem")
-	creds, err := credentials.NewClientTLSFromFile(targetPath, "")
+	creds, err := credentials.NewClientTLSFromFile(certPath, "")
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +83,12 @@ func main() {
 			Usage:       "the default currency pair delimiter used to standardise currency pair input",
 			Destination: &pairDelimiter,
 		},
+		cli.StringFlag{
+			Name:        "cert",
+			Value:       filepath.Join(common.GetDefaultDataDir(runtime.GOOS), "tls", "cert.pem"),
+			Usage:       "the path to TLS cert of the gRPC server",
+			Destination: &certPath,
+		},
 	}
 	app.Commands = []cli.Command{
 		getInfoCommand,
@@ -116,6 +122,7 @@ func main() {
 		simulateOrderCommand,
 		whaleBombCommand,
 		cancelOrderCommand,
+		cancelBatchOrdersCommand,
 		cancelAllOrdersCommand,
 		getEventsCommand,
 		addEventCommand,
@@ -127,16 +134,18 @@ func main() {
 		withdrawalRequestCommand,
 		getLoggerDetailsCommand,
 		setLoggerDetailsCommand,
-		getExchangePairsCommand,
-		enableExchangePairCommand,
-		disableExchangePairCommand,
+		exchangePairManagerCommand,
 		getOrderbookStreamCommand,
 		getExchangeOrderbookStreamCommand,
 		getTickerStreamCommand,
 		getExchangeTickerStreamCommand,
 		getAuditEventCommand,
 		getHistoricCandlesCommand,
+		getHistoricCandlesExtendedCommand,
+		findMissingSavedCandleIntervalsCommand,
 		gctScriptCommand,
+		websocketManagerCommand,
+		tradeCommand,
 	}
 
 	err := app.Run(os.Args)

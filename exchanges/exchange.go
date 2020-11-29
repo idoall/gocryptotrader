@@ -6,28 +6,33 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/protocol"
 	"github.com/idoall/gocryptotrader/exchanges/request"
+	"github.com/idoall/gocryptotrader/exchanges/stream"
+	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/log"
 	"github.com/idoall/gocryptotrader/portfolio/banking"
 )
 
 const (
-	warningBase64DecryptSecretKeyFailed = "exchange %s unable to base64 decode secret key.. Disabling Authenticated API support" // nolint:gosec
+	warningBase64DecryptSecretKeyFailed = "exchange %s unable to base64 decode secret key.. Disabling Authenticated API support" // nolint // False positive (G101: Potential hardcoded credentials)
 	// WarningAuthenticatedRequestWithoutCredentialsSet error message for authenticated request without credentials set
 	WarningAuthenticatedRequestWithoutCredentialsSet = "exchange %s authenticated HTTP request called but not supported due to unset/default API keys"
 	// DefaultHTTPTimeout is the default HTTP/HTTPS Timeout for exchange requests
 	DefaultHTTPTimeout = time.Second * 15
-	// DefaultWebsocketResponseCheckTimeout websocket 响应时的默认延迟
-	DefaultWebsocketResponseCheckTimeout = time.Millisecond * 30
-	// DefaultWebsocketResponseMaxLimit websocket 响应的默认最大等待时间
+	// DefaultWebsocketResponseCheckTimeout is the default delay in checking for an expected websocket response
+	DefaultWebsocketResponseCheckTimeout = time.Millisecond * 50
+	// DefaultWebsocketResponseMaxLimit is the default max wait for an expected websocket response before a timeout
 	DefaultWebsocketResponseMaxLimit = time.Second * 7
 	// DefaultWebsocketOrderbookBufferLimit is the maximum number of orderbook updates that get stored before being applied
 	DefaultWebsocketOrderbookBufferLimit = 5
@@ -36,16 +41,21 @@ const (
 func (e *Base) checkAndInitRequester() {
 	if e.Requester == nil {
 		e.Requester = request.New(e.Name,
-			new(http.Client),
-			nil)
+			&http.Client{Transport: new(http.Transport)})
 	}
 }
 
-// SetHTTPClientTimeout sets the timeout value for the exchanges
-// HTTP Client
-func (e *Base) SetHTTPClientTimeout(t time.Duration) {
+// SetHTTPClientTimeout sets the timeout value for the exchanges HTTP Client and
+// also the underlying transports idle connection timeout
+func (e *Base) SetHTTPClientTimeout(t time.Duration) error {
 	e.checkAndInitRequester()
 	e.Requester.HTTPClient.Timeout = t
+	tr, ok := e.Requester.HTTPClient.Transport.(*http.Transport)
+	if !ok {
+		return errors.New("transport not set, cannot set timeout")
+	}
+	tr.IdleConnTimeout = t
+	return nil
 }
 
 // SetHTTPClient sets exchanges HTTP client
@@ -74,22 +84,24 @@ func (e *Base) GetHTTPClientUserAgent() string {
 
 // SetClientProxyAddress 设置 URL 和 Websocket 的代理
 func (e *Base) SetClientProxyAddress(addr string) error {
-	if addr != "" {
-		proxy, err := url.Parse(addr)
+	if addr == "" {
+		return nil
+	}
+	proxy, err := url.Parse(addr)
+	if err != nil {
+		return fmt.Errorf("exchange.go - setting proxy address error %s",
+			err)
+	}
+
+	err = e.Requester.SetProxy(proxy)
+	if err != nil {
+		return err
+	}
+
+	if e.Websocket != nil {
+		err = e.Websocket.SetProxyAddress(addr)
 		if err != nil {
-			return fmt.Errorf("exchange.go - setting proxy address error %s",
-				err)
-		}
-
-		// No needs to check err here as the only err condition is an empty
-		// string which is already checked above
-		_ = e.Requester.SetProxy(proxy)
-
-		if e.Websocket != nil {
-			err = e.Websocket.SetProxyAddress(addr)
-			if err != nil {
-				return err
-			}
+			return err
 		}
 	}
 	return nil
@@ -141,6 +153,10 @@ func (e *Base) SetFeatureDefaults() {
 
 		if e.Features.Supports.Websocket != e.Config.Features.Supports.Websocket {
 			e.Config.Features.Supports.Websocket = e.Features.Supports.Websocket
+		}
+
+		if e.IsSaveTradeDataEnabled() != e.Config.Features.Enabled.SaveTradeData {
+			e.SetSaveTradeDataStatus(e.Config.Features.Enabled.SaveTradeData)
 		}
 
 		e.Features.Enabled.AutoPairUpdates = e.Config.Features.Enabled.AutoPairUpdates
@@ -196,26 +212,23 @@ func (e *Base) GetLastPairsUpdateTime() int64 {
 	return e.CurrencyPairs.LastUpdated
 }
 
-// SetAssetTypes checks the exchange asset types (whether it supports SPOT,
-// Binary or Futures) and sets it to a default setting if it doesn't exist
-func (e *Base) SetAssetTypes() {
-	if e.Config.CurrencyPairs.AssetTypes.JoinToString(",") == "" {
-		e.Config.CurrencyPairs.AssetTypes = e.CurrencyPairs.AssetTypes
-	} else if e.Config.CurrencyPairs.AssetTypes.JoinToString(",") != e.CurrencyPairs.AssetTypes.JoinToString(",") {
-		e.Config.CurrencyPairs.AssetTypes = e.CurrencyPairs.AssetTypes
-	}
-}
-
 // GetAssetTypes returns the available asset types for an individual exchange
 func (e *Base) GetAssetTypes() asset.Items {
-	return e.CurrencyPairs.AssetTypes
+	return e.CurrencyPairs.GetAssetTypes()
 }
 
 // GetPairAssetType returns the associated asset type for the currency pair
+// This method is only useful for exchanges that have pair names with multiple delimiters (BTC-USD-0626)
+// Helpful if the exchange has only a single asset type but in that case the asset type can be hard coded
 func (e *Base) GetPairAssetType(c currency.Pair) (asset.Item, error) {
-	for i := range e.GetAssetTypes() {
-		if e.GetEnabledPairs(e.GetAssetTypes()[i]).Contains(c, true) {
-			return e.GetAssetTypes()[i], nil
+	assetTypes := e.GetAssetTypes()
+	for i := range assetTypes {
+		avail, err := e.GetAvailablePairs(assetTypes[i])
+		if err != nil {
+			return "", err
+		}
+		if avail.Contains(c, true) {
+			return assetTypes[i], nil
 		}
 	}
 	return "", errors.New("asset type not associated with currency pair")
@@ -258,35 +271,53 @@ func (e *Base) SetCurrencyPairFormat() {
 
 	assetTypes := e.GetAssetTypes()
 	for x := range assetTypes {
-		if e.Config.CurrencyPairs.Get(assetTypes[x]) == nil {
-			r := e.CurrencyPairs.Get(assetTypes[x])
-			if r == nil {
+		if _, err := e.Config.CurrencyPairs.Get(assetTypes[x]); err != nil {
+			ps, err := e.CurrencyPairs.Get(assetTypes[x])
+			if err != nil {
 				continue
 			}
-			e.Config.CurrencyPairs.Store(assetTypes[x], *e.CurrencyPairs.Get(assetTypes[x]))
+			e.Config.CurrencyPairs.Store(assetTypes[x], *ps)
 		}
 	}
 }
 
 // SetConfigPairs sets the exchanges currency pairs to the pairs set in the config
-func (e *Base) SetConfigPairs() {
-	assetTypes := e.GetAssetTypes()
+func (e *Base) SetConfigPairs() error {
+	assetTypes := e.Config.CurrencyPairs.GetAssetTypes()
+	exchangeAssets := e.CurrencyPairs.GetAssetTypes()
 	for x := range assetTypes {
-		cfgPS := e.Config.CurrencyPairs.Get(assetTypes[x])
-		if cfgPS == nil {
-			continue
+		if !exchangeAssets.Contains(assetTypes[x]) {
+			log.Warnf(log.ExchangeSys,
+				"%s exchange asset type %s unsupported, please manually remove from configuration",
+				e.Name,
+				assetTypes[x])
 		}
+		cfgPS, err := e.Config.CurrencyPairs.Get(assetTypes[x])
+		if err != nil {
+			return err
+		}
+
+		var enabledAsset bool
+		if e.Config.CurrencyPairs.IsAssetEnabled(assetTypes[x]) == nil {
+			enabledAsset = true
+		}
+		e.CurrencyPairs.SetAssetEnabled(assetTypes[x], enabledAsset)
+
 		if e.Config.CurrencyPairs.UseGlobalFormat {
 			e.CurrencyPairs.StorePairs(assetTypes[x], cfgPS.Available, false)
 			e.CurrencyPairs.StorePairs(assetTypes[x], cfgPS.Enabled, true)
 			continue
 		}
-		exchPS := e.CurrencyPairs.Get(assetTypes[x])
+		exchPS, err := e.CurrencyPairs.Get(assetTypes[x])
+		if err != nil {
+			return err
+		}
 		cfgPS.ConfigFormat = exchPS.ConfigFormat
 		cfgPS.RequestFormat = exchPS.RequestFormat
 		e.CurrencyPairs.StorePairs(assetTypes[x], cfgPS.Available, false)
 		e.CurrencyPairs.StorePairs(assetTypes[x], cfgPS.Enabled, true)
 	}
+	return nil
 }
 
 // GetAuthenticatedAPISupport returns whether the exchange supports
@@ -318,53 +349,144 @@ func (e *Base) GetSupportedFeatures() FeaturesSupported {
 
 // GetPairFormat returns the pair format based on the exchange and
 // asset type
-func (e *Base) GetPairFormat(assetType asset.Item, requestFormat bool) currency.PairFormat {
+func (e *Base) GetPairFormat(assetType asset.Item, requestFormat bool) (currency.PairFormat, error) {
 	if e.CurrencyPairs.UseGlobalFormat {
 		if requestFormat {
-			return *e.CurrencyPairs.RequestFormat
+			if e.CurrencyPairs.RequestFormat == nil {
+				return currency.PairFormat{},
+					errors.New("global request format is nil")
+			}
+			return *e.CurrencyPairs.RequestFormat, nil
 		}
-		return *e.CurrencyPairs.ConfigFormat
+
+		if e.CurrencyPairs.ConfigFormat == nil {
+			return currency.PairFormat{},
+				errors.New("global config format is nil")
+		}
+		return *e.CurrencyPairs.ConfigFormat, nil
+	}
+
+	ps, err := e.CurrencyPairs.Get(assetType)
+	if err != nil {
+		return currency.PairFormat{}, err
 	}
 
 	if requestFormat {
-		return *e.CurrencyPairs.Get(assetType).RequestFormat
+		if ps.RequestFormat == nil {
+			return currency.PairFormat{},
+				errors.New("asset type request format is nil")
+		}
+		return *ps.RequestFormat, nil
 	}
-	return *e.CurrencyPairs.Get(assetType).ConfigFormat
+
+	if ps.ConfigFormat == nil {
+		return currency.PairFormat{},
+			errors.New("asset type config format is nil")
+	}
+	return *ps.ConfigFormat, nil
 }
 
 // GetEnabledPairs is a method that returns the enabled currency pairs of
-// the exchange by asset type
-func (e *Base) GetEnabledPairs(assetType asset.Item) currency.Pairs {
-	format := e.GetPairFormat(assetType, false)
-	pairs := e.CurrencyPairs.GetPairs(assetType, true)
-	return pairs.Format(format.Delimiter, format.Index, format.Uppercase)
+// the exchange by asset type, if the asset type is disabled this will return no
+// enabled pairs
+func (e *Base) GetEnabledPairs(a asset.Item) (currency.Pairs, error) {
+	err := e.CurrencyPairs.IsAssetEnabled(a)
+	if err != nil {
+		return nil, nil
+	}
+	format, err := e.GetPairFormat(a, false)
+	if err != nil {
+		return nil, err
+	}
+	enabledpairs, err := e.CurrencyPairs.GetPairs(a, true)
+	if err != nil {
+		return nil, err
+	}
+	return enabledpairs.Format(format.Delimiter,
+			format.Index,
+			format.Uppercase),
+		nil
+}
+
+// GetRequestFormattedPairAndAssetType is a method that returns the enabled currency pair of
+// along with its asset type. Only use when there is no chance of the same name crossing over
+func (e *Base) GetRequestFormattedPairAndAssetType(p string) (currency.Pair, asset.Item, error) {
+	assetTypes := e.GetAssetTypes()
+	var response currency.Pair
+	for i := range assetTypes {
+		format, err := e.GetPairFormat(assetTypes[i], true)
+		if err != nil {
+			return response, assetTypes[i], err
+		}
+
+		pairs, err := e.CurrencyPairs.GetPairs(assetTypes[i], true)
+		if err != nil {
+			return response, assetTypes[i], err
+		}
+
+		for j := range pairs {
+			formattedPair := pairs[j].Format(format.Delimiter, format.Uppercase)
+			if strings.EqualFold(formattedPair.String(), p) {
+				return formattedPair, assetTypes[i], nil
+			}
+		}
+	}
+	return response, "", errors.New("pair not found: " + p)
 }
 
 // GetAvailablePairs is a method that returns the available currency pairs
 // of the exchange by asset type
-func (e *Base) GetAvailablePairs(assetType asset.Item) currency.Pairs {
-	format := e.GetPairFormat(assetType, false)
-	pairs := e.CurrencyPairs.GetPairs(assetType, false)
-	return pairs.Format(format.Delimiter, format.Index, format.Uppercase)
+func (e *Base) GetAvailablePairs(assetType asset.Item) (currency.Pairs, error) {
+	format, err := e.GetPairFormat(assetType, false)
+	if err != nil {
+		return nil, err
+	}
+	pairs, err := e.CurrencyPairs.GetPairs(assetType, false)
+	if err != nil {
+		return nil, err
+	}
+	return pairs.Format(format.Delimiter, format.Index, format.Uppercase), nil
 }
 
 // SupportsPair returns true or not whether a currency pair exists in the
 // exchange available currencies or not
-func (e *Base) SupportsPair(p currency.Pair, enabledPairs bool, assetType asset.Item) bool {
+func (e *Base) SupportsPair(p currency.Pair, enabledPairs bool, assetType asset.Item) error {
 	if enabledPairs {
-		return e.GetEnabledPairs(assetType).Contains(p, false)
+		pairs, err := e.GetEnabledPairs(assetType)
+		if err != nil {
+			return err
+		}
+		if pairs.Contains(p, false) {
+			return nil
+		}
+		return errors.New("pair not supported")
 	}
-	return e.GetAvailablePairs(assetType).Contains(p, false)
+
+	avail, err := e.GetAvailablePairs(assetType)
+	if err != nil {
+		return err
+	}
+	if avail.Contains(p, false) {
+		return nil
+	}
+	return errors.New("pair not supported")
 }
 
 // FormatExchangeCurrencies returns a string containing
 // the exchanges formatted currency pairs
 func (e *Base) FormatExchangeCurrencies(pairs []currency.Pair, assetType asset.Item) (string, error) {
 	var currencyItems strings.Builder
-	pairFmt := e.GetPairFormat(assetType, true)
+	pairFmt, err := e.GetPairFormat(assetType, true)
+	if err != nil {
+		return "", err
+	}
 
 	for x := range pairs {
-		currencyItems.WriteString(e.FormatExchangeCurrency(pairs[x], assetType).String())
+		format, err := e.FormatExchangeCurrency(pairs[x], assetType)
+		if err != nil {
+			return "", err
+		}
+		currencyItems.WriteString(format.String())
 		if x == len(pairs)-1 {
 			continue
 		}
@@ -379,9 +501,12 @@ func (e *Base) FormatExchangeCurrencies(pairs []currency.Pair, assetType asset.I
 
 // FormatExchangeCurrency is a method that formats and returns a currency pair
 // based on the user currency display preferences
-func (e *Base) FormatExchangeCurrency(p currency.Pair, assetType asset.Item) currency.Pair {
-	pairFmt := e.GetPairFormat(assetType, true)
-	return p.Format(pairFmt.Delimiter, pairFmt.Uppercase)
+func (e *Base) FormatExchangeCurrency(p currency.Pair, assetType asset.Item) (currency.Pair, error) {
+	pairFmt, err := e.GetPairFormat(assetType, true)
+	if err != nil {
+		return currency.Pair{}, err
+	}
+	return p.Format(pairFmt.Delimiter, pairFmt.Uppercase), nil
 }
 
 // SetEnabled is a method that sets if the exchange is enabled
@@ -433,7 +558,10 @@ func (e *Base) SetupDefaults(exch *config.ExchangeConfig) error {
 	if exch.HTTPTimeout <= time.Duration(0) {
 		exch.HTTPTimeout = DefaultHTTPTimeout
 	} else {
-		e.SetHTTPClientTimeout(exch.HTTPTimeout)
+		err := e.SetHTTPClientTimeout(exch.HTTPTimeout)
+		if err != nil {
+			return err
+		}
 	}
 
 	if exch.CurrencyPairs == nil {
@@ -442,18 +570,26 @@ func (e *Base) SetupDefaults(exch *config.ExchangeConfig) error {
 
 	e.HTTPDebugging = exch.HTTPDebugging
 	e.SetHTTPClientUserAgent(exch.HTTPUserAgent)
-	e.SetAssetTypes()
 	e.SetCurrencyPairFormat()
-	e.SetConfigPairs()
-	e.SetFeatureDefaults()
-	e.SetAPIURL()
-	e.SetAPICredentialDefaults()
-	e.SetClientProxyAddress(exch.ProxyAddress)
-	e.BaseCurrencies = exch.BaseCurrencies
 
-	if e.Features.Supports.Websocket {
-		return e.Websocket.Initialise()
+	err := e.SetConfigPairs()
+	if err != nil {
+		return err
 	}
+
+	e.SetFeatureDefaults()
+	err = e.SetAPIURL()
+	if err != nil {
+		return err
+	}
+
+	e.SetAPICredentialDefaults()
+
+	err = e.SetClientProxyAddress(exch.ProxyAddress)
+	if err != nil {
+		return err
+	}
+	e.BaseCurrencies = exch.BaseCurrencies
 	return nil
 }
 
@@ -542,7 +678,11 @@ func (e *Base) SetPairs(pairs currency.Pairs, assetType asset.Item, enabled bool
 		return fmt.Errorf("%s SetPairs error - pairs is empty", e.Name)
 	}
 
-	pairFmt := e.GetPairFormat(assetType, false)
+	pairFmt, err := e.GetPairFormat(assetType, false)
+	if err != nil {
+		return err
+	}
+
 	var newPairs currency.Pairs
 	for x := range pairs {
 		newPairs = append(newPairs, pairs[x].Format(pairFmt.Delimiter,
@@ -557,10 +697,6 @@ func (e *Base) SetPairs(pairs currency.Pairs, assetType asset.Item, enabled bool
 // UpdatePairs updates the exchange currency pairs for either enabledPairs or
 // availablePairs
 func (e *Base) UpdatePairs(exchangeProducts currency.Pairs, assetType asset.Item, enabled, force bool) error {
-	if len(exchangeProducts) == 0 {
-		return fmt.Errorf("%s UpdatePairs error - exchangeProducts is empty", e.Name)
-	}
-
 	exchangeProducts = exchangeProducts.Upper()
 	var products currency.Pairs
 	for x := range exchangeProducts {
@@ -570,37 +706,71 @@ func (e *Base) UpdatePairs(exchangeProducts currency.Pairs, assetType asset.Item
 		products = append(products, exchangeProducts[x])
 	}
 
-	var newPairs, removedPairs currency.Pairs
 	var updateType string
-	targetPairs := e.CurrencyPairs.GetPairs(assetType, enabled)
+	targetPairs, err := e.CurrencyPairs.GetPairs(assetType, enabled)
+	if err != nil {
+		return err
+	}
 
 	if enabled {
-		newPairs, removedPairs = targetPairs.FindDifferences(products)
 		updateType = "enabled"
 	} else {
-		newPairs, removedPairs = targetPairs.FindDifferences(products)
 		updateType = "available"
 	}
 
+	newPairs, removedPairs := targetPairs.FindDifferences(products)
 	if force || len(newPairs) > 0 || len(removedPairs) > 0 {
 		if force {
 			log.Debugf(log.ExchangeSys,
-				"%s forced update of %s [%v] pairs.", e.Name, updateType,
+				"%s forced update of %s [%v] pairs.",
+				e.Name,
+				updateType,
 				strings.ToUpper(assetType.String()))
 		} else {
 			if len(newPairs) > 0 {
 				log.Debugf(log.ExchangeSys,
-					"%s Updating pairs [%v] - New: %s.\n", e.Name,
-					strings.ToUpper(assetType.String()), newPairs)
+					"%s Updating %s pairs [%v] - Added: %s.\n",
+					e.Name,
+					updateType,
+					strings.ToUpper(assetType.String()),
+					newPairs)
 			}
 			if len(removedPairs) > 0 {
 				log.Debugf(log.ExchangeSys,
-					"%s Updating pairs [%v] - Removed: %s.\n", e.Name,
-					strings.ToUpper(assetType.String()), removedPairs)
+					"%s Updating %s pairs [%v] - Removed: %s.\n",
+					e.Name,
+					updateType,
+					strings.ToUpper(assetType.String()),
+					removedPairs)
 			}
 		}
+
 		e.Config.CurrencyPairs.StorePairs(assetType, products, enabled)
 		e.CurrencyPairs.StorePairs(assetType, products, enabled)
+
+		if !enabled {
+			// If available pairs are changed we will remove currency pair items
+			// that are still included in the enabled pairs list.
+			enabledPairs, err := e.CurrencyPairs.GetPairs(assetType, true)
+			if err == nil {
+				return nil
+			}
+			_, remove := enabledPairs.FindDifferences(products)
+			for i := range remove {
+				enabledPairs = enabledPairs.Remove(remove[i])
+			}
+
+			if len(remove) > 0 {
+				log.Debugf(log.ExchangeSys,
+					"%s Checked and updated enabled pairs [%v] - Removed: %s.\n",
+					e.Name,
+					strings.ToUpper(assetType.String()),
+					remove)
+
+				e.Config.CurrencyPairs.StorePairs(assetType, enabledPairs, true)
+				e.CurrencyPairs.StorePairs(assetType, enabledPairs, true)
+			}
+		}
 	}
 	return nil
 }
@@ -612,7 +782,7 @@ func (e *Base) SetAPIURL() error {
 	}
 
 	checkInsecureEndpoint := func(endpoint string) {
-		if !strings.Contains(endpoint, "https") {
+		if strings.Contains(endpoint, "https") {
 			return
 		}
 		log.Warnf(log.ExchangeSys,
@@ -653,25 +823,10 @@ func (e *Base) GetAPIURLSecondaryDefault() string {
 	return e.API.Endpoints.URLSecondaryDefault
 }
 
-// SupportsWebsocket returns whether or not the exchange supports
-// websocket
-func (e *Base) SupportsWebsocket() bool {
-	return e.Features.Supports.Websocket
-}
-
 // SupportsREST returns whether or not the exchange supports
 // REST
 func (e *Base) SupportsREST() bool {
 	return e.Features.Supports.REST
-}
-
-// IsWebsocketEnabled returns whether or not the exchange has its
-// websocket client enabled
-func (e *Base) IsWebsocketEnabled() bool {
-	if e.Websocket != nil {
-		return e.Websocket.IsEnabled()
-	}
-	return false
 }
 
 // GetWithdrawPermissions passes through the exchange's withdraw permissions
@@ -745,7 +900,8 @@ func (e *Base) FormatWithdrawPermissions() string {
 // SupportsAsset whether or not the supplied asset is supported
 // by the exchange
 func (e *Base) SupportsAsset(a asset.Item) bool {
-	return e.CurrencyPairs.AssetTypes.Contains(a)
+	_, ok := e.CurrencyPairs.Pairs[a]
+	return ok
 }
 
 // PrintEnabledPairs prints the exchanges enabled asset pairs
@@ -780,4 +936,202 @@ func (e *Base) DisableRateLimiter() error {
 // EnableRateLimiter enables the rate limiting system for the exchange
 func (e *Base) EnableRateLimiter() error {
 	return e.Requester.EnableRateLimiter()
+}
+
+// StoreAssetPairFormat initialises and stores a defined asset format
+func (e *Base) StoreAssetPairFormat(a asset.Item, f currency.PairStore) error {
+	if a.String() == "" {
+		return fmt.Errorf("%s cannot add to pairs manager, no asset provided",
+			e.Name)
+	}
+
+	if f.RequestFormat == nil {
+		return fmt.Errorf("%s cannot add to pairs manager, request pair format not provided",
+			e.Name)
+	}
+
+	if f.ConfigFormat == nil {
+		return fmt.Errorf("%s cannot add to pairs manager, config pair format not provided",
+			e.Name)
+	}
+
+	if e.CurrencyPairs.Pairs == nil {
+		e.CurrencyPairs.Pairs = make(map[asset.Item]*currency.PairStore)
+	}
+
+	e.CurrencyPairs.Pairs[a] = &f
+	return nil
+}
+
+// SetGlobalPairsManager sets defined asset and pairs management system with
+// with global formatting
+func (e *Base) SetGlobalPairsManager(request, config *currency.PairFormat, assets ...asset.Item) error {
+	if request == nil {
+		return fmt.Errorf("%s cannot set pairs manager, request pair format not provided",
+			e.Name)
+	}
+
+	if config == nil {
+		return fmt.Errorf("%s cannot set pairs manager, config pair format not provided",
+			e.Name)
+	}
+
+	if len(assets) == 0 {
+		return fmt.Errorf("%s cannot set pairs manager, no assets provided",
+			e.Name)
+	}
+
+	e.CurrencyPairs.UseGlobalFormat = true
+	e.CurrencyPairs.RequestFormat = request
+	e.CurrencyPairs.ConfigFormat = config
+
+	if e.CurrencyPairs.Pairs != nil {
+		return fmt.Errorf("%s cannot set pairs manager, pairs already set",
+			e.Name)
+	}
+
+	e.CurrencyPairs.Pairs = make(map[asset.Item]*currency.PairStore)
+
+	for i := range assets {
+		if assets[i].String() == "" {
+			e.CurrencyPairs.Pairs = nil
+			return fmt.Errorf("%s cannot set pairs manager, asset is empty string",
+				e.Name)
+		}
+		e.CurrencyPairs.Pairs[assets[i]] = new(currency.PairStore)
+		e.CurrencyPairs.Pairs[assets[i]].ConfigFormat = config
+		e.CurrencyPairs.Pairs[assets[i]].RequestFormat = request
+	}
+
+	return nil
+}
+
+// GetWebsocket returns a pointer to the exchange websocket
+func (e *Base) GetWebsocket() (*stream.Websocket, error) {
+	if e.Websocket == nil {
+		return nil, common.ErrFunctionNotSupported
+	}
+	return e.Websocket, nil
+}
+
+// SupportsWebsocket returns whether or not the exchange supports
+// websocket
+func (e *Base) SupportsWebsocket() bool {
+	return e.Features.Supports.Websocket
+}
+
+// IsWebsocketEnabled returns whether or not the exchange has its
+// websocket client enabled
+func (e *Base) IsWebsocketEnabled() bool {
+	if e.Websocket == nil {
+		return false
+	}
+	return e.Websocket.IsEnabled()
+}
+
+// FlushWebsocketChannels refreshes websocket channel subscriptions based on
+// websocket features. Used in the event of a pair/asset or subscription change.
+func (e *Base) FlushWebsocketChannels() error {
+	if e.Websocket == nil {
+		return nil
+	}
+	return e.Websocket.FlushChannels()
+}
+
+// SubscribeToWebsocketChannels appends to ChannelsToSubscribe
+// which lets websocket.manageSubscriptions handle subscribing
+func (e *Base) SubscribeToWebsocketChannels(channels []stream.ChannelSubscription) error {
+	if e.Websocket == nil {
+		return common.ErrFunctionNotSupported
+	}
+	return e.Websocket.SubscribeToChannels(channels)
+}
+
+// UnsubscribeToWebsocketChannels removes from ChannelsToSubscribe
+// which lets websocket.manageSubscriptions handle unsubscribing
+func (e *Base) UnsubscribeToWebsocketChannels(channels []stream.ChannelSubscription) error {
+	if e.Websocket == nil {
+		return common.ErrFunctionNotSupported
+	}
+	return e.Websocket.UnsubscribeChannels(channels)
+}
+
+// GetSubscriptions returns a copied list of subscriptions
+func (e *Base) GetSubscriptions() ([]stream.ChannelSubscription, error) {
+	if e.Websocket == nil {
+		return nil, common.ErrFunctionNotSupported
+	}
+	return e.Websocket.GetSubscriptions(), nil
+}
+
+// AuthenticateWebsocket sends an authentication message to the websocket
+func (e *Base) AuthenticateWebsocket() error {
+	return common.ErrFunctionNotSupported
+}
+
+// KlineIntervalEnabled returns if requested interval is enabled on exchange
+func (e *Base) klineIntervalEnabled(in kline.Interval) bool {
+	return e.Features.Enabled.Kline.Intervals[in.Word()]
+}
+
+// FormatExchangeKlineInterval returns Interval to string
+// Exchanges can override this if they require custom formatting
+func (e *Base) FormatExchangeKlineInterval(in kline.Interval) string {
+	return strconv.FormatFloat(in.Duration().Seconds(), 'f', 0, 64)
+}
+
+// ValidateKline confirms that the requested pair, asset & interval are supported and/or enabled by the requested exchange
+func (e *Base) ValidateKline(pair currency.Pair, a asset.Item, interval kline.Interval) error {
+	var errorList []string
+	var err kline.ErrorKline
+	if e.CurrencyPairs.IsAssetEnabled(a) != nil {
+		err.Asset = a
+		errorList = append(errorList, "asset not enabled")
+	} else if !e.CurrencyPairs.Pairs[a].Enabled.Contains(pair, true) {
+		err.Pair = pair
+		errorList = append(errorList, "pair not enabled")
+	}
+
+	if !e.klineIntervalEnabled(interval) {
+		err.Interval = interval
+		errorList = append(errorList, "interval not supported")
+	}
+
+	if len(errorList) > 0 {
+		err.Err = errors.New(strings.Join(errorList, ","))
+		return &err
+	}
+
+	return nil
+}
+
+// AddTradesToBuffer is a helper function that will only
+// add trades to the buffer if it is allowed
+func (e *Base) AddTradesToBuffer(trades ...trade.Data) error {
+	if !e.IsSaveTradeDataEnabled() {
+		return nil
+	}
+
+	return trade.AddTradesToBuffer(e.Name, trades...)
+}
+
+// IsSaveTradeDataEnabled checks the state of
+// SaveTradeData in a concurrent-friendly manner
+func (e *Base) IsSaveTradeDataEnabled() bool {
+	e.settingsMutex.RLock()
+	isEnabled := e.Features.Enabled.SaveTradeData
+	e.settingsMutex.RUnlock()
+	return isEnabled
+}
+
+// SetSaveTradeDataStatus locks and sets the status of
+// the config and the exchange's setting for SaveTradeData
+func (e *Base) SetSaveTradeDataStatus(enabled bool) {
+	e.settingsMutex.Lock()
+	defer e.settingsMutex.Unlock()
+	e.Features.Enabled.SaveTradeData = enabled
+	e.Config.Features.Enabled.SaveTradeData = enabled
+	if e.Verbose {
+		log.Debugf(log.Trade, "Set %v 'SaveTradeData' to %v", e.Name, enabled)
+	}
 }

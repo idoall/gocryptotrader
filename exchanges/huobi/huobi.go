@@ -2,6 +2,7 @@ package huobi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,7 +16,6 @@ import (
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 )
 
 const (
@@ -61,14 +61,7 @@ const (
 // HUOBI is the overarching type across this package
 type HUOBI struct {
 	exchange.Base
-	AccountID                  string
-	WebsocketConn              *wshandler.WebsocketConnection
-	AuthenticatedWebsocketConn *wshandler.WebsocketConnection
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (h *HUOBI) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
+	AccountID string
 }
 
 // GetSpotKline returns kline data
@@ -76,7 +69,7 @@ func (h *HUOBI) GetHistoricCandles(pair currency.Pair, rangesize, granularity in
 func (h *HUOBI) GetSpotKline(arg KlinesRequestParams) ([]KlineItem, error) {
 	vals := url.Values{}
 	vals.Set("symbol", arg.Symbol)
-	vals.Set("period", string(arg.Period))
+	vals.Set("period", arg.Period)
 
 	if arg.Size != 0 {
 		vals.Set("size", strconv.Itoa(arg.Size))
@@ -174,7 +167,7 @@ func (h *HUOBI) GetTrades(symbol string) ([]Trade, error) {
 //
 // symbol: string of currency pair
 func (h *HUOBI) GetLatestSpotPrice(symbol string) (float64, error) {
-	list, err := h.GetTradeHistory(symbol, "1")
+	list, err := h.GetTradeHistory(symbol, 1)
 
 	if err != nil {
 		return 0, err
@@ -187,12 +180,12 @@ func (h *HUOBI) GetLatestSpotPrice(symbol string) (float64, error) {
 }
 
 // GetTradeHistory returns the trades for the specified symbol
-func (h *HUOBI) GetTradeHistory(symbol, size string) ([]TradeHistory, error) {
+func (h *HUOBI) GetTradeHistory(symbol string, size int64) ([]TradeHistory, error) {
 	vals := url.Values{}
 	vals.Set("symbol", symbol)
 
-	if size != "" {
-		vals.Set("size", size)
+	if size > 0 {
+		vals.Set("size", strconv.FormatInt(size, 10))
 	}
 
 	type response struct {
@@ -715,7 +708,7 @@ func (h *HUOBI) QueryWithdrawQuotas(cryptocurrency string) (WithdrawQuota, error
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (h *HUOBI) SendHTTPRequest(path string, result interface{}) error {
-	return h.SendPayload(&request.Item{
+	return h.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -735,10 +728,11 @@ func (h *HUOBI) SendAuthenticatedHTTPRequest(method, endpoint string, values url
 		values = url.Values{}
 	}
 
+	now := time.Now()
 	values.Set("AccessKeyId", h.API.Credentials.Key)
 	values.Set("SignatureMethod", "HmacSHA256")
 	values.Set("SignatureVersion", "2")
-	values.Set("Timestamp", time.Now().UTC().Format("2006-01-02T15:04:05"))
+	values.Set("Timestamp", now.UTC().Format("2006-01-02T15:04:05"))
 
 	if isVersion2API {
 		endpoint = fmt.Sprintf("/v%s/%s", huobiAPIVersion2, endpoint)
@@ -770,8 +764,11 @@ func (h *HUOBI) SendAuthenticatedHTTPRequest(method, endpoint string, values url
 		body = encoded
 	}
 
+	// Time difference between your timestamp and standard should be less than 1 minute.
+	ctx, cancel := context.WithDeadline(context.Background(), now.Add(time.Minute))
+	defer cancel()
 	interim := json.RawMessage{}
-	err := h.SendPayload(&request.Item{
+	err := h.SendPayload(ctx, &request.Item{
 		Method:        method,
 		Path:          urlPath,
 		Headers:       headers,

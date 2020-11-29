@@ -6,13 +6,13 @@ import (
 	"context"
 	"encoding/hex"
 	"io/ioutil"
-	"os"
 	"path/filepath"
 	"sync/atomic"
 	"time"
 
 	"github.com/d5/tengo/v2"
 	"github.com/gofrs/uuid"
+	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	scriptevent "github.com/idoall/gocryptotrader/database/repository/script"
 	"github.com/idoall/gocryptotrader/gctscript/modules/loader"
@@ -22,7 +22,14 @@ import (
 )
 
 // NewVM attempts to create a new Virtual Machine firstly from pool
-func NewVM() (vm *VM) {
+func (g *GctScriptManager) NewVM() (vm *VM) {
+	if !g.Started() {
+		log.Error(log.GCTScriptMgr, Error{
+			Action: "NewVM",
+			Cause:  ErrScriptingDisabled,
+		})
+		return nil
+	}
 	newUUID, err := uuid.NewV4()
 	if err != nil {
 		log.Error(log.GCTScriptMgr, Error{
@@ -32,15 +39,22 @@ func NewVM() (vm *VM) {
 		return nil
 	}
 
-	if GCTScriptConfig.Verbose {
+	if g.config.Verbose {
 		log.Debugln(log.GCTScriptMgr, "New GCTScript VM created")
 	}
 
 	vm = &VM{
-		ID:     newUUID,
-		Script: pool.Get().(*tengo.Script),
+		ID:         newUUID,
+		Script:     pool.Get().(*tengo.Script),
+		config:     g.config,
+		unregister: func() error { return g.RemoveVM(newUUID) },
 	}
 	return
+}
+
+// SetDefaultScriptOutput sets default output file for scripts
+func SetDefaultScriptOutput() {
+	loader.SetDefaultScriptOutput(filepath.Join(ScriptPath, "output"))
 }
 
 // Load parses and creates a new instance of tengo script vm
@@ -49,35 +63,18 @@ func (vm *VM) Load(file string) error {
 		return ErrNoVMLoaded
 	}
 
-	if !GCTScriptConfig.Enabled {
-		return &Error{
-			Action: "Load",
-			Cause:  ErrScriptingDisabled,
-		}
+	if filepath.Ext(file) != common.GctExt {
+		file += common.GctExt
 	}
 
-	if filepath.Ext(file) != ".gct" {
-		file += ".gct"
-	}
-
-	if GCTScriptConfig.Verbose {
+	if vm.config.Verbose {
 		log.Debugf(log.GCTScriptMgr, "Loading script: %s ID: %v", vm.ShortName(), vm.ID)
 	}
 
-	f, err := os.Open(file)
+	code, err := ioutil.ReadFile(file)
 	if err != nil {
 		return &Error{
-			Action: "Load: Open",
-			Script: file,
-			Cause:  err,
-		}
-	}
-
-	defer f.Close()
-	code, err := ioutil.ReadAll(f)
-	if err != nil {
-		return &Error{
-			Action: "Load: Read",
+			Action: "Load: ReadFile",
 			Script: file,
 			Cause:  err,
 		}
@@ -86,11 +83,17 @@ func (vm *VM) Load(file string) error {
 	vm.File = file
 	vm.Path = filepath.Dir(file)
 	vm.Script = tengo.NewScript(code)
+	scriptctx := vm.ShortName() + "-" + vm.ID.String()
+	err = vm.Script.Add("ctx", scriptctx)
+	if err != nil {
+		return err
+	}
+
 	vm.Script.SetImports(loader.GetModuleMap())
 	vm.Hash = vm.getHash()
 
-	if GCTScriptConfig.AllowImports {
-		if GCTScriptConfig.Verbose {
+	if vm.config.AllowImports {
+		if vm.config.Verbose {
 			log.Debugf(log.GCTScriptMgr, "File imports enabled for vm: %v", vm.ID)
 		}
 		vm.Script.EnableFileImport(true)
@@ -108,7 +111,7 @@ func (vm *VM) Compile() (err error) {
 
 // Run runs byte code
 func (vm *VM) Run() (err error) {
-	if GCTScriptConfig.Verbose {
+	if vm.config.Verbose {
 		log.Debugf(log.GCTScriptMgr, "Running script: %s ID: %v", vm.ShortName(), vm.ID)
 	}
 
@@ -130,10 +133,10 @@ func (vm *VM) RunCtx() (err error) {
 		vm.ctx = context.Background()
 	}
 
-	ct, cancel := context.WithTimeout(vm.ctx, GCTScriptConfig.ScriptTimeout)
+	ct, cancel := context.WithTimeout(vm.ctx, vm.config.ScriptTimeout)
 	defer cancel()
 
-	if GCTScriptConfig.Verbose {
+	if vm.config.Verbose {
 		log.Debugf(log.GCTScriptMgr, "Running script: %s ID: %v", vm.ShortName(), vm.ID)
 	}
 
@@ -157,7 +160,7 @@ func (vm *VM) CompileAndRun() {
 	err := vm.Compile()
 	if err != nil {
 		log.Error(log.GCTScriptMgr, err)
-		err = RemoveVM(vm.ID)
+		err = vm.unregister()
 		if err != nil {
 			log.Error(log.GCTScriptMgr, err)
 		}
@@ -167,7 +170,7 @@ func (vm *VM) CompileAndRun() {
 	err = vm.RunCtx()
 	if err != nil {
 		log.Error(log.GCTScriptMgr, err)
-		err = RemoveVM(vm.ID)
+		err = vm.unregister()
 		if err != nil {
 			log.Error(log.GCTScriptMgr, err)
 		}
@@ -209,13 +212,13 @@ func (vm *VM) Shutdown() error {
 	if vm.S != nil {
 		close(vm.S)
 	}
-	if GCTScriptConfig.Verbose {
+	if vm.config.Verbose {
 		log.Debugf(log.GCTScriptMgr, "Shutting down script: %s ID: %v", vm.ShortName(), vm.ID)
 	}
 	vm.Script = nil
 	pool.Put(vm.Script)
 	vm.event(StatusSuccess, TypeStop)
-	return RemoveVM(vm.ID)
+	return vm.unregister()
 }
 
 // Read contents of script back and create script event
@@ -226,7 +229,7 @@ func (vm *VM) Read() ([]byte, error) {
 
 // Read contents of script back
 func (vm *VM) read() ([]byte, error) {
-	if GCTScriptConfig.Verbose {
+	if vm.config.Verbose {
 		log.Debugf(log.GCTScriptMgr, "Read script: %s ID: %v", vm.ShortName(), vm.ID)
 	}
 	return ioutil.ReadFile(vm.File)

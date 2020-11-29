@@ -14,7 +14,7 @@ This config package is part of the GoCryptoTrader codebase.
 
 ## This is still in active development
 
-You can track ideas, planned features and what's in progresss on this Trello board: [https://trello.com/b/ZAhMhpOy/gocryptotrader](https://trello.com/b/ZAhMhpOy/gocryptotrader).
+You can track ideas, planned features and what's in progress on this Trello board: [https://trello.com/b/ZAhMhpOy/gocryptotrader](https://trello.com/b/ZAhMhpOy/gocryptotrader).
 
 Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader Slack](https://join.slack.com/t/gocryptotrader/shared_invite/enQtNTQ5NDAxMjA2Mjc5LTc5ZDE1ZTNiOGM3ZGMyMmY1NTAxYWZhODE0MWM5N2JlZDk1NDU0YTViYzk4NTk3OTRiMDQzNGQ1YTc4YmRlMTk)
 
@@ -24,21 +24,21 @@ Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader 
 
  + Contains configurations for:
 
-    - Exchanges for utilisation of a broad or minimal amount of enabled
-    exchanges [Example](#enable-exchange-via-config-example) for
-    enabling an exchange.
+	- Exchanges for utilisation of a broad or minimal amount of enabled
+	exchanges [Example](#enable-exchange-via-config-example) for
+	enabling an exchange.
 
-    - Bank accounts for withdrawal and depositing FIAT between exchange and
-    your personal accounts [Example](#enable-bank-accounts-via-config-example).
+	- Bank accounts for withdrawal and depositing FIAT between exchange and
+	your personal accounts [Example](#enable-bank-accounts-via-config-example).
 
-    - Portfolio to monitor online and offline accounts [Example](#enable-portfolio-via-config-example).
+	- Portfolio to monitor online and offline accounts [Example](#enable-portfolio-via-config-example).
 
-    - Currency configurations to set your foreign exchange provider accounts,
-    your preferred display currency, suitable FIAT currency and suitable
-    cryptocurrency [Example](#enable-currency-via-config-example).
+	- Currency configurations to set your foreign exchange provider accounts,
+	your preferred display currency, suitable FIAT currency and suitable
+	cryptocurrency [Example](#enable-currency-via-config-example).
 
-    - Communication for utilisation of supported communication mediums e.g.
-    email events direct to your personal account [Example](#enable-communications-via-config-example).
+	- Communication for utilisation of supported communication mediums e.g.
+	email events direct to your personal account [Example](#enable-communications-via-config-example).
 
 # Config Examples
 

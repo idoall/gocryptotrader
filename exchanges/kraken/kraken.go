@@ -1,6 +1,7 @@
 package kraken
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -16,7 +17,6 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 	"github.com/idoall/gocryptotrader/log"
 )
 
@@ -55,21 +55,19 @@ const (
 	// Rate limit consts
 	krakenRateInterval = time.Second
 	krakenRequestRate  = 1
+
+	// Status consts
+	StatusOpen = "open"
 )
 
-var assetPairMap map[string]string
+var (
+	assetTranslator assetTranslatorStore
+)
 
 // Kraken is the overarching type across the alphapoint package
 type Kraken struct {
 	exchange.Base
-	WebsocketConn              *wshandler.WebsocketConnection
-	AuthenticatedWebsocketConn *wshandler.WebsocketConnection
-	wsRequestMtx               sync.Mutex
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (k *Kraken) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
+	wsRequestMtx sync.Mutex
 }
 
 // GetServerTime returns current server time
@@ -88,41 +86,54 @@ func (k *Kraken) GetServerTime() (TimeResponse, error) {
 	return response.Result, GetError(response.Error)
 }
 
+// SeedAssets seeds Kraken's asset list and stores it in the
+// asset translator
+func (k *Kraken) SeedAssets() error {
+	assets, err := k.GetAssets()
+	if err != nil {
+		return err
+	}
+	for k, v := range assets {
+		assetTranslator.Seed(k, v.Altname)
+	}
+
+	assetPairs, err := k.GetAssetPairs()
+	if err != nil {
+		return err
+	}
+	for k, v := range assetPairs {
+		assetTranslator.Seed(k, v.Altname)
+	}
+	return nil
+}
+
 // GetAssets returns a full asset list
-func (k *Kraken) GetAssets() (map[string]Asset, error) {
+func (k *Kraken) GetAssets() (map[string]*Asset, error) {
 	path := fmt.Sprintf("%s/%s/public/%s", k.API.Endpoints.URL, krakenAPIVersion, krakenAssets)
 
 	var response struct {
-		Error  []string         `json:"error"`
-		Result map[string]Asset `json:"result"`
+		Error  []string          `json:"error"`
+		Result map[string]*Asset `json:"result"`
 	}
 
 	if err := k.SendHTTPRequest(path, &response); err != nil {
 		return response.Result, err
 	}
-
 	return response.Result, GetError(response.Error)
 }
 
 // GetAssetPairs returns a full asset pair list
-func (k *Kraken) GetAssetPairs() (map[string]AssetPairs, error) {
+func (k *Kraken) GetAssetPairs() (map[string]*AssetPairs, error) {
 	path := fmt.Sprintf("%s/%s/public/%s", k.API.Endpoints.URL, krakenAPIVersion, krakenAssetPairs)
 
 	var response struct {
-		Error  []string              `json:"error"`
-		Result map[string]AssetPairs `json:"result"`
+		Error  []string               `json:"error"`
+		Result map[string]*AssetPairs `json:"result"`
 	}
 
 	if err := k.SendHTTPRequest(path, &response); err != nil {
 		return response.Result, err
 	}
-	for i := range response.Result {
-		if assetPairMap == nil {
-			assetPairMap = make(map[string]string)
-		}
-		assetPairMap[i] = response.Result[i].Altname
-	}
-
 	return response.Result, GetError(response.Error)
 }
 
@@ -206,10 +217,10 @@ func (k *Kraken) GetTickers(pairList string) (map[string]Ticker, error) {
 }
 
 // GetOHLC returns an array of open high low close values of a currency pair
-func (k *Kraken) GetOHLC(symbol string) ([]OpenHighLowClose, error) {
+func (k *Kraken) GetOHLC(symbol, interval string) ([]OpenHighLowClose, error) {
 	values := url.Values{}
 	values.Set("pair", symbol)
-
+	values.Set("interval", interval)
 	type Response struct {
 		Error []interface{}          `json:"error"`
 		Data  map[string]interface{} `json:"result"`
@@ -227,6 +238,11 @@ func (k *Kraken) GetOHLC(symbol string) ([]OpenHighLowClose, error) {
 
 	if len(result.Error) != 0 {
 		return OHLC, fmt.Errorf("getOHLC error: %s", result.Error)
+	}
+
+	_, ok := result.Data[symbol].([]interface{})
+	if !ok {
+		return nil, errors.New("invalid data returned")
 	}
 
 	for _, y := range result.Data[symbol].([]interface{}) {
@@ -265,7 +281,6 @@ func (k *Kraken) GetDepth(symbol string) (Orderbook, error) {
 	var orderBook Orderbook
 
 	path := fmt.Sprintf("%s/%s/public/%s?%s", k.API.Endpoints.URL, krakenAPIVersion, krakenDepth, values.Encode())
-
 	err := k.SendHTTPRequest(path, &result)
 	if err != nil {
 		return orderBook, err
@@ -330,29 +345,94 @@ func (k *Kraken) GetTrades(symbol string) ([]RecentTrades, error) {
 
 	err := k.SendHTTPRequest(path, &result)
 	if err != nil {
-		return recentTrades, err
+		return nil, err
 	}
 
-	data := result.(map[string]interface{})
-	tradeInfo := data["result"].(map[string]interface{})
-
-	for _, x := range tradeInfo[symbol].([]interface{}) {
-		r := RecentTrades{}
-		for i, y := range x.([]interface{}) {
-			switch i {
-			case 0:
-				r.Price, _ = strconv.ParseFloat(y.(string), 64)
-			case 1:
-				r.Volume, _ = strconv.ParseFloat(y.(string), 64)
-			case 2:
-				r.Time = y.(float64)
-			case 3:
-				r.BuyOrSell = y.(string)
-			case 4:
-				r.MarketOrLimit = y.(string)
-			case 5:
-				r.Miscellaneous = y.(string)
+	data, ok := result.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("unable to parse trade data")
+	}
+	var dataError interface{}
+	dataError, ok = data["error"]
+	if ok {
+		var dataErrorInterface interface{}
+		dataErrorInterface, ok = dataError.(interface{})
+		if ok {
+			var errorList []interface{}
+			errorList, ok = dataErrorInterface.([]interface{})
+			if ok {
+				var errs common.Errors
+				for i := range errorList {
+					var errString string
+					errString, ok = errorList[i].(string)
+					if !ok {
+						continue
+					}
+					errs = append(errs, errors.New(errString))
+				}
+				if len(errs) > 0 {
+					return nil, errs
+				}
 			}
+		}
+	}
+
+	var resultField interface{}
+	resultField, ok = data["result"]
+	if !ok {
+		return nil, errors.New("unable to find field 'result'")
+	}
+	var tradeInfo map[string]interface{}
+	tradeInfo, ok = resultField.(map[string]interface{})
+	if !ok {
+		return nil, errors.New("unable to parse field 'result'")
+	}
+
+	var trades []interface{}
+	var tradesForSymbol interface{}
+	tradesForSymbol, ok = tradeInfo[symbol]
+	if !ok {
+		return nil, fmt.Errorf("no data returned for symbol %v", symbol)
+	}
+
+	trades, ok = tradesForSymbol.([]interface{})
+	if !ok {
+		return nil, fmt.Errorf("no trades returned for symbol %v", symbol)
+	}
+
+	for _, x := range trades {
+		r := RecentTrades{}
+		var individualTrade []interface{}
+		individualTrade, ok = x.([]interface{})
+		if !ok {
+			return nil, errors.New("unable to parse individual trade data")
+		}
+		if len(individualTrade) != 6 {
+			return nil, errors.New("unrecognised trade data received")
+		}
+		r.Price, err = strconv.ParseFloat(individualTrade[0].(string), 64)
+		if err != nil {
+			return nil, err
+		}
+		r.Volume, err = strconv.ParseFloat(individualTrade[1].(string), 64)
+		if err != nil {
+			return nil, err
+		}
+		r.Time, ok = individualTrade[2].(float64)
+		if !ok {
+			return nil, errors.New("unable to parse time for individual trade data")
+		}
+		r.BuyOrSell, ok = individualTrade[3].(string)
+		if !ok {
+			return nil, errors.New("unable to parse order side for individual trade data")
+		}
+		r.MarketOrLimit, ok = individualTrade[4].(string)
+		if !ok {
+			return nil, errors.New("unable to parse order type for individual trade data")
+		}
+		r.Miscellaneous, ok = individualTrade[5].(string)
+		if !ok {
+			return nil, errors.New("unable to parse misc field for individual trade data")
 		}
 		recentTrades = append(recentTrades, r)
 	}
@@ -865,7 +945,7 @@ func GetError(apiErrors []string) error {
 
 // SendHTTPRequest sends an unauthenticated HTTP requests
 func (k *Kraken) SendHTTPRequest(path string, result interface{}) error {
-	return k.SendPayload(&request.Item{
+	return k.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -901,7 +981,7 @@ func (k *Kraken) SendAuthenticatedHTTPRequest(method string, params url.Values, 
 	headers["API-Key"] = k.API.Credentials.Key
 	headers["API-Sign"] = signature
 
-	return k.SendPayload(&request.Item{
+	return k.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodPost,
 		Path:          k.API.Endpoints.URL + path,
 		Headers:       headers,
@@ -1058,4 +1138,54 @@ func (k *Kraken) GetWebsocketToken() (string, error) {
 		return "", fmt.Errorf("%s - %v", k.Name, response.Error)
 	}
 	return response.Result.Token, nil
+}
+
+// LookupAltname converts a currency into its altname (ZUSD -> USD)
+func (a *assetTranslatorStore) LookupAltname(target string) string {
+	a.l.RLock()
+	alt, ok := a.Assets[target]
+	if !ok {
+		a.l.RUnlock()
+		return ""
+	}
+	a.l.RUnlock()
+	return alt
+}
+
+// LookupAltname converts an altname to its original type (USD -> ZUSD)
+func (a *assetTranslatorStore) LookupCurrency(target string) string {
+	a.l.RLock()
+	for k, v := range a.Assets {
+		if v == target {
+			a.l.RUnlock()
+			return k
+		}
+	}
+	a.l.RUnlock()
+	return ""
+}
+
+// Seed seeds a currency translation pair
+func (a *assetTranslatorStore) Seed(orig, alt string) {
+	a.l.Lock()
+	if a.Assets == nil {
+		a.Assets = make(map[string]string)
+	}
+
+	_, ok := a.Assets[orig]
+	if ok {
+		a.l.Unlock()
+		return
+	}
+
+	a.Assets[orig] = alt
+	a.l.Unlock()
+}
+
+// Seeded returns whether or not the asset translator has been seeded
+func (a *assetTranslatorStore) Seeded() bool {
+	a.l.RLock()
+	isSeeded := len(a.Assets) > 0
+	a.l.RUnlock()
+	return isSeeded
 }

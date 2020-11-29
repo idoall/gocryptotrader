@@ -45,20 +45,21 @@ Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader 
 | BitMEX | Yes | Yes | NA |
 | Bitstamp | Yes  | Yes       | No  |
 | Bittrex | Yes | No | NA |
-| BTCMarkets | Yes | No       | NA  |
+| BTCMarkets | Yes | Yes       | NA  |
 | BTSE | Yes | Yes | NA |
+| CoinbasePro | Yes | Yes | No|
+| Coinbene | Yes | Yes | No |
 | COINUT | Yes | Yes | NA |
 | Exmo | Yes | NA | NA |
-| CoinbasePro | Yes | Yes | No|
-| Coinbene | Yes | No | No |
+| FTX | Yes | Yes | No |
 | GateIO | Yes | Yes | NA |
 | Gemini | Yes | Yes | No |
 | HitBTC | Yes | Yes | No |
 | Huobi.Pro | Yes | Yes | NA |
 | ItBit | Yes | NA | No |
 | Kraken | Yes | Yes | NA |
+| LakeBTC | Yes | Yes | NA |
 | Lbank | Yes | No | NA |
-| LakeBTC | Yes | No | NA |
 | LocalBitcoins | Yes | NA | NA |
 | OKCoin International | Yes | Yes | No |
 | OKEX | Yes | Yes | No |
@@ -66,9 +67,10 @@ Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader 
 | Yobit | Yes | NA | NA |
 | ZB.COM | Yes | Yes | NA |
 
-We are aiming to support the top 20 highest volume exchanges based off the [CoinMarketCap exchange data](https://coinmarketcap.com/exchanges/volume/24-hour/).
+We are aiming to support the top 30 exchanges sorted by average liquidity as [ranked by CoinMarketCap](https://coinmarketcap.com/rankings/exchanges/). 
+However, we welcome pull requests for any exchange which does not match this criterion. If you need help with this, please join us on [Slack](https://join.slack.com/t/gocryptotrader/shared_invite/enQtNTQ5NDAxMjA2Mjc5LTc5ZDE1ZTNiOGM3ZGMyMmY1NTAxYWZhODE0MWM5N2JlZDk1NDU0YTViYzk4NTk3OTRiMDQzNGQ1YTc4YmRlMTk).
 
-** NA means not applicable as the Exchange does not support the feature.
+** NA means not applicable as the exchange does not support the feature.
 
 ## Current Features
 
@@ -91,7 +93,9 @@ We are aiming to support the top 20 highest volume exchanges based off the [Coin
 + Packages for handling currency pairs, tickers and orderbooks.
 + Portfolio management tool; fetches balances from supported exchanges and allows for custom address tracking.
 + Basic event trigger system.
++ OHLCV/Candle retrieval support. See [OHLCV](/docs/OHLCV.md).
 + Scripting support. See [gctscript](/gctscript/README.md).
++ Recent and historic trade processing. See [trades](/exchanges/trade/README.md).
 + WebGUI (discontinued).
 
 ## Planned Features
@@ -157,22 +161,26 @@ Binaries will be published once the codebase reaches a stable condition.
 
 |User|Contribution Amount|
 |--|--|
-| [thrasher-](https://github.com/thrasher-) | 630 |
-| [shazbert](https://github.com/shazbert) | 186 |
-| [gloriousCode](https://github.com/gloriousCode) | 166 |
-| [xtda](https://github.com/xtda) | 38 |
+| [thrasher-](https://github.com/thrasher-) | 645 |
+| [shazbert](https://github.com/shazbert) | 199 |
+| [gloriousCode](https://github.com/gloriousCode) | 173 |
+| [dependabot-preview[bot]](https://github.com/apps/dependabot-preview) | 70 |
+| [xtda](https://github.com/xtda) | 47 |
 | [ermalguni](https://github.com/ermalguni) | 14 |
-| [dependabot-preview[bot]](https://github.com/apps/dependabot-preview) | 12 |
 | [vadimzhukck](https://github.com/vadimzhukck) | 10 |
+| [MadCozBadd](https://github.com/MadCozBadd) | 9 |
+| [Rots](https://github.com/Rots) | 9 |
 | [140am](https://github.com/140am) | 8 |
 | [marcofranssen](https://github.com/marcofranssen) | 8 |
-| [MadCozBadd](https://github.com/MadCozBadd) | 7 |
+| [vazha](https://github.com/vazha) | 7 |
+| [dackroyd](https://github.com/dackroyd) | 5 |
 | [cranktakular](https://github.com/cranktakular) | 5 |
+| [woshidama323](https://github.com/woshidama323) | 3 |
 | [crackcomm](https://github.com/crackcomm) | 3 |
+| [azhang](https://github.com/azhang) | 2 |
 | [andreygrehov](https://github.com/andreygrehov) | 2 |
 | [bretep](https://github.com/bretep) | 2 |
-| [woshidama323](https://github.com/woshidama323) | 2 |
-| [vazha](https://github.com/vazha) | 2 |
+| [Christian-Achilli](https://github.com/Christian-Achilli) | 2 |
 | [gam-phon](https://github.com/gam-phon) | 2 |
 | [cornelk](https://github.com/cornelk) | 2 |
 | [if1live](https://github.com/if1live) | 2 |
@@ -180,7 +188,6 @@ Binaries will be published once the codebase reaches a stable condition.
 | [soxipy](https://github.com/soxipy) | 2 |
 | [herenow](https://github.com/herenow) | 2 |
 | [blombard](https://github.com/blombard) | 1 |
-| [Christian-Achilli](https://github.com/Christian-Achilli) | 1 |
 | [CodeLingoBot](https://github.com/CodeLingoBot) | 1 |
 | [CodeLingoTeam](https://github.com/CodeLingoTeam) | 1 |
 | [Daanikus](https://github.com/Daanikus) | 1 |
@@ -196,3 +203,4 @@ Binaries will be published once the codebase reaches a stable condition.
 | [starit](https://github.com/starit) | 1 |
 | [Jimexist](https://github.com/Jimexist) | 1 |
 | [lookfirst](https://github.com/lookfirst) | 1 |
+| [merkeld](https://github.com/merkeld) | 1 |

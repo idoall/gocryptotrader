@@ -2,7 +2,6 @@ package engine
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -17,6 +16,7 @@ import (
 	"github.com/idoall/gocryptotrader/currency/coinmarketcap"
 	"github.com/idoall/gocryptotrader/dispatch"
 	"github.com/idoall/gocryptotrader/exchanges/request"
+	"github.com/idoall/gocryptotrader/exchanges/trade"
 	gctscript "github.com/idoall/gocryptotrader/gctscript/vm"
 	gctlog "github.com/idoall/gocryptotrader/log"
 	"github.com/idoall/gocryptotrader/portfolio"
@@ -33,7 +33,7 @@ type Engine struct {
 	NTPManager                  ntpManager
 	ConnectionManager           connectionManager
 	DatabaseManager             databaseManager
-	GctScriptManager            gctScriptManager
+	GctScriptManager            *gctscript.GctScriptManager
 	OrderManager                orderManager
 	PortfolioManager            portfolioManager
 	CommsManager                commsManager
@@ -47,9 +47,6 @@ type Engine struct {
 // Vars for engine
 var (
 	Bot *Engine
-
-	// Stores the set flags
-	flagSet = make(map[string]bool)
 )
 
 // New starts a new engine
@@ -61,32 +58,26 @@ func New() (*Engine, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config. Err: %s", err)
 	}
+	b.GctScriptManager, err = gctscript.NewManager(&b.Config.GCTScript)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create script manager. Err: %s", err)
+	}
 
 	return &b, nil
 }
 
 // NewFromSettings starts a new engine based on supplied settings
-func NewFromSettings(settings *Settings) (*Engine, error) {
+func NewFromSettings(settings *Settings, flagSet map[string]bool) (*Engine, error) {
 	if settings == nil {
 		return nil, errors.New("engine: settings is nil")
 	}
 
 	var b Engine
-	b.Config = &config.Cfg
-	filePath, err := config.GetFilePath(settings.ConfigFile)
-	if err != nil {
-		return nil, err
-	}
+	var err error
 
-	log.Printf("Loading config file %s..\n", filePath)
-	err = b.Config.LoadConfig(filePath, settings.EnableDryRun)
+	b.Config, err = loadConfigWithSettings(settings, flagSet)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config. Err: %s", err)
-	}
-
-	err = common.CreateDir(settings.DataDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open/create data directory: %s. Err: %s", settings.DataDir, err)
 	}
 
 	if *b.Config.Logging.Enabled {
@@ -95,8 +86,8 @@ func NewFromSettings(settings *Settings) (*Engine, error) {
 		gctlog.Infoln(gctlog.Global, "Logger initialised.")
 	}
 
-	b.Settings.ConfigFile = filePath
-	b.Settings.DataDir = settings.DataDir
+	b.Settings.ConfigFile = settings.ConfigFile
+	b.Settings.DataDir = b.Config.GetDataPath()
 	b.Settings.CheckParamInteraction = settings.CheckParamInteraction
 
 	err = utils.AdjustGoMaxProcs(settings.GoMaxProcs)
@@ -104,27 +95,57 @@ func NewFromSettings(settings *Settings) (*Engine, error) {
 		return nil, fmt.Errorf("unable to adjust runtime GOMAXPROCS value. Err: %s", err)
 	}
 
-	ValidateSettings(&b, settings)
+	b.GctScriptManager, err = gctscript.NewManager(&b.Config.GCTScript)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create script manager. Err: %s", err)
+	}
+
+	validateSettings(&b, settings, flagSet)
+
 	return &b, nil
 }
 
-// ValidateSettings validates and sets all bot settings
-func ValidateSettings(b *Engine, s *Settings) {
-	flag.Visit(func(f *flag.Flag) { flagSet[f.Name] = true })
+// loadConfigWithSettings creates configuration based on the provided settings
+func loadConfigWithSettings(settings *Settings, flagSet map[string]bool) (*config.Config, error) {
+	filePath, err := config.GetAndMigrateDefaultPath(settings.ConfigFile)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("Loading config file %s..\n", filePath)
 
+	conf := &config.Cfg
+	err = conf.ReadConfigFromFile(filePath, settings.EnableDryRun)
+	if err != nil {
+		return nil, fmt.Errorf(config.ErrFailureOpeningConfig, filePath, err)
+	}
+	// Apply overrides from settings
+	if flagSet["datadir"] {
+		// warn if dryrun isn't enabled
+		if !settings.EnableDryRun {
+			log.Println("Command line argument '-datadir' induces dry run mode.")
+		}
+		settings.EnableDryRun = true
+		conf.DataDirectory = settings.DataDir
+	}
+
+	return conf, conf.CheckConfig()
+}
+
+// validateSettings validates and sets all bot settings
+func validateSettings(b *Engine, s *Settings, flagSet map[string]bool) {
 	b.Settings.Verbose = s.Verbose
 	b.Settings.EnableDryRun = s.EnableDryRun
 	b.Settings.EnableAllExchanges = s.EnableAllExchanges
 	b.Settings.EnableAllPairs = s.EnableAllPairs
 	b.Settings.EnableCoinmarketcapAnalysis = s.EnableCoinmarketcapAnalysis
 	b.Settings.EnableDatabaseManager = s.EnableDatabaseManager
-	b.Settings.EnableGCTScriptManager = s.EnableGCTScriptManager
+	b.Settings.EnableGCTScriptManager = s.EnableGCTScriptManager && (flagSet["gctscriptmanager"] || b.Config.GCTScript.Enabled)
 	b.Settings.MaxVirtualMachines = s.MaxVirtualMachines
 	b.Settings.EnableDispatcher = s.EnableDispatcher
 	b.Settings.EnablePortfolioManager = s.EnablePortfolioManager
 	b.Settings.WithdrawCacheSize = s.WithdrawCacheSize
 	if b.Settings.EnablePortfolioManager {
-		if b.Settings.PortfolioManagerDelay != time.Duration(0) && s.PortfolioManagerDelay > 0 {
+		if b.Settings.PortfolioManagerDelay == time.Duration(0) && s.PortfolioManagerDelay > 0 {
 			b.Settings.PortfolioManagerDelay = s.PortfolioManagerDelay
 		} else {
 			b.Settings.PortfolioManagerDelay = PortfolioSleepDelay
@@ -155,12 +176,9 @@ func ValidateSettings(b *Engine, s *Settings) {
 		b.Settings.EnableDeprecatedRPC = b.Config.RemoteControl.DeprecatedRPC.Enabled
 	}
 
-	if flagSet["gctscriptmanager"] {
-		gctscript.GCTScriptConfig.Enabled = s.EnableGCTScriptManager
-	}
-
 	if flagSet["maxvirtualmachines"] {
-		gctscript.GCTScriptConfig.MaxVirtualMachines = uint8(s.MaxVirtualMachines)
+		maxMachines := uint8(s.MaxVirtualMachines)
+		b.GctScriptManager.MaxVirtualMachines = &maxMachines
 	}
 
 	if flagSet["withdrawcachesize"] {
@@ -206,20 +224,31 @@ func ValidateSettings(b *Engine, s *Settings) {
 		request.MaxRequestJobs = int32(b.Settings.MaxHTTPRequestJobsLimit)
 	}
 
-	b.Settings.RequestTimeoutRetryAttempts = s.RequestTimeoutRetryAttempts
-	if b.Settings.RequestTimeoutRetryAttempts != request.DefaultTimeoutRetryAttempts && s.RequestTimeoutRetryAttempts > 0 {
-		request.TimeoutRetryAttempts = b.Settings.RequestTimeoutRetryAttempts
+	b.Settings.TradeBufferProcessingInterval = s.TradeBufferProcessingInterval
+	if b.Settings.TradeBufferProcessingInterval != trade.DefaultProcessorIntervalTime {
+		if b.Settings.TradeBufferProcessingInterval >= time.Second {
+			trade.BufferProcessorIntervalTime = b.Settings.TradeBufferProcessingInterval
+		} else {
+			b.Settings.TradeBufferProcessingInterval = trade.DefaultProcessorIntervalTime
+			gctlog.Warnf(gctlog.Global, "-tradeprocessinginterval must be >= to 1 second, using default value of %v",
+				trade.DefaultProcessorIntervalTime)
+		}
 	}
 
-	b.Settings.ExchangeHTTPTimeout = s.ExchangeHTTPTimeout
-	if s.ExchangeHTTPTimeout != time.Duration(0) && s.ExchangeHTTPTimeout > 0 {
-		b.Settings.ExchangeHTTPTimeout = s.ExchangeHTTPTimeout
+	b.Settings.RequestMaxRetryAttempts = s.RequestMaxRetryAttempts
+	if b.Settings.RequestMaxRetryAttempts != request.DefaultMaxRetryAttempts && s.RequestMaxRetryAttempts > 0 {
+		request.MaxRetryAttempts = b.Settings.RequestMaxRetryAttempts
+	}
+
+	b.Settings.HTTPTimeout = s.HTTPTimeout
+	if s.HTTPTimeout != time.Duration(0) && s.HTTPTimeout > 0 {
+		b.Settings.HTTPTimeout = s.HTTPTimeout
 	} else {
-		b.Settings.ExchangeHTTPTimeout = b.Config.GlobalHTTPTimeout
+		b.Settings.HTTPTimeout = b.Config.GlobalHTTPTimeout
 	}
 
-	b.Settings.ExchangeHTTPUserAgent = s.ExchangeHTTPUserAgent
-	b.Settings.ExchangeHTTPProxy = s.ExchangeHTTPProxy
+	b.Settings.HTTPUserAgent = s.HTTPUserAgent
+	b.Settings.HTTPProxy = s.HTTPProxy
 
 	if s.GlobalHTTPTimeout != time.Duration(0) && s.GlobalHTTPTimeout > 0 {
 		b.Settings.GlobalHTTPTimeout = s.GlobalHTTPTimeout
@@ -285,11 +314,11 @@ func PrintSettings(s *Settings) {
 	gctlog.Debugf(gctlog.Global, "\t Enable exchange verbose mode: %v", s.EnableExchangeVerbose)
 	gctlog.Debugf(gctlog.Global, "\t Enable exchange HTTP rate limiter: %v", s.EnableExchangeHTTPRateLimiter)
 	gctlog.Debugf(gctlog.Global, "\t Enable exchange HTTP debugging: %v", s.EnableExchangeHTTPDebugging)
-	gctlog.Debugf(gctlog.Global, "\t Exchange max HTTP request jobs: %v", s.MaxHTTPRequestJobsLimit)
-	gctlog.Debugf(gctlog.Global, "\t Exchange HTTP request timeout retry amount: %v", s.RequestTimeoutRetryAttempts)
-	gctlog.Debugf(gctlog.Global, "\t Exchange HTTP timeout: %v", s.ExchangeHTTPTimeout)
-	gctlog.Debugf(gctlog.Global, "\t Exchange HTTP user agent: %v", s.ExchangeHTTPUserAgent)
-	gctlog.Debugf(gctlog.Global, "\t Exchange HTTP proxy: %v\n", s.ExchangeHTTPProxy)
+	gctlog.Debugf(gctlog.Global, "\t Max HTTP request jobs: %v", s.MaxHTTPRequestJobsLimit)
+	gctlog.Debugf(gctlog.Global, "\t HTTP request max retry attempts: %v", s.RequestMaxRetryAttempts)
+	gctlog.Debugf(gctlog.Global, "\t Trade buffer processing interval: %v", s.TradeBufferProcessingInterval)
+	gctlog.Debugf(gctlog.Global, "\t HTTP timeout: %v", s.HTTPTimeout)
+	gctlog.Debugf(gctlog.Global, "\t HTTP user agent: %v", s.HTTPUserAgent)
 	gctlog.Debugf(gctlog.Global, "- GCTSCRIPT SETTINGS: ")
 	gctlog.Debugf(gctlog.Global, "\t Enable GCTScript manager: %v", s.EnableGCTScriptManager)
 	gctlog.Debugf(gctlog.Global, "\t GCTScript max virtual machines: %v", s.MaxVirtualMachines)
@@ -298,162 +327,159 @@ func PrintSettings(s *Settings) {
 	gctlog.Debugf(gctlog.Global, "- COMMON SETTINGS:")
 	gctlog.Debugf(gctlog.Global, "\t Global HTTP timeout: %v", s.GlobalHTTPTimeout)
 	gctlog.Debugf(gctlog.Global, "\t Global HTTP user agent: %v", s.GlobalHTTPUserAgent)
-	gctlog.Debugf(gctlog.Global, "\t Global HTTP proxy: %v", s.ExchangeHTTPProxy)
+	gctlog.Debugf(gctlog.Global, "\t Global HTTP proxy: %v", s.GlobalHTTPProxy)
 
 	gctlog.Debugln(gctlog.Global)
 }
 
 // Start starts the engine
-func (e *Engine) Start() error {
-	if e == nil {
+func (bot *Engine) Start() error {
+	if bot == nil {
 		return errors.New("engine instance is nil")
 	}
 
-	if e.Settings.EnableDatabaseManager {
-		if err := e.DatabaseManager.Start(); err != nil {
+	if bot.Settings.EnableDatabaseManager {
+		if err := bot.DatabaseManager.Start(bot); err != nil {
 			gctlog.Errorf(gctlog.Global, "Database manager unable to start: %v", err)
 		}
 	}
 
-	if e.Settings.EnableDispatcher {
-		if err := dispatch.Start(e.Settings.DispatchMaxWorkerAmount, e.Settings.DispatchJobsLimit); err != nil {
+	if bot.Settings.EnableDispatcher {
+		if err := dispatch.Start(bot.Settings.DispatchMaxWorkerAmount, bot.Settings.DispatchJobsLimit); err != nil {
 			gctlog.Errorf(gctlog.DispatchMgr, "Dispatcher unable to start: %v", err)
 		}
 	}
 
 	// Sets up internet connectivity monitor
-	if e.Settings.EnableConnectivityMonitor {
-		if err := e.ConnectionManager.Start(); err != nil {
+	if bot.Settings.EnableConnectivityMonitor {
+		if err := bot.ConnectionManager.Start(&bot.Config.ConnectionMonitor); err != nil {
 			gctlog.Errorf(gctlog.Global, "Connection manager unable to start: %v", err)
 		}
 	}
 
-	if e.Settings.EnableNTPClient {
-		if err := e.NTPManager.Start(); err != nil {
+	if bot.Settings.EnableNTPClient {
+		if err := bot.NTPManager.Start(); err != nil {
 			gctlog.Errorf(gctlog.Global, "NTP manager unable to start: %v", err)
 		}
 	}
 
-	e.Uptime = time.Now()
-	gctlog.Debugf(gctlog.Global, "Bot '%s' started.\n", e.Config.Name)
-	gctlog.Debugf(gctlog.Global, "Using data dir: %s\n", e.Settings.DataDir)
-	if *e.Config.Logging.Enabled && strings.Contains(e.Config.Logging.Output, "file") {
+	bot.Uptime = time.Now()
+	gctlog.Debugf(gctlog.Global, "Bot '%s' started.\n", bot.Config.Name)
+	gctlog.Debugf(gctlog.Global, "Using data dir: %s\n", bot.Settings.DataDir)
+	if *bot.Config.Logging.Enabled && strings.Contains(bot.Config.Logging.Output, "file") {
 		gctlog.Debugf(gctlog.Global, "Using log file: %s\n",
-			filepath.Join(gctlog.LogPath, e.Config.Logging.LoggerFileConfig.FileName))
+			filepath.Join(gctlog.LogPath, bot.Config.Logging.LoggerFileConfig.FileName))
 	}
 	gctlog.Debugf(gctlog.Global,
 		"Using %d out of %d logical processors for runtime performance\n",
 		runtime.GOMAXPROCS(-1), runtime.NumCPU())
 
-	enabledExchanges := e.Config.CountEnabledExchanges()
-	if e.Settings.EnableAllExchanges {
-		enabledExchanges = len(e.Config.Exchanges)
+	enabledExchanges := bot.Config.CountEnabledExchanges()
+	if bot.Settings.EnableAllExchanges {
+		enabledExchanges = len(bot.Config.Exchanges)
 	}
 
 	gctlog.Debugln(gctlog.Global, "EXCHANGE COVERAGE")
 	gctlog.Debugf(gctlog.Global, "\t Available Exchanges: %d. Enabled Exchanges: %d.\n",
-		len(e.Config.Exchanges), enabledExchanges)
+		len(bot.Config.Exchanges), enabledExchanges)
 
-	if e.Settings.ExchangePurgeCredentials {
+	if bot.Settings.ExchangePurgeCredentials {
 		gctlog.Debugln(gctlog.Global, "Purging exchange API credentials.")
-		e.Config.PurgeExchangeAPICredentials()
+		bot.Config.PurgeExchangeAPICredentials()
 	}
 
 	gctlog.Debugln(gctlog.Global, "Setting up exchanges..")
-	SetupExchanges()
-	if Bot.exchangeManager.Len() == 0 {
+	bot.SetupExchanges()
+	if bot.exchangeManager.Len() == 0 {
 		return errors.New("no exchanges are loaded")
 	}
 
-	if e.Settings.EnableCommsRelayer {
-		if err := e.CommsManager.Start(); err != nil {
+	if bot.Settings.EnableCommsRelayer {
+		if err := bot.CommsManager.Start(); err != nil {
 			gctlog.Errorf(gctlog.Global, "Communications manager unable to start: %v\n", err)
 		}
 	}
 
 	err := currency.RunStorageUpdater(currency.BotOverrides{
-		Coinmarketcap:       e.Settings.EnableCoinmarketcapAnalysis,
-		FxCurrencyConverter: e.Settings.EnableCurrencyConverter,
-		FxCurrencyLayer:     e.Settings.EnableCurrencyLayer,
-		FxFixer:             e.Settings.EnableFixer,
-		FxOpenExchangeRates: e.Settings.EnableOpenExchangeRates,
+		Coinmarketcap:       bot.Settings.EnableCoinmarketcapAnalysis,
+		FxCurrencyConverter: bot.Settings.EnableCurrencyConverter,
+		FxCurrencyLayer:     bot.Settings.EnableCurrencyLayer,
+		FxFixer:             bot.Settings.EnableFixer,
+		FxOpenExchangeRates: bot.Settings.EnableOpenExchangeRates,
 	},
 		&currency.MainConfiguration{
-			ForexProviders:         e.Config.GetForexProviders(),
-			CryptocurrencyProvider: coinmarketcap.Settings(e.Config.Currency.CryptocurrencyProvider),
-			Cryptocurrencies:       e.Config.Currency.Cryptocurrencies,
-			FiatDisplayCurrency:    e.Config.Currency.FiatDisplayCurrency,
-			CurrencyDelay:          e.Config.Currency.CurrencyFileUpdateDuration,
-			FxRateDelay:            e.Config.Currency.ForeignExchangeUpdateDuration,
+			ForexProviders:         bot.Config.GetForexProviders(),
+			CryptocurrencyProvider: coinmarketcap.Settings(bot.Config.Currency.CryptocurrencyProvider),
+			Cryptocurrencies:       bot.Config.Currency.Cryptocurrencies,
+			FiatDisplayCurrency:    bot.Config.Currency.FiatDisplayCurrency,
+			CurrencyDelay:          bot.Config.Currency.CurrencyFileUpdateDuration,
+			FxRateDelay:            bot.Config.Currency.ForeignExchangeUpdateDuration,
 		},
-		e.Settings.DataDir,
-		e.Settings.Verbose)
+		bot.Settings.DataDir)
 	if err != nil {
 		gctlog.Errorf(gctlog.Global, "Currency updater system failed to start %v", err)
 	}
 
-	if e.Settings.EnableGRPC {
-		go StartRPCServer()
+	if bot.Settings.EnableGRPC {
+		go StartRPCServer(bot)
 	}
 
-	if e.Settings.EnableDeprecatedRPC {
-		go StartRESTServer()
+	if bot.Settings.EnableDeprecatedRPC {
+		go StartRESTServer(bot)
 	}
 
-	if e.Settings.EnableWebsocketRPC {
-		go StartWebsocketServer()
+	if bot.Settings.EnableWebsocketRPC {
+		go StartWebsocketServer(bot)
 		StartWebsocketHandler()
 	}
 
-	if e.Settings.EnablePortfolioManager {
-		if err = e.PortfolioManager.Start(); err != nil {
+	if bot.Settings.EnablePortfolioManager {
+		if err = bot.PortfolioManager.Start(); err != nil {
 			gctlog.Errorf(gctlog.Global, "Fund manager unable to start: %v", err)
 		}
 	}
 
-	if e.Settings.EnableDepositAddressManager {
-		e.DepositAddressManager = new(DepositAddressManager)
-		go e.DepositAddressManager.Sync()
+	if bot.Settings.EnableDepositAddressManager {
+		bot.DepositAddressManager = new(DepositAddressManager)
+		go bot.DepositAddressManager.Sync()
 	}
 
-	if e.Settings.EnableOrderManager {
-		if err = e.OrderManager.Start(); err != nil {
+	if bot.Settings.EnableOrderManager {
+		if err = bot.OrderManager.Start(); err != nil {
 			gctlog.Errorf(gctlog.Global, "Order manager unable to start: %v", err)
 		}
 	}
 
-	if e.Settings.EnableExchangeSyncManager {
+	if bot.Settings.EnableExchangeSyncManager {
 		exchangeSyncCfg := CurrencyPairSyncerConfig{
-			SyncTicker:       e.Settings.EnableTickerSyncing,
-			SyncOrderbook:    e.Settings.EnableOrderbookSyncing,
-			SyncTrades:       e.Settings.EnableTradeSyncing,
-			SyncContinuously: e.Settings.SyncContinuously,
-			NumWorkers:       e.Settings.SyncWorkers,
-			Verbose:          e.Settings.Verbose,
-			SyncTimeout:      e.Settings.SyncTimeout,
+			SyncTicker:       bot.Settings.EnableTickerSyncing,
+			SyncOrderbook:    bot.Settings.EnableOrderbookSyncing,
+			SyncTrades:       bot.Settings.EnableTradeSyncing,
+			SyncContinuously: bot.Settings.SyncContinuously,
+			NumWorkers:       bot.Settings.SyncWorkers,
+			Verbose:          bot.Settings.Verbose,
+			SyncTimeout:      bot.Settings.SyncTimeout,
 		}
 
-		e.ExchangeCurrencyPairManager, err = NewCurrencyPairSyncer(exchangeSyncCfg)
+		bot.ExchangeCurrencyPairManager, err = NewCurrencyPairSyncer(exchangeSyncCfg)
 		if err != nil {
 			gctlog.Warnf(gctlog.Global, "Unable to initialise exchange currency pair syncer. Err: %s", err)
 		} else {
-			go e.ExchangeCurrencyPairManager.Start()
+			go bot.ExchangeCurrencyPairManager.Start()
 		}
 	}
 
-	if e.Settings.EnableEventManager {
+	if bot.Settings.EnableEventManager {
 		go EventManger()
 	}
 
-	if e.Settings.EnableWebsocketRoutine {
+	if bot.Settings.EnableWebsocketRoutine {
 		go WebsocketRoutine()
 	}
 
-	if e.Settings.EnableGCTScriptManager {
-		if e.Config.GCTScript.Enabled {
-			if err := e.GctScriptManager.Start(); err != nil {
-				gctlog.Errorf(gctlog.Global, "GCTScript manager unable to start: %v", err)
-			}
+	if bot.Settings.EnableGCTScriptManager {
+		if err := bot.GctScriptManager.Start(&bot.ServicesWG); err != nil {
+			gctlog.Errorf(gctlog.Global, "GCTScript manager unable to start: %v", err)
 		}
 	}
 
@@ -461,50 +487,50 @@ func (e *Engine) Start() error {
 }
 
 // Stop correctly shuts down engine saving configuration files
-func (e *Engine) Stop() {
+func (bot *Engine) Stop() {
 	gctlog.Debugln(gctlog.Global, "Engine shutting down..")
 
 	if len(portfolio.Portfolio.Addresses) != 0 {
-		e.Config.Portfolio = portfolio.Portfolio
+		bot.Config.Portfolio = portfolio.Portfolio
 	}
 
-	if e.GctScriptManager.Started() {
-		if err := e.GctScriptManager.Stop(); err != nil {
+	if bot.GctScriptManager.Started() {
+		if err := bot.GctScriptManager.Stop(); err != nil {
 			gctlog.Errorf(gctlog.Global, "GCTScript manager unable to stop. Error: %v", err)
 		}
 	}
-	if e.OrderManager.Started() {
-		if err := e.OrderManager.Stop(); err != nil {
+	if bot.OrderManager.Started() {
+		if err := bot.OrderManager.Stop(); err != nil {
 			gctlog.Errorf(gctlog.Global, "Order manager unable to stop. Error: %v", err)
 		}
 	}
 
-	if e.NTPManager.Started() {
-		if err := e.NTPManager.Stop(); err != nil {
+	if bot.NTPManager.Started() {
+		if err := bot.NTPManager.Stop(); err != nil {
 			gctlog.Errorf(gctlog.Global, "NTP manager unable to stop. Error: %v", err)
 		}
 	}
 
-	if e.CommsManager.Started() {
-		if err := e.CommsManager.Stop(); err != nil {
+	if bot.CommsManager.Started() {
+		if err := bot.CommsManager.Stop(); err != nil {
 			gctlog.Errorf(gctlog.Global, "Communication manager unable to stop. Error: %v", err)
 		}
 	}
 
-	if e.PortfolioManager.Started() {
-		if err := e.PortfolioManager.Stop(); err != nil {
+	if bot.PortfolioManager.Started() {
+		if err := bot.PortfolioManager.Stop(); err != nil {
 			gctlog.Errorf(gctlog.Global, "Fund manager unable to stop. Error: %v", err)
 		}
 	}
 
-	if e.ConnectionManager.Started() {
-		if err := e.ConnectionManager.Stop(); err != nil {
+	if bot.ConnectionManager.Started() {
+		if err := bot.ConnectionManager.Stop(); err != nil {
 			gctlog.Errorf(gctlog.Global, "Connection manager unable to stop. Error: %v", err)
 		}
 	}
 
-	if e.DatabaseManager.Started() {
-		if err := e.DatabaseManager.Stop(); err != nil {
+	if bot.DatabaseManager.Started() {
+		if err := bot.DatabaseManager.Stop(); err != nil {
 			gctlog.Errorf(gctlog.Global, "Database manager unable to stop. Error: %v", err)
 		}
 	}
@@ -515,8 +541,12 @@ func (e *Engine) Stop() {
 		}
 	}
 
-	if !e.Settings.EnableDryRun {
-		err := e.Config.SaveConfig(e.Settings.ConfigFile, false)
+	if err := currency.ShutdownStorageUpdater(); err != nil {
+		gctlog.Errorf(gctlog.Global, "Currency storage system. Error: %v", err)
+	}
+
+	if !bot.Settings.EnableDryRun {
+		err := bot.Config.SaveConfigToFile(bot.Settings.ConfigFile)
 		if err != nil {
 			gctlog.Errorln(gctlog.Global, "Unable to save config.")
 		} else {
@@ -525,7 +555,7 @@ func (e *Engine) Stop() {
 	}
 
 	// Wait for services to gracefully shutdown
-	e.ServicesWG.Wait()
+	bot.ServicesWG.Wait()
 	err := gctlog.CloseLogger()
 	if err != nil {
 		log.Printf("Failed to close logger. Error: %v\n", err)

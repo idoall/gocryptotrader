@@ -29,3 +29,7 @@ cmd/gctcli/gctcli
 *.out
 sqlboiler.toml
 sqlboiler.json
+
+# GCT API Check
+backup.json
+.DS_STORE

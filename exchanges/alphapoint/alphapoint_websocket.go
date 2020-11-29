@@ -17,7 +17,9 @@ func (a *Alphapoint) WebsocketClient() {
 	for a.Enabled {
 		var dialer websocket.Dialer
 		var err error
-		a.WebsocketConn, _, err = dialer.Dial(a.API.Endpoints.WebsocketURL, http.Header{})
+		var httpResp *http.Response
+		a.WebsocketConn, httpResp, err = dialer.Dial(a.API.Endpoints.WebsocketURL, http.Header{})
+		httpResp.Body.Close() // not used, so safely free the body
 
 		if err != nil {
 			log.Errorf(log.ExchangeSys, "%s Unable to connect to Websocket. Error: %s\n", a.Name, err)
@@ -38,7 +40,6 @@ func (a *Alphapoint) WebsocketClient() {
 		for a.Enabled {
 			msgType, resp, err := a.WebsocketConn.ReadMessage()
 			if err != nil {
-				a.Websocket.ReadMessageErrors <- err
 				log.Error(log.ExchangeSys, err)
 				break
 			}

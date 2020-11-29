@@ -1,6 +1,7 @@
 package yobit
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -8,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
@@ -42,11 +42,6 @@ const (
 // Yobit is the overarching type across the Yobit package
 type Yobit struct {
 	exchange.Base
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (y *Yobit) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
 }
 
 // GetInfo returns the Yobit info
@@ -83,15 +78,22 @@ func (y *Yobit) GetDepth(symbol string) (Orderbook, error) {
 }
 
 // GetTrades returns the trades for a specific currency
-func (y *Yobit) GetTrades(symbol string) ([]Trades, error) {
-	type Response struct {
-		Data map[string][]Trades
+func (y *Yobit) GetTrades(symbol string) ([]Trade, error) {
+	type respDataHolder struct {
+		Data map[string][]Trade
 	}
 
-	response := Response{}
-	path := fmt.Sprintf("%s/%s/%s/%s", y.API.Endpoints.URL, apiPublicVersion, publicTrades, symbol)
+	var dataHolder respDataHolder
+	path := y.API.Endpoints.URL + "/" + apiPublicVersion + "/" + publicTrades + "/" + symbol
+	err := y.SendHTTPRequest(path, &dataHolder.Data)
+	if err != nil {
+		return nil, err
+	}
 
-	return response.Data[symbol], y.SendHTTPRequest(path, &response.Data)
+	if tr, ok := dataHolder.Data[symbol]; ok {
+		return tr, nil
+	}
+	return nil, nil
 }
 
 // GetAccountInformation returns a users account info
@@ -116,7 +118,7 @@ func (y *Yobit) Trade(pair, orderType string, amount, price float64) (int64, err
 	req.Add("amount", strconv.FormatFloat(amount, 'f', -1, 64))
 	req.Add("rate", strconv.FormatFloat(price, 'f', -1, 64))
 
-	result := Trade{}
+	result := TradeOrderResponse{}
 
 	err := y.SendAuthenticatedHTTPRequest(privateTrade, req, &result)
 	if err != nil {
@@ -263,7 +265,7 @@ func (y *Yobit) RedeemCoupon(coupon string) (RedeemCoupon, error) {
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (y *Yobit) SendHTTPRequest(path string, result interface{}) error {
-	return y.SendPayload(&request.Item{
+	return y.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -303,7 +305,7 @@ func (y *Yobit) SendAuthenticatedHTTPRequest(path string, params url.Values, res
 	headers["Sign"] = crypto.HexEncodeToString(hmac)
 	headers["Content-Type"] = "application/x-www-form-urlencoded"
 
-	return y.SendPayload(&request.Item{
+	return y.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodPost,
 		Path:          apiPrivateURL,
 		Headers:       headers,

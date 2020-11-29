@@ -1,7 +1,6 @@
 package coinbasepro
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -9,13 +8,17 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/idoall/gocryptotrader/common"
+	"github.com/idoall/gocryptotrader/common/convert"
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/core"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/sharedtestvalues"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
+	"github.com/idoall/gocryptotrader/exchanges/stream"
 	"github.com/idoall/gocryptotrader/portfolio/banking"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
@@ -47,11 +50,11 @@ func TestMain(m *testing.M) {
 	gdxConfig.API.Credentials.ClientID = clientID
 	gdxConfig.API.AuthenticatedSupport = true
 	gdxConfig.API.AuthenticatedWebsocketSupport = true
+	c.Websocket = sharedtestvalues.NewTestWebsocket()
 	err = c.Setup(gdxConfig)
 	if err != nil {
 		log.Fatal("CoinbasePro setup error", err)
 	}
-
 	os.Exit(m.Run())
 }
 
@@ -76,55 +79,24 @@ func TestGetTrades(t *testing.T) {
 	}
 }
 
-func TestGetHistoricRatesApiCheck(t *testing.T) {
-	e := expectedCandles(5, 300, 60)
-	if e != nil {
-		t.Error(e)
-	}
-	e = expectedCandles(2, 600, 300)
-	if e != nil {
-		t.Error(e)
-	}
-	e = expectedCandles(2, 1800, 900)
-	if e != nil {
-		t.Error(e)
-	}
-	e = expectedCandles(2, 7200, 3600)
-	if e != nil {
-		t.Error(e)
-	}
-	e = expectedCandles(2, 43200, 21600)
-	if e != nil {
-		t.Error(e)
-	}
-	e = expectedCandles(2, 172800, 86400)
-	if e != nil {
-		t.Error(e)
-	}
-}
-
-// expectedCandles uses the previous candle time window because the current one might not be complete and if used the test would become non-deterministic
-func expectedCandles(expectedCandles int, timeRange time.Duration, candleGranularity int64) error {
-	end := time.Now().UTC().Add(-time.Second * timeRange) // the latest candle may not yet be ready, so skipping to the previous one
-	start := end.Add(-time.Second * timeRange)
-	resp, err := c.GetHistoricRates(testPair, start.Format(time.RFC3339), end.Format(time.RFC3339), candleGranularity)
-	if err != nil {
-		return err
-	}
-	if len(resp) != expectedCandles {
-		err := fmt.Errorf("expected %d candles, returned: %d", expectedCandles, len(resp))
-		return err
-	}
-	return nil
-}
-
 func TestGetHistoricRatesGranularityCheck(t *testing.T) {
-	end := time.Now().UTC()
-	start := time.Now().UTC().Add(-time.Second * 300)
-	invalidGranularity := 11
-	_, err := c.GetHistoricRates(testPair, start.Format(time.RFC3339), end.Format(time.RFC3339), int64(invalidGranularity))
-	if err == nil {
-		t.Error("granularity validation did not work as expected")
+	end := time.Now()
+	start := end.Add(-time.Hour * 2)
+	p := currency.NewPairWithDelimiter("BTC", "USD", "-")
+	_, err := c.GetHistoricCandles(p, asset.Spot, start, end, kline.OneHour)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestCoinbasePro_GetHistoricCandlesExtended(t *testing.T) {
+	start := time.Unix(1546300800, 0)
+	end := time.Unix(1577836799, 0)
+
+	p := currency.NewPairWithDelimiter("BTC", "USD", "-")
+	_, err := c.GetHistoricCandlesExtended(p, asset.Spot, start, end, kline.OneDay)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -202,10 +174,6 @@ func TestAuthRequests(t *testing.T) {
 		t.Error("Expecting error")
 	}
 	_, err = c.GetFills("", "")
-	if err == nil {
-		t.Error("Expecting error")
-	}
-	_, err = c.GetFundingRecords("rejected")
 	if err == nil {
 		t.Error("Expecting error")
 	}
@@ -426,8 +394,8 @@ func TestFormatWithdrawPermissions(t *testing.T) {
 
 func TestGetActiveOrders(t *testing.T) {
 	var getOrdersRequest = order.GetOrdersRequest{
-		OrderType: order.AnyType,
-		Currencies: []currency.Pair{currency.NewPair(currency.BTC,
+		Type: order.AnyType,
+		Pairs: []currency.Pair{currency.NewPair(currency.BTC,
 			currency.LTC)},
 	}
 
@@ -441,8 +409,8 @@ func TestGetActiveOrders(t *testing.T) {
 
 func TestGetOrderHistory(t *testing.T) {
 	var getOrdersRequest = order.GetOrdersRequest{
-		OrderType: order.AnyType,
-		Currencies: []currency.Pair{currency.NewPair(currency.BTC,
+		Type: order.AnyType,
+		Pairs: []currency.Pair{currency.NewPair(currency.BTC,
 			currency.LTC)},
 	}
 
@@ -471,11 +439,12 @@ func TestSubmitOrder(t *testing.T) {
 			Base:      currency.BTC,
 			Quote:     currency.USD,
 		},
-		OrderSide: order.Buy,
-		OrderType: order.Limit,
+		Side:      order.Buy,
+		Type:      order.Limit,
 		Price:     1,
 		Amount:    1,
 		ClientID:  "meowOrder",
+		AssetType: asset.Spot,
 	}
 	response, err := c.SubmitOrder(orderSubmission)
 	if areTestAPIKeysSet() && (err != nil || !response.IsOrderPlaced) {
@@ -492,10 +461,11 @@ func TestCancelExchangeOrder(t *testing.T) {
 
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = &order.Cancel{
-		OrderID:       "1",
+		ID:            "1",
 		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
-		CurrencyPair:  currencyPair,
+		Pair:          currencyPair,
+		AssetType:     asset.Spot,
 	}
 
 	err := c.CancelOrder(orderCancellation)
@@ -514,10 +484,11 @@ func TestCancelAllExchangeOrders(t *testing.T) {
 
 	currencyPair := currency.NewPair(currency.LTC, currency.BTC)
 	var orderCancellation = &order.Cancel{
-		OrderID:       "1",
+		ID:            "1",
 		WalletAddress: core.BitcoinDonationAddress,
 		AccountID:     "1",
-		CurrencyPair:  currencyPair,
+		Pair:          currencyPair,
+		AssetType:     asset.Spot,
 	}
 
 	resp, err := c.CancelAllOrders(orderCancellation)
@@ -538,7 +509,7 @@ func TestModifyOrder(t *testing.T) {
 	if areTestAPIKeysSet() && !canManipulateRealOrders {
 		t.Skip("API keys set, canManipulateRealOrders false, skipping test")
 	}
-	_, err := c.ModifyOrder(&order.Modify{})
+	_, err := c.ModifyOrder(&order.Modify{AssetType: asset.Spot})
 	if err == nil {
 		t.Error("ModifyOrder() Expected error")
 	}
@@ -549,7 +520,7 @@ func TestWithdraw(t *testing.T) {
 		Amount:      -1,
 		Currency:    currency.BTC,
 		Description: "WITHDRAW IT ALL",
-		Crypto: &withdraw.CryptoRequest{
+		Crypto: withdraw.CryptoRequest{
 			Address: core.BitcoinDonationAddress,
 		},
 	}
@@ -575,8 +546,8 @@ func TestWithdrawFiat(t *testing.T) {
 	var withdrawFiatRequest = withdraw.Request{
 		Amount:   100,
 		Currency: currency.USD,
-		Fiat: &withdraw.FiatRequest{
-			Bank: &banking.Account{
+		Fiat: withdraw.FiatRequest{
+			Bank: banking.Account{
 				BankName: "Federal Reserve Bank",
 			},
 		},
@@ -599,8 +570,8 @@ func TestWithdrawInternationalBank(t *testing.T) {
 	var withdrawFiatRequest = withdraw.Request{
 		Amount:   100,
 		Currency: currency.USD,
-		Fiat: &withdraw.FiatRequest{
-			Bank: &banking.Account{
+		Fiat: withdraw.FiatRequest{
+			Bank: banking.Account{
 				BankName: "Federal Reserve Bank",
 			},
 		},
@@ -625,26 +596,24 @@ func TestGetDepositAddress(t *testing.T) {
 // TestWsAuth dials websocket, sends login request.
 func TestWsAuth(t *testing.T) {
 	if !c.Websocket.IsEnabled() && !c.API.AuthenticatedWebsocketSupport || !areTestAPIKeysSet() {
-		t.Skip(wshandler.WebsocketNotEnabled)
-	}
-	c.WebsocketConn = &wshandler.WebsocketConnection{
-		ExchangeName:         c.Name,
-		URL:                  c.Websocket.GetWebsocketURL(),
-		Verbose:              c.Verbose,
-		ResponseMaxLimit:     exchange.DefaultWebsocketResponseMaxLimit,
-		ResponseCheckTimeout: exchange.DefaultWebsocketResponseCheckTimeout,
+		t.Skip(stream.WebsocketNotEnabled)
 	}
 	var dialer websocket.Dialer
-	err := c.WebsocketConn.Dial(&dialer, http.Header{})
+	err := c.Websocket.Conn.Dial(&dialer, http.Header{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	c.Websocket.DataHandler = sharedtestvalues.GetWebsocketInterfaceChannelOverride()
-	c.Websocket.TrafficAlert = sharedtestvalues.GetWebsocketStructChannelOverride()
-	go c.WsHandleData()
-	err = c.Subscribe(wshandler.WebsocketChannelSubscription{
-		Channel:  "user",
-		Currency: currency.NewPairFromString(testPair),
+	go c.wsReadData()
+
+	p, err := currency.NewPairFromString(testPair)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = c.Subscribe([]stream.ChannelSubscription{
+		{
+			Channel:  "user",
+			Currency: p,
+		},
 	})
 	if err != nil {
 		t.Error(err)
@@ -656,4 +625,411 @@ func TestWsAuth(t *testing.T) {
 	case <-timer.C:
 	}
 	timer.Stop()
+}
+
+func TestWsSubscribe(t *testing.T) {
+	pressXToJSON := []byte(`{
+		"type": "subscriptions",
+		"channels": [
+			{
+				"name": "level2",
+				"product_ids": [
+					"ETH-USD",
+					"ETH-EUR"
+				]
+			},
+			{
+				"name": "heartbeat",
+				"product_ids": [
+					"ETH-USD",
+					"ETH-EUR"
+				]
+			},
+			{
+				"name": "ticker",
+				"product_ids": [
+					"ETH-USD",
+					"ETH-EUR",
+					"ETH-BTC"
+				]
+			}
+		]
+	}`)
+	err := c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsHeartbeat(t *testing.T) {
+	pressXToJSON := []byte(`{
+		"type": "heartbeat",
+		"sequence": 90,
+		"last_trade_id": 20,
+		"product_id": "BTC-USD",
+		"time": "2014-11-07T08:19:28.464459Z"
+	}`)
+	err := c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsStatus(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "type": "status",
+    "products": [
+        {
+            "id": "BTC-USD",
+            "base_currency": "BTC",
+            "quote_currency": "USD",
+            "base_min_size": "0.001",
+            "base_max_size": "70",
+            "base_increment": "0.00000001",
+            "quote_increment": "0.01",
+            "display_name": "BTC/USD",
+            "status": "online",
+            "status_message": null,
+            "min_market_funds": "10",
+            "max_market_funds": "1000000",
+            "post_only": false,
+            "limit_only": false,
+            "cancel_only": false
+        }
+    ],
+    "currencies": [
+        {
+            "id": "USD",
+            "name": "United States Dollar",
+            "min_size": "0.01000000",
+            "status": "online",
+            "status_message": null,
+            "max_precision": "0.01",
+            "convertible_to": ["USDC"], "details": {}
+        },
+        {
+            "id": "USDC",
+            "name": "USD Coin",
+            "min_size": "0.00000100",
+            "status": "online",
+            "status_message": null,
+            "max_precision": "0.000001",
+            "convertible_to": ["USD"], "details": {}
+        },
+        {
+            "id": "BTC",
+            "name": "Bitcoin",
+            "min_size": "0.00000001",
+            "status": "online",
+            "status_message": null,
+            "max_precision": "0.00000001",
+            "convertible_to": []
+        }
+    ]
+}`)
+	err := c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsTicker(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "type": "ticker",
+    "trade_id": 20153558,
+    "sequence": 3262786978,
+    "time": "2017-09-02T17:05:49.250000Z",
+    "product_id": "BTC-USD",
+    "price": "4388.01000000",
+    "side": "buy", 
+    "last_size": "0.03000000",
+    "best_bid": "4388",
+    "best_ask": "4388.01"
+}`)
+	err := c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsOrderbook(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "type": "snapshot",
+    "product_id": "BTC-USD",
+    "bids": [["10101.10", "0.45054140"]],
+    "asks": [["10102.55", "0.57753524"]]
+}`)
+	err := c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+
+	pressXToJSON = []byte(`{
+  "type": "l2update",
+  "product_id": "BTC-USD",
+  "time": "2019-08-14T20:42:27.265Z",
+  "changes": [
+    [
+      "buy",
+      "10101.80000000",
+      "0.162567"
+    ]
+  ]
+}`)
+	err = c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestWsOrders(t *testing.T) {
+	pressXToJSON := []byte(`{
+    "type": "received",
+    "time": "2014-11-07T08:19:27.028459Z",
+    "product_id": "BTC-USD",
+    "sequence": 10,
+    "order_id": "d50ec984-77a8-460a-b958-66f114b0de9b",
+    "size": "1.34",
+    "price": "502.1",
+    "side": "buy",
+    "order_type": "limit"
+}`)
+	err := c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+
+	pressXToJSON = []byte(`{
+    "type": "received",
+    "time": "2014-11-09T08:19:27.028459Z",
+    "product_id": "BTC-USD",
+    "sequence": 12,
+    "order_id": "dddec984-77a8-460a-b958-66f114b0de9b",
+    "funds": "3000.234",
+    "side": "buy",
+    "order_type": "market"
+}`)
+	err = c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+
+	pressXToJSON = []byte(`{
+    "type": "open",
+    "time": "2014-11-07T08:19:27.028459Z",
+    "product_id": "BTC-USD",
+    "sequence": 10,
+    "order_id": "d50ec984-77a8-460a-b958-66f114b0de9b",
+    "price": "200.2",
+    "remaining_size": "1.00",
+    "side": "sell"
+}`)
+	err = c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+
+	pressXToJSON = []byte(`{
+    "type": "done",
+    "time": "2014-11-07T08:19:27.028459Z",
+    "product_id": "BTC-USD",
+    "sequence": 10,
+    "price": "200.2",
+    "order_id": "d50ec984-77a8-460a-b958-66f114b0de9b",
+    "reason": "filled", 
+    "side": "sell",
+    "remaining_size": "0"
+}`)
+	err = c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+
+	pressXToJSON = []byte(`{
+    "type": "match",
+    "trade_id": 10,
+    "sequence": 50,
+    "maker_order_id": "ac928c66-ca53-498f-9c13-a110027a60e8",
+    "taker_order_id": "132fb6ae-456b-4654-b4e0-d681ac05cea1",
+    "time": "2014-11-07T08:19:27.028459Z",
+    "product_id": "BTC-USD",
+    "size": "5.23512",
+    "price": "400.23",
+    "side": "sell"
+}`)
+	err = c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+
+	pressXToJSON = []byte(`{
+    "type": "change",
+    "time": "2014-11-07T08:19:27.028459Z",
+    "sequence": 80,
+    "order_id": "ac928c66-ca53-498f-9c13-a110027a60e8",
+    "product_id": "BTC-USD",
+    "new_size": "5.23512",
+    "old_size": "12.234412",
+    "price": "400.23",
+    "side": "sell"
+}`)
+	err = c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+	pressXToJSON = []byte(`{
+    "type": "change",
+    "time": "2014-11-07T08:19:27.028459Z",
+    "sequence": 80,
+    "order_id": "ac928c66-ca53-498f-9c13-a110027a60e8",
+    "product_id": "BTC-USD",
+    "new_funds": "5.23512",
+    "old_funds": "12.234412",
+    "price": "400.23",
+    "side": "sell"
+}`)
+	err = c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+	pressXToJSON = []byte(`{
+  "type": "activate",
+  "product_id": "BTC-USD",
+  "timestamp": "1483736448.299000",
+  "user_id": "12",
+  "profile_id": "30000727-d308-cf50-7b1c-c06deb1934fc",
+  "order_id": "7b52009b-64fd-0a2a-49e6-d8a939753077",
+  "stop_type": "entry",
+  "side": "buy",
+  "stop_price": "80",
+  "size": "2",
+  "funds": "50",
+  "taker_fee_rate": "0.0025",
+  "private": true
+}`)
+	err = c.wsHandleData(pressXToJSON)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestStatusToStandardStatus(t *testing.T) {
+	type TestCases struct {
+		Case   string
+		Result order.Status
+	}
+	testCases := []TestCases{
+		{Case: "received", Result: order.New},
+		{Case: "open", Result: order.Active},
+		{Case: "done", Result: order.Filled},
+		{Case: "match", Result: order.PartiallyFilled},
+		{Case: "change", Result: order.Active},
+		{Case: "activate", Result: order.Active},
+		{Case: "LOL", Result: order.UnknownStatus},
+	}
+	for i := range testCases {
+		result, _ := statusToStandardStatus(testCases[i].Case)
+		if result != testCases[i].Result {
+			t.Errorf("Exepcted: %v, received: %v", testCases[i].Result, result)
+		}
+	}
+}
+
+func TestParseTime(t *testing.T) {
+	// Rest examples use 2014-11-07T22:19:28.578544Z" and can be safely
+	// unmarhsalled into time.Time
+
+	// All events except for activate use the above, in the below test
+	// we'll use their API docs example
+	r := convert.TimeFromUnixTimestampDecimal(1483736448.299000).UTC()
+	if r.Year() != 2017 ||
+		r.Month().String() != "January" ||
+		r.Day() != 6 {
+		t.Error("unexpected result")
+	}
+}
+
+func TestCheckInterval(t *testing.T) {
+	interval := time.Minute
+	i, err := checkInterval(interval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i != 60 {
+		t.Fatal("incorrect return")
+	}
+	interval = time.Minute * 5
+	i, err = checkInterval(interval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i != 300 {
+		t.Fatal("incorrect return")
+	}
+
+	interval = time.Minute * 15
+	i, err = checkInterval(interval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i != 900 {
+		t.Fatal("incorrect return")
+	}
+
+	interval = time.Hour
+	i, err = checkInterval(interval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i != 3600 {
+		t.Fatal("incorrect return")
+	}
+
+	interval = time.Hour * 6
+	i, err = checkInterval(interval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i != 21600 {
+		t.Fatal("incorrect return")
+	}
+
+	interval = time.Hour * 24
+	i, err = checkInterval(interval)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if i != 86400 {
+		t.Fatal("incorrect return")
+	}
+
+	interval = time.Hour * 1337
+	_, err = checkInterval(interval)
+	if err == nil {
+		t.Fatal("error cannot be nil")
+	}
+}
+
+func TestGetRecentTrades(t *testing.T) {
+	t.Parallel()
+	currencyPair, err := currency.NewPairFromString(testPair)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.GetRecentTrades(currencyPair, asset.Spot)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGetHistoricTrades(t *testing.T) {
+	t.Parallel()
+	currencyPair, err := currency.NewPairFromString(testPair)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = c.GetHistoricTrades(currencyPair, asset.Spot, time.Now().Add(-time.Minute*15), time.Now())
+	if err != nil && err != common.ErrFunctionNotSupported {
+		t.Error(err)
+	}
 }

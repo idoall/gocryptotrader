@@ -13,12 +13,18 @@
   "paths": {
     "/v1/addevent": {
       "post": {
-        "operationId": "AddEvent",
+        "operationId": "GoCryptoTrader_AddEvent",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcAddEventResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -39,12 +45,18 @@
     },
     "/v1/addportfolioaddress": {
       "post": {
-        "operationId": "AddPortfolioAddress",
+        "operationId": "GoCryptoTrader_AddPortfolioAddress",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcAddPortfolioAddressResponse"
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -65,12 +77,18 @@
     },
     "/v1/cancelallorders": {
       "post": {
-        "operationId": "CancelAllOrders",
+        "operationId": "GoCryptoTrader_CancelAllOrders",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcCancelAllOrdersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -89,14 +107,52 @@
         ]
       }
     },
-    "/v1/cancelorder": {
+    "/v1/cancelbatchorders": {
       "post": {
-        "operationId": "CancelOrder",
+        "operationId": "GoCryptoTrader_CancelBatchOrders",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcCancelOrderResponse"
+              "$ref": "#/definitions/gctrpcCancelBatchOrdersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/gctrpcCancelBatchOrdersRequest"
+            }
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/cancelorder": {
+      "post": {
+        "operationId": "GoCryptoTrader_CancelOrder",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -115,14 +171,105 @@
         ]
       }
     },
-    "/v1/disableexchange": {
-      "post": {
-        "operationId": "DisableExchange",
+    "/v1/converttradestocandles": {
+      "get": {
+        "operationId": "GoCryptoTrader_ConvertTradesToCandles",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcGenericExchangeNameResponse"
+              "$ref": "#/definitions/gctrpcGetHistoricCandlesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.delimiter",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.base",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.quote",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "asset_type",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "time_interval",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "sync",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/disableexchange": {
+      "post": {
+        "operationId": "GoCryptoTrader_DisableExchange",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -141,40 +288,20 @@
         ]
       }
     },
-    "/v1/disableexchangepair": {
-      "post": {
-        "operationId": "DisableExchangePair",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/gctrpcGenericExchangeNameResponse"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/gctrpcExchangePairRequest"
-            }
-          }
-        ],
-        "tags": [
-          "GoCryptoTrader"
-        ]
-      }
-    },
     "/v1/disablesubsystem": {
       "get": {
-        "operationId": "DisableSubsystem",
+        "operationId": "GoCryptoTrader_DisableSubsystem",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcGenericSubsystemResponse"
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -193,12 +320,18 @@
     },
     "/v1/enableexchange": {
       "post": {
-        "operationId": "EnableExchange",
+        "operationId": "GoCryptoTrader_EnableExchange",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcGenericExchangeNameResponse"
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -217,40 +350,20 @@
         ]
       }
     },
-    "/v1/enableexchangepair": {
-      "post": {
-        "operationId": "EnableExchangePair",
-        "responses": {
-          "200": {
-            "description": "A successful response.",
-            "schema": {
-              "$ref": "#/definitions/gctrpcGenericExchangeNameResponse"
-            }
-          }
-        },
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "required": true,
-            "schema": {
-              "$ref": "#/definitions/gctrpcExchangePairRequest"
-            }
-          }
-        ],
-        "tags": [
-          "GoCryptoTrader"
-        ]
-      }
-    },
     "/v1/enablesubsystem": {
       "get": {
-        "operationId": "EnableSubsystem",
+        "operationId": "GoCryptoTrader_EnableSubsystem",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcGenericSubsystemResponse"
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -267,14 +380,159 @@
         ]
       }
     },
-    "/v1/gctscript/autoload": {
-      "post": {
-        "operationId": "GCTScriptAutoLoadToggle",
+    "/v1/findmissingsavedcandleintervals": {
+      "get": {
+        "operationId": "GoCryptoTrader_FindMissingSavedCandleIntervals",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcGCTScriptGenericResponse"
+              "$ref": "#/definitions/gctrpcFindMissingIntervalsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange_name",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "asset_type",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.delimiter",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.base",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.quote",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "interval",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/findmissingsavedtradeintervals": {
+      "get": {
+        "operationId": "GoCryptoTrader_FindMissingSavedTradeIntervals",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcFindMissingIntervalsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange_name",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "asset_type",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.delimiter",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.base",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.quote",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/gctscript/autoload": {
+      "post": {
+        "operationId": "GoCryptoTrader_GCTScriptAutoLoadToggle",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -295,12 +553,18 @@
     },
     "/v1/gctscript/execute": {
       "get": {
-        "operationId": "GCTScriptExecute",
+        "operationId": "GoCryptoTrader_GCTScriptExecute",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcGCTScriptGenericResponse"
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -337,12 +601,18 @@
     },
     "/v1/gctscript/query": {
       "get": {
-        "operationId": "GCTScriptQuery",
+        "operationId": "GoCryptoTrader_GCTScriptQuery",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGCTScriptQueryResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -379,12 +649,18 @@
     },
     "/v1/gctscript/read": {
       "post": {
-        "operationId": "GCTScriptReadScript",
+        "operationId": "GoCryptoTrader_GCTScriptReadScript",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGCTScriptQueryResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -405,12 +681,18 @@
     },
     "/v1/gctscript/status": {
       "get": {
-        "operationId": "GCTScriptStatus",
+        "operationId": "GoCryptoTrader_GCTScriptStatus",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGCTScriptStatusResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -421,12 +703,18 @@
     },
     "/v1/gctscript/stop": {
       "post": {
-        "operationId": "GCTScriptListAll",
+        "operationId": "GoCryptoTrader_GCTScriptListAll",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGCTScriptStatusResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -447,12 +735,18 @@
     },
     "/v1/gctscript/upload": {
       "post": {
-        "operationId": "GCTScriptUpload",
+        "operationId": "GoCryptoTrader_GCTScriptUpload",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcGCTScriptGenericResponse"
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -473,12 +767,18 @@
     },
     "/v1/getaccountinfo": {
       "get": {
-        "operationId": "GetAccountInfo",
+        "operationId": "GoCryptoTrader_GetAccountInfo",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetAccountInfoResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -497,12 +797,27 @@
     },
     "/v1/getaccountinfostream": {
       "get": {
-        "operationId": "GetAccountInfoStream",
+        "operationId": "GoCryptoTrader_GetAccountInfoStream",
         "responses": {
           "200": {
             "description": "A successful response.(streaming responses)",
             "schema": {
-              "$ref": "#/x-stream-definitions/gctrpcGetAccountInfoResponse"
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/gctrpcGetAccountInfoResponse"
+                },
+                "error": {
+                  "$ref": "#/definitions/runtimeStreamError"
+                }
+              },
+              "title": "Stream result of gctrpcGetAccountInfoResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -521,12 +836,18 @@
     },
     "/v1/getauditevent": {
       "get": {
-        "operationId": "GetAuditEvent",
+        "operationId": "GoCryptoTrader_GetAuditEvent",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetAuditEventResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -571,12 +892,18 @@
     },
     "/v1/getcommunicationrelayers": {
       "get": {
-        "operationId": "GetCommunicationRelayers",
+        "operationId": "GoCryptoTrader_GetCommunicationRelayers",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetCommunicationRelayersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -587,12 +914,18 @@
     },
     "/v1/getconfig": {
       "get": {
-        "operationId": "GetConfig",
+        "operationId": "GoCryptoTrader_GetConfig",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetConfigResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -603,12 +936,18 @@
     },
     "/v1/getcryptodepositaddress": {
       "post": {
-        "operationId": "GetCryptocurrencyDepositAddress",
+        "operationId": "GoCryptoTrader_GetCryptocurrencyDepositAddress",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetCryptocurrencyDepositAddressResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -629,12 +968,18 @@
     },
     "/v1/getcryptodepositaddresses": {
       "post": {
-        "operationId": "GetCryptocurrencyDepositAddresses",
+        "operationId": "GoCryptoTrader_GetCryptocurrencyDepositAddresses",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetCryptocurrencyDepositAddressesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -655,12 +1000,18 @@
     },
     "/v1/getevents": {
       "get": {
-        "operationId": "GetEvents",
+        "operationId": "GoCryptoTrader_GetEvents",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetEventsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -669,14 +1020,50 @@
         ]
       }
     },
+    "/v1/getexchangeassets": {
+      "get": {
+        "operationId": "GoCryptoTrader_GetExchangeAssets",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGetExchangeAssetsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
     "/v1/getexchangeinfo": {
       "get": {
-        "operationId": "GetExchangeInfo",
+        "operationId": "GoCryptoTrader_GetExchangeInfo",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetExchangeInfoResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -695,12 +1082,27 @@
     },
     "/v1/getexchangeorderbookstream": {
       "get": {
-        "operationId": "GetExchangeOrderbookStream",
+        "operationId": "GoCryptoTrader_GetExchangeOrderbookStream",
         "responses": {
           "200": {
             "description": "A successful response.(streaming responses)",
             "schema": {
-              "$ref": "#/x-stream-definitions/gctrpcOrderbookResponse"
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/gctrpcOrderbookResponse"
+                },
+                "error": {
+                  "$ref": "#/definitions/runtimeStreamError"
+                }
+              },
+              "title": "Stream result of gctrpcOrderbookResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -719,12 +1121,18 @@
     },
     "/v1/getexchangeotp": {
       "get": {
-        "operationId": "GetExchangeOTPCode",
+        "operationId": "GoCryptoTrader_GetExchangeOTPCode",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetExchangeOTPReponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -743,12 +1151,18 @@
     },
     "/v1/getexchangeotps": {
       "get": {
-        "operationId": "GetExchangeOTPCodes",
+        "operationId": "GoCryptoTrader_GetExchangeOTPCodes",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetExchangeOTPsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -759,12 +1173,18 @@
     },
     "/v1/getexchangepairs": {
       "post": {
-        "operationId": "GetExchangePairs",
+        "operationId": "GoCryptoTrader_GetExchangePairs",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetExchangePairsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -785,12 +1205,18 @@
     },
     "/v1/getexchanges": {
       "get": {
-        "operationId": "GetExchanges",
+        "operationId": "GoCryptoTrader_GetExchanges",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetExchangesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -799,8 +1225,7 @@
             "name": "enabled",
             "in": "query",
             "required": false,
-            "type": "boolean",
-            "format": "boolean"
+            "type": "boolean"
           }
         ],
         "tags": [
@@ -810,12 +1235,27 @@
     },
     "/v1/getexchangetickerstream": {
       "get": {
-        "operationId": "GetExchangeTickerStream",
+        "operationId": "GoCryptoTrader_GetExchangeTickerStream",
         "responses": {
           "200": {
             "description": "A successful response.(streaming responses)",
             "schema": {
-              "$ref": "#/x-stream-definitions/gctrpcTickerResponse"
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/gctrpcTickerResponse"
+                },
+                "error": {
+                  "$ref": "#/definitions/runtimeStreamError"
+                }
+              },
+              "title": "Stream result of gctrpcTickerResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -834,12 +1274,18 @@
     },
     "/v1/getforexproviders": {
       "get": {
-        "operationId": "GetForexProviders",
+        "operationId": "GoCryptoTrader_GetForexProviders",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetForexProvidersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -850,12 +1296,18 @@
     },
     "/v1/getforexrates": {
       "get": {
-        "operationId": "GetForexRates",
+        "operationId": "GoCryptoTrader_GetForexRates",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetForexRatesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -866,12 +1318,18 @@
     },
     "/v1/gethistoriccandles": {
       "get": {
-        "operationId": "GetHistoricCandles",
+        "operationId": "GoCryptoTrader_GetHistoricCandles",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetHistoricCandlesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -901,18 +1359,59 @@
             "type": "string"
           },
           {
-            "name": "rangesize",
+            "name": "asset_type",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "time_interval",
             "in": "query",
             "required": false,
             "type": "string",
             "format": "int64"
           },
           {
-            "name": "granularity",
+            "name": "ex_request",
             "in": "query",
             "required": false,
-            "type": "string",
-            "format": "int64"
+            "type": "boolean"
+          },
+          {
+            "name": "sync",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "use_db",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "fill_missing_with_trades",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "force",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
           }
         ],
         "tags": [
@@ -922,12 +1421,18 @@
     },
     "/v1/getinfo": {
       "get": {
-        "operationId": "GetInfo",
+        "operationId": "GoCryptoTrader_GetInfo",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetInfoResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -938,12 +1443,18 @@
     },
     "/v1/getloggerdetails": {
       "get": {
-        "operationId": "GetLoggerDetails",
+        "operationId": "GoCryptoTrader_GetLoggerDetails",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetLoggerDetailsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -962,12 +1473,18 @@
     },
     "/v1/getorder": {
       "post": {
-        "operationId": "GetOrder",
+        "operationId": "GoCryptoTrader_GetOrder",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcOrderDetails"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -988,12 +1505,18 @@
     },
     "/v1/getorderbook": {
       "post": {
-        "operationId": "GetOrderbook",
+        "operationId": "GoCryptoTrader_GetOrderbook",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcOrderbookResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1014,12 +1537,18 @@
     },
     "/v1/getorderbooks": {
       "get": {
-        "operationId": "GetOrderbooks",
+        "operationId": "GoCryptoTrader_GetOrderbooks",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetOrderbooksResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1030,12 +1559,27 @@
     },
     "/v1/getorderbookstream": {
       "get": {
-        "operationId": "GetOrderbookStream",
+        "operationId": "GoCryptoTrader_GetOrderbookStream",
         "responses": {
           "200": {
             "description": "A successful response.(streaming responses)",
             "schema": {
-              "$ref": "#/x-stream-definitions/gctrpcOrderbookResponse"
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/gctrpcOrderbookResponse"
+                },
+                "error": {
+                  "$ref": "#/definitions/runtimeStreamError"
+                }
+              },
+              "title": "Stream result of gctrpcOrderbookResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1078,12 +1622,18 @@
     },
     "/v1/getorders": {
       "post": {
-        "operationId": "GetOrders",
+        "operationId": "GoCryptoTrader_GetOrders",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetOrdersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1104,12 +1654,18 @@
     },
     "/v1/getportfolio": {
       "get": {
-        "operationId": "GetPortfolio",
+        "operationId": "GoCryptoTrader_GetPortfolio",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetPortfolioResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1120,12 +1676,18 @@
     },
     "/v1/getportfoliosummary": {
       "get": {
-        "operationId": "GetPortfolioSummary",
+        "operationId": "GoCryptoTrader_GetPortfolioSummary",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetPortfolioSummaryResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1136,12 +1698,18 @@
     },
     "/v1/getrpcendpoints": {
       "get": {
-        "operationId": "GetRPCEndpoints",
+        "operationId": "GoCryptoTrader_GetRPCEndpoints",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetRPCEndpointsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1150,14 +1718,86 @@
         ]
       }
     },
+    "/v1/getsavedtrades": {
+      "get": {
+        "operationId": "GoCryptoTrader_GetSavedTrades",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcSavedTradesResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.delimiter",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.base",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "pair.quote",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "asset_type",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
     "/v1/getsubsystems": {
       "get": {
-        "operationId": "GetSubsystems",
+        "operationId": "GoCryptoTrader_GetSubsystems",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetSusbsytemsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1168,12 +1808,18 @@
     },
     "/v1/getticker": {
       "post": {
-        "operationId": "GetTicker",
+        "operationId": "GoCryptoTrader_GetTicker",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcTickerResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1194,12 +1840,18 @@
     },
     "/v1/gettickers": {
       "get": {
-        "operationId": "GetTickers",
+        "operationId": "GoCryptoTrader_GetTickers",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetTickersResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1210,12 +1862,27 @@
     },
     "/v1/gettickerstream": {
       "get": {
-        "operationId": "GetTickerStream",
+        "operationId": "GoCryptoTrader_GetTickerStream",
         "responses": {
           "200": {
             "description": "A successful response.(streaming responses)",
             "schema": {
-              "$ref": "#/x-stream-definitions/gctrpcTickerResponse"
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/gctrpcTickerResponse"
+                },
+                "error": {
+                  "$ref": "#/definitions/runtimeStreamError"
+                }
+              },
+              "title": "Stream result of gctrpcTickerResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1258,12 +1925,18 @@
     },
     "/v1/removeevent": {
       "post": {
-        "operationId": "RemoveEvent",
+        "operationId": "GoCryptoTrader_RemoveEvent",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcRemoveEventResponse"
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1284,12 +1957,18 @@
     },
     "/v1/removeportfolioaddress": {
       "post": {
-        "operationId": "RemovePortfolioAddress",
+        "operationId": "GoCryptoTrader_RemovePortfolioAddress",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
-              "$ref": "#/definitions/gctrpcRemovePortfolioAddressResponse"
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1308,14 +1987,166 @@
         ]
       }
     },
+    "/v1/setallexchangepairs": {
+      "get": {
+        "operationId": "GoCryptoTrader_SetAllExchangePairs",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "enable",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/setexchangeasset": {
+      "get": {
+        "operationId": "GoCryptoTrader_SetExchangeAsset",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "asset",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "enable",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/setexchangepair": {
+      "post": {
+        "operationId": "GoCryptoTrader_SetExchangePair",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/gctrpcSetExchangePairRequest"
+            }
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/setexchangetradeprocessing": {
+      "get": {
+        "operationId": "GoCryptoTrader_SetExchangeTradeProcessing",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
     "/v1/setloggerdetails": {
       "post": {
-        "operationId": "SetLoggerDetails",
+        "operationId": "GoCryptoTrader_SetLoggerDetails",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcGetLoggerDetailsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1336,12 +2167,18 @@
     },
     "/v1/simulateorder": {
       "post": {
-        "operationId": "SimulateOrder",
+        "operationId": "GoCryptoTrader_SimulateOrder",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcSimulateOrderResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1362,12 +2199,18 @@
     },
     "/v1/submitorder": {
       "post": {
-        "operationId": "SubmitOrder",
+        "operationId": "GoCryptoTrader_SubmitOrder",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcSubmitOrderResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1386,14 +2229,218 @@
         ]
       }
     },
+    "/v1/updateexchangesupportedpairs": {
+      "get": {
+        "operationId": "GoCryptoTrader_UpdateExchangeSupportedPairs",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/websocketgetinfo": {
+      "get": {
+        "operationId": "GoCryptoTrader_WebsocketGetInfo",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcWebsocketGetInfoResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/websocketgetsubscriptions": {
+      "get": {
+        "operationId": "GoCryptoTrader_WebsocketGetSubscriptions",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcWebsocketGetSubscriptionsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/websocketsetenabled": {
+      "get": {
+        "operationId": "GoCryptoTrader_WebsocketSetEnabled",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "enable",
+            "in": "query",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/websocketsetproxy": {
+      "get": {
+        "operationId": "GoCryptoTrader_WebsocketSetProxy",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "proxy",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
+    "/v1/websocketseturl": {
+      "get": {
+        "operationId": "GoCryptoTrader_WebsocketSetURL",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/gctrpcGenericResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "exchange",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "url",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "GoCryptoTrader"
+        ]
+      }
+    },
     "/v1/whalebomb": {
       "post": {
-        "operationId": "WhaleBomb",
+        "operationId": "GoCryptoTrader_WhaleBomb",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcSimulateOrderResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1414,12 +2461,18 @@
     },
     "/v1/withdrawaleventbydate": {
       "post": {
-        "operationId": "WithdrawalEventsByDate",
+        "operationId": "GoCryptoTrader_WithdrawalEventsByDate",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcWithdrawalEventsByExchangeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1440,12 +2493,18 @@
     },
     "/v1/withdrawaleventbyid": {
       "post": {
-        "operationId": "WithdrawalEventsByExchange",
+        "operationId": "GoCryptoTrader_WithdrawalEventsByExchange",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcWithdrawalEventsByExchangeResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1466,12 +2525,18 @@
     },
     "/v1/withdrawfiatfunds": {
       "post": {
-        "operationId": "WithdrawFiatFunds",
+        "operationId": "GoCryptoTrader_WithdrawFiatFunds",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcWithdrawResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1492,12 +2557,18 @@
     },
     "/v1/withdrawithdrawcryptofundswfiatfunds": {
       "post": {
-        "operationId": "WithdrawCryptocurrencyFunds",
+        "operationId": "GoCryptoTrader_WithdrawCryptocurrencyFunds",
         "responses": {
           "200": {
             "description": "A successful response.",
             "schema": {
               "$ref": "#/definitions/gctrpcWithdrawResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/runtimeError"
             }
           }
         },
@@ -1518,20 +2589,6 @@
     }
   },
   "definitions": {
-    "CancelAllOrdersResponseOrders": {
-      "type": "object",
-      "properties": {
-        "exchange": {
-          "type": "string"
-        },
-        "order_status": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "string"
-          }
-        }
-      }
-    },
     "gctrpcAccount": {
       "type": "object",
       "properties": {
@@ -1614,13 +2671,9 @@
           "type": "string"
         },
         "cold_storage": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         }
       }
-    },
-    "gctrpcAddPortfolioAddressResponse": {
-      "type": "object"
     },
     "gctrpcAuditEvent": {
       "type": "object",
@@ -1653,7 +2706,73 @@
         "orders": {
           "type": "array",
           "items": {
-            "$ref": "#/definitions/CancelAllOrdersResponseOrders"
+            "$ref": "#/definitions/gctrpcCancelAllOrdersResponseOrders"
+          }
+        },
+        "count": {
+          "type": "string",
+          "format": "int64"
+        }
+      }
+    },
+    "gctrpcCancelAllOrdersResponseOrders": {
+      "type": "object",
+      "properties": {
+        "exchange": {
+          "type": "string"
+        },
+        "order_status": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "gctrpcCancelBatchOrdersRequest": {
+      "type": "object",
+      "properties": {
+        "exchange": {
+          "type": "string"
+        },
+        "account_id": {
+          "type": "string"
+        },
+        "orders_id": {
+          "type": "string"
+        },
+        "pair": {
+          "$ref": "#/definitions/gctrpcCurrencyPair"
+        },
+        "asset_type": {
+          "type": "string"
+        },
+        "wallet_address": {
+          "type": "string"
+        },
+        "side": {
+          "type": "string"
+        }
+      }
+    },
+    "gctrpcCancelBatchOrdersResponse": {
+      "type": "object",
+      "properties": {
+        "orders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/gctrpcCancelBatchOrdersResponseOrders"
+          }
+        }
+      }
+    },
+    "gctrpcCancelBatchOrdersResponseOrders": {
+      "type": "object",
+      "properties": {
+        "order_status": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
           }
         }
       }
@@ -1684,15 +2803,11 @@
         }
       }
     },
-    "gctrpcCancelOrderResponse": {
-      "type": "object"
-    },
     "gctrpcCandle": {
       "type": "object",
       "properties": {
         "time": {
-          "type": "string",
-          "format": "int64"
+          "type": "string"
         },
         "low": {
           "type": "number",
@@ -1739,12 +2854,10 @@
       "type": "object",
       "properties": {
         "enabled": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "connected": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         }
       }
     },
@@ -1759,12 +2872,10 @@
           "format": "double"
         },
         "check_bids": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "check_bids_and_asks": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "orderbook_amount": {
           "type": "number",
@@ -1801,20 +2912,6 @@
         }
       }
     },
-    "gctrpcExchangePairRequest": {
-      "type": "object",
-      "properties": {
-        "exchange": {
-          "type": "string"
-        },
-        "asset_type": {
-          "type": "string"
-        },
-        "pair": {
-          "$ref": "#/definitions/gctrpcCurrencyPair"
-        }
-      }
-    },
     "gctrpcFiatWithdrawalEvent": {
       "type": "object",
       "properties": {
@@ -1838,6 +2935,29 @@
         }
       }
     },
+    "gctrpcFindMissingIntervalsResponse": {
+      "type": "object",
+      "properties": {
+        "exchange_name": {
+          "type": "string"
+        },
+        "asset_type": {
+          "type": "string"
+        },
+        "pair": {
+          "$ref": "#/definitions/gctrpcCurrencyPair"
+        },
+        "missing_periods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
     "gctrpcForexProvider": {
       "type": "object",
       "properties": {
@@ -1845,12 +2965,10 @@
           "type": "string"
         },
         "enabled": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "verbose": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "rest_polling_delay": {
           "type": "string"
@@ -1863,8 +2981,7 @@
           "format": "int64"
         },
         "primary_provider": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         }
       }
     },
@@ -1911,19 +3028,7 @@
           "type": "string"
         },
         "status": {
-          "type": "boolean",
-          "format": "boolean"
-        }
-      }
-    },
-    "gctrpcGCTScriptGenericResponse": {
-      "type": "object",
-      "properties": {
-        "status": {
-          "type": "string"
-        },
-        "data": {
-          "type": "string"
+          "type": "boolean"
         }
       }
     },
@@ -1991,12 +3096,10 @@
           "format": "byte"
         },
         "archived": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "overwrite": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         }
       }
     },
@@ -2008,11 +3111,16 @@
         }
       }
     },
-    "gctrpcGenericExchangeNameResponse": {
-      "type": "object"
-    },
-    "gctrpcGenericSubsystemResponse": {
-      "type": "object"
+    "gctrpcGenericResponse": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        }
+      }
     },
     "gctrpcGetAccountInfoResponse": {
       "type": "object",
@@ -2120,8 +3228,15 @@
           "type": "string"
         },
         "executed": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
+        }
+      }
+    },
+    "gctrpcGetExchangeAssetsResponse": {
+      "type": "object",
+      "properties": {
+        "assets": {
+          "type": "string"
         }
       }
     },
@@ -2132,16 +3247,13 @@
           "type": "string"
         },
         "enabled": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "verbose": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "using_sandbox": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "http_timeout": {
           "type": "string"
@@ -2162,8 +3274,7 @@
           }
         },
         "authenticated_api": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         }
       }
     },
@@ -2241,6 +3352,21 @@
     "gctrpcGetHistoricCandlesResponse": {
       "type": "object",
       "properties": {
+        "exchange": {
+          "type": "string"
+        },
+        "pair": {
+          "$ref": "#/definitions/gctrpcCurrencyPair"
+        },
+        "start": {
+          "type": "string"
+        },
+        "end": {
+          "type": "string"
+        },
+        "interval": {
+          "type": "string"
+        },
         "candle": {
           "type": "array",
           "items": {
@@ -2272,8 +3398,7 @@
         "subsystem_status": {
           "type": "object",
           "additionalProperties": {
-            "type": "boolean",
-            "format": "boolean"
+            "type": "boolean"
           }
         },
         "rpc_endpoints": {
@@ -2288,20 +3413,16 @@
       "type": "object",
       "properties": {
         "info": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "debug": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "warn": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "error": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         }
       }
     },
@@ -2313,6 +3434,9 @@
         },
         "order_id": {
           "type": "string"
+        },
+        "pair": {
+          "$ref": "#/definitions/gctrpcCurrencyPair"
         }
       }
     },
@@ -2429,8 +3553,7 @@
         "subsystems_status": {
           "type": "object",
           "additionalProperties": {
-            "type": "boolean",
-            "format": "boolean"
+            "type": "boolean"
           }
         }
       }
@@ -2520,6 +3643,9 @@
         "id": {
           "type": "string"
         },
+        "client_order_id": {
+          "type": "string"
+        },
         "base_currency": {
           "type": "string"
         },
@@ -2539,6 +3665,10 @@
           "type": "string",
           "format": "int64"
         },
+        "update_time": {
+          "type": "string",
+          "format": "int64"
+        },
         "status": {
           "type": "string"
         },
@@ -2553,6 +3683,20 @@
         "open_volume": {
           "type": "number",
           "format": "double"
+        },
+        "fee": {
+          "type": "number",
+          "format": "double"
+        },
+        "cost": {
+          "type": "number",
+          "format": "double"
+        },
+        "trades": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/gctrpcTradeHistory"
+          }
         }
       }
     },
@@ -2650,8 +3794,7 @@
       "type": "object",
       "properties": {
         "started": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "listen_address": {
           "type": "string"
@@ -2667,9 +3810,6 @@
         }
       }
     },
-    "gctrpcRemoveEventResponse": {
-      "type": "object"
-    },
     "gctrpcRemovePortfolioAddressRequest": {
       "type": "object",
       "properties": {
@@ -2684,8 +3824,67 @@
         }
       }
     },
-    "gctrpcRemovePortfolioAddressResponse": {
-      "type": "object"
+    "gctrpcSavedTrades": {
+      "type": "object",
+      "properties": {
+        "price": {
+          "type": "number",
+          "format": "double"
+        },
+        "amount": {
+          "type": "number",
+          "format": "double"
+        },
+        "side": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "trade_id": {
+          "type": "string"
+        }
+      }
+    },
+    "gctrpcSavedTradesResponse": {
+      "type": "object",
+      "properties": {
+        "exchange_name": {
+          "type": "string"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "pair": {
+          "$ref": "#/definitions/gctrpcCurrencyPair"
+        },
+        "trades": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/gctrpcSavedTrades"
+          }
+        }
+      }
+    },
+    "gctrpcSetExchangePairRequest": {
+      "type": "object",
+      "properties": {
+        "exchange": {
+          "type": "string"
+        },
+        "asset_type": {
+          "type": "string"
+        },
+        "pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/gctrpcCurrencyPair"
+          }
+        },
+        "enable": {
+          "type": "boolean"
+        }
+      }
     },
     "gctrpcSetLoggerDetailsRequest": {
       "type": "object",
@@ -2771,6 +3970,9 @@
         },
         "client_id": {
           "type": "string"
+        },
+        "asset_type": {
+          "type": "string"
         }
       }
     },
@@ -2778,11 +3980,16 @@
       "type": "object",
       "properties": {
         "order_placed": {
-          "type": "boolean",
-          "format": "boolean"
+          "type": "boolean"
         },
         "order_id": {
           "type": "string"
+        },
+        "trades": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/gctrpcTrades"
+          }
         }
       }
     },
@@ -2840,6 +4047,116 @@
           "items": {
             "$ref": "#/definitions/gctrpcTickerResponse"
           }
+        }
+      }
+    },
+    "gctrpcTradeHistory": {
+      "type": "object",
+      "properties": {
+        "creation_time": {
+          "type": "string",
+          "format": "int64"
+        },
+        "id": {
+          "type": "string"
+        },
+        "price": {
+          "type": "number",
+          "format": "double"
+        },
+        "amount": {
+          "type": "number",
+          "format": "double"
+        },
+        "exchange": {
+          "type": "string"
+        },
+        "asset_type": {
+          "type": "string"
+        },
+        "order_side": {
+          "type": "string"
+        },
+        "fee": {
+          "type": "number",
+          "format": "double"
+        }
+      }
+    },
+    "gctrpcTrades": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "number",
+          "format": "double"
+        },
+        "price": {
+          "type": "number",
+          "format": "double"
+        },
+        "fee": {
+          "type": "number",
+          "format": "double"
+        },
+        "fee_asset": {
+          "type": "string"
+        }
+      }
+    },
+    "gctrpcWebsocketGetInfoResponse": {
+      "type": "object",
+      "properties": {
+        "exchange": {
+          "type": "string"
+        },
+        "supported": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "authenticated_supported": {
+          "type": "boolean"
+        },
+        "authenticated": {
+          "type": "boolean"
+        },
+        "running_url": {
+          "type": "string"
+        },
+        "proxy_address": {
+          "type": "string"
+        }
+      }
+    },
+    "gctrpcWebsocketGetSubscriptionsResponse": {
+      "type": "object",
+      "properties": {
+        "exchange": {
+          "type": "string"
+        },
+        "subscriptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/gctrpcWebsocketSubscription"
+          }
+        }
+      }
+    },
+    "gctrpcWebsocketSubscription": {
+      "type": "object",
+      "properties": {
+        "channel": {
+          "type": "string"
+        },
+        "currency": {
+          "type": "string"
+        },
+        "asset": {
+          "type": "string"
+        },
+        "params": {
+          "type": "string"
         }
       }
     },
@@ -3054,6 +4371,27 @@
         }
       }
     },
+    "runtimeError": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        },
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
     "runtimeStreamError": {
       "type": "object",
       "properties": {
@@ -3078,44 +4416,6 @@
           }
         }
       }
-    }
-  },
-  "x-stream-definitions": {
-    "gctrpcGetAccountInfoResponse": {
-      "type": "object",
-      "properties": {
-        "result": {
-          "$ref": "#/definitions/gctrpcGetAccountInfoResponse"
-        },
-        "error": {
-          "$ref": "#/definitions/runtimeStreamError"
-        }
-      },
-      "title": "Stream result of gctrpcGetAccountInfoResponse"
-    },
-    "gctrpcOrderbookResponse": {
-      "type": "object",
-      "properties": {
-        "result": {
-          "$ref": "#/definitions/gctrpcOrderbookResponse"
-        },
-        "error": {
-          "$ref": "#/definitions/runtimeStreamError"
-        }
-      },
-      "title": "Stream result of gctrpcOrderbookResponse"
-    },
-    "gctrpcTickerResponse": {
-      "type": "object",
-      "properties": {
-        "result": {
-          "$ref": "#/definitions/gctrpcTickerResponse"
-        },
-        "error": {
-          "$ref": "#/definitions/runtimeStreamError"
-        }
-      },
-      "title": "Stream result of gctrpcTickerResponse"
     }
   }
 }

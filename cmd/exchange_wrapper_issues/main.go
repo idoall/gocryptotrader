@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -12,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"text/template"
+	"time"
 
 	"github.com/idoall/gocryptotrader/common/file"
 	"github.com/idoall/gocryptotrader/config"
@@ -20,9 +22,11 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/account"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/orderbook"
 	"github.com/idoall/gocryptotrader/exchanges/ticker"
+	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/portfolio/banking"
 	"github.com/idoall/gocryptotrader/portfolio/withdraw"
 )
@@ -30,16 +34,17 @@ import (
 func main() {
 	log.Println("Loading flags...")
 	parseCLFlags()
-	var err error
 	log.Println("Loading engine...")
-	engine.Bot, err = engine.New()
+	bot, err := engine.New()
 	if err != nil {
 		log.Fatalf("Failed to initialise engine. Err: %s", err)
 	}
+	engine.Bot = bot
 
-	engine.Bot.Settings = engine.Settings{
+	bot.Settings = engine.Settings{
 		DisableExchangeAutoPairUpdates: true,
 		Verbose:                        verboseOverride,
+		EnableExchangeHTTPRateLimiter:  true,
 	}
 
 	log.Println("Loading config...")
@@ -60,7 +65,7 @@ func main() {
 			wrapperConfig.Exchanges[strings.ToLower(name)] = &config.APICredentialsConfig{}
 		}
 		if shouldLoadExchange(name) {
-			err = engine.LoadExchange(name, true, &wg)
+			err = bot.LoadExchange(name, true, &wg)
 			if err != nil {
 				log.Printf("Failed to load exchange %s. Err: %s", name, err)
 				continue
@@ -89,8 +94,9 @@ func main() {
 	log.Println("Testing exchange wrappers..")
 	var exchangeResponses []ExchangeResponses
 
-	exchs := engine.GetExchanges()
+	exchs := bot.GetExchanges()
 	for x := range exchs {
+		exchs[x].SetDefaults()
 		base := exchs[x].GetBase()
 		if !base.Config.Enabled {
 			log.Printf("Exchange %v not enabled, skipping", base.GetName())
@@ -262,8 +268,8 @@ func parseOrderType(orderType string) order.Type {
 		return order.Stop
 	case order.TrailingStop.String():
 		return order.TrailingStop
-	case order.Unknown.String():
-		return order.Unknown
+	case order.UnknownType.String():
+		return order.UnknownType
 	default:
 		log.Printf("OrderType '%v' not recognised, defaulting to LIMIT",
 			orderTypeOverride)
@@ -277,26 +283,33 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 	testOrderType := parseOrderType(config.OrderSubmission.OrderType)
 	assetTypes := base.GetAssetTypes()
 	if assetTypeOverride != "" {
-		if asset.IsValid(asset.Item(assetTypeOverride)) {
-			assetTypes = asset.Items{asset.Item(assetTypeOverride)}
-		} else {
+		a, err := asset.New(assetTypeOverride)
+		if err != nil {
 			log.Printf("%v Asset Type '%v' not recognised, defaulting to exchange defaults", base.GetName(), assetTypeOverride)
+		} else {
+			assetTypes = asset.Items{a}
 		}
 	}
 	for i := range assetTypes {
 		var msg string
-		var p currency.Pair
 		log.Printf("%v %v", base.GetName(), assetTypes[i])
 		if _, ok := base.Config.CurrencyPairs.Pairs[assetTypes[i]]; !ok {
 			continue
 		}
 
+		var p currency.Pair
 		switch {
 		case currencyPairOverride != "":
-			p = currency.NewPairFromString(currencyPairOverride)
+			var err error
+			p, err = currency.NewPairFromString(currencyPairOverride)
+			if err != nil {
+				log.Printf("%v Encountered error: '%v'", base.GetName(), err)
+				continue
+			}
 		case len(base.Config.CurrencyPairs.Pairs[assetTypes[i]].Enabled) == 0:
 			if len(base.Config.CurrencyPairs.Pairs[assetTypes[i]].Available) == 0 {
-				log.Printf("%v has no enabled or available currencies. Skipping", base.GetName())
+				log.Printf("%v has no enabled or available currencies. Skipping",
+					base.GetName())
 				continue
 			}
 			p = base.Config.CurrencyPairs.Pairs[assetTypes[i]].Available.GetRandomPair()
@@ -304,21 +317,27 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			p = base.Config.CurrencyPairs.Pairs[assetTypes[i]].Enabled.GetRandomPair()
 		}
 
+		var err error
+		p, err = disruptFormatting(p)
+		if err != nil {
+			log.Println("failed to disrupt currency pair formatting:", err)
+		}
+
 		responseContainer := ExchangeAssetPairResponses{
-			AssetType:    assetTypes[i],
-			CurrencyPair: p,
+			AssetType: assetTypes[i],
+			Pair:      p,
 		}
 
 		log.Printf("Setup config for %v %v %v", base.GetName(), assetTypes[i], p)
-		err := e.Setup(base.Config)
+		err = e.Setup(base.Config)
 		if err != nil {
 			log.Printf("%v Encountered error reloading config: '%v'", base.GetName(), err)
 		}
 		log.Printf("Executing wrappers for %v %v %v", base.GetName(), assetTypes[i], p)
 
 		if !authenticatedOnly {
-			var r1 *ticker.Price
-			r1, err = e.FetchTicker(p, assetTypes[i])
+			var fetchTickerResponse *ticker.Price
+			fetchTickerResponse, err = e.FetchTicker(p, assetTypes[i])
 			msg = ""
 			if err != nil {
 				msg = err.Error()
@@ -328,11 +347,11 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 				SentParams: jsonifyInterface([]interface{}{p, assetTypes[i]}),
 				Function:   "FetchTicker",
 				Error:      msg,
-				Response:   jsonifyInterface([]interface{}{r1}),
+				Response:   jsonifyInterface([]interface{}{fetchTickerResponse}),
 			})
 
-			var r2 *ticker.Price
-			r2, err = e.UpdateTicker(p, assetTypes[i])
+			var updateTickerResponse *ticker.Price
+			updateTickerResponse, err = e.UpdateTicker(p, assetTypes[i])
 			msg = ""
 			if err != nil {
 				msg = err.Error()
@@ -342,11 +361,11 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 				SentParams: jsonifyInterface([]interface{}{p, assetTypes[i]}),
 				Function:   "UpdateTicker",
 				Error:      msg,
-				Response:   jsonifyInterface([]interface{}{r2}),
+				Response:   jsonifyInterface([]interface{}{updateTickerResponse}),
 			})
 
-			var r3 *orderbook.Base
-			r3, err = e.FetchOrderbook(p, assetTypes[i])
+			var fetchOrderbookResponse *orderbook.Base
+			fetchOrderbookResponse, err = e.FetchOrderbook(p, assetTypes[i])
 			msg = ""
 			if err != nil {
 				msg = err.Error()
@@ -356,11 +375,11 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 				SentParams: jsonifyInterface([]interface{}{p, assetTypes[i]}),
 				Function:   "FetchOrderbook",
 				Error:      msg,
-				Response:   jsonifyInterface([]interface{}{r3}),
+				Response:   jsonifyInterface([]interface{}{fetchOrderbookResponse}),
 			})
 
-			var r4 *orderbook.Base
-			r4, err = e.UpdateOrderbook(p, assetTypes[i])
+			var updateOrderbookResponse *orderbook.Base
+			updateOrderbookResponse, err = e.UpdateOrderbook(p, assetTypes[i])
 			msg = ""
 			if err != nil {
 				msg = err.Error()
@@ -370,11 +389,11 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 				SentParams: jsonifyInterface([]interface{}{p, assetTypes[i]}),
 				Function:   "UpdateOrderbook",
 				Error:      msg,
-				Response:   jsonifyInterface([]interface{}{r4}),
+				Response:   jsonifyInterface([]interface{}{updateOrderbookResponse}),
 			})
 
-			var r5 []string
-			r5, err = e.FetchTradablePairs(assetTypes[i])
+			var fetchTradablePairsResponse []string
+			fetchTradablePairsResponse, err = e.FetchTradablePairs(assetTypes[i])
 			msg = ""
 			if err != nil {
 				msg = err.Error()
@@ -384,7 +403,7 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 				SentParams: jsonifyInterface([]interface{}{assetTypes[i]}),
 				Function:   "FetchTradablePairs",
 				Error:      msg,
-				Response:   jsonifyInterface([]interface{}{r5}),
+				Response:   jsonifyInterface([]interface{}{fetchTradablePairsResponse}),
 			})
 			// r6
 			err = e.UpdateTradablePairs(false)
@@ -399,10 +418,67 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 				Error:      msg,
 				Response:   jsonifyInterface([]interface{}{nil}),
 			})
+
+			var getHistoricTradesResponse []trade.Data
+			getHistoricTradesResponse, err = e.GetHistoricTrades(p, assetTypes[i], time.Now().Add(-time.Hour*24), time.Now())
+			msg = ""
+			if err != nil {
+				msg = err.Error()
+				responseContainer.ErrorCount++
+			}
+			responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
+				SentParams: jsonifyInterface([]interface{}{p, assetTypes[i], time.Now().Add(-time.Hour * 24), time.Now()}),
+				Function:   "GetHistoricTrades",
+				Error:      msg,
+				Response:   jsonifyInterface([]interface{}{getHistoricTradesResponse}),
+			})
+
+			var getRecentTradesResponse []trade.Data
+			getRecentTradesResponse, err = e.GetRecentTrades(p, assetTypes[i])
+			msg = ""
+			if err != nil {
+				msg = err.Error()
+				responseContainer.ErrorCount++
+			}
+			responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
+				SentParams: jsonifyInterface([]interface{}{p, assetTypes[i]}),
+				Function:   "GetRecentTrades",
+				Error:      msg,
+				Response:   jsonifyInterface([]interface{}{getRecentTradesResponse}),
+			})
+
+			var getHistoricCandlesResponse kline.Item
+			startTime, endTime := time.Now().AddDate(0, -1, 0), time.Now()
+			getHistoricCandlesResponse, err = e.GetHistoricCandles(p, assetTypes[i], startTime, endTime, kline.OneDay)
+			msg = ""
+			if err != nil {
+				msg = err.Error()
+				responseContainer.ErrorCount++
+			}
+			responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
+				Function:   "GetHistoricCandles",
+				Error:      msg,
+				Response:   getHistoricCandlesResponse,
+				SentParams: jsonifyInterface([]interface{}{p, assetTypes[i], startTime, endTime, kline.OneDay}),
+			})
+
+			var getHisotirCandlesExtendedResponse kline.Item
+			getHisotirCandlesExtendedResponse, err = e.GetHistoricCandlesExtended(p, assetTypes[i], startTime, endTime, kline.OneDay)
+			msg = ""
+			if err != nil {
+				msg = err.Error()
+				responseContainer.ErrorCount++
+			}
+			responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
+				Function:   "GetHistoricCandlesExtended",
+				Error:      msg,
+				Response:   getHisotirCandlesExtendedResponse,
+				SentParams: jsonifyInterface([]interface{}{p, assetTypes[i], startTime, endTime, kline.OneDay}),
+			})
 		}
 
-		var r7 account.Holdings
-		r7, err = e.FetchAccountInfo()
+		var fetchAccountInfoResponse account.Holdings
+		fetchAccountInfoResponse, err = e.FetchAccountInfo()
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -411,25 +487,11 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 		responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
 			Function: "FetchAccountInfo",
 			Error:    msg,
-			Response: jsonifyInterface([]interface{}{r7}),
+			Response: jsonifyInterface([]interface{}{fetchAccountInfoResponse}),
 		})
 
-		var r8 []exchange.TradeHistory
-		r8, err = e.GetExchangeHistory(p, assetTypes[i])
-		msg = ""
-		if err != nil {
-			msg = err.Error()
-			responseContainer.ErrorCount++
-		}
-		responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
-			SentParams: jsonifyInterface([]interface{}{p, assetTypes[i]}),
-			Function:   "GetExchangeHistory",
-			Error:      msg,
-			Response:   jsonifyInterface([]interface{}{r8}),
-		})
-
-		var r9 []exchange.FundHistory
-		r9, err = e.GetFundingHistory()
+		var getFundingHistoryResponse []exchange.FundHistory
+		getFundingHistoryResponse, err = e.GetFundingHistory()
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -438,7 +500,7 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 		responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
 			Function: "GetFundingHistory",
 			Error:    msg,
-			Response: jsonifyInterface([]interface{}{r9}),
+			Response: jsonifyInterface([]interface{}{getFundingHistoryResponse}),
 		})
 
 		feeType := exchange.FeeBuilder{
@@ -447,8 +509,8 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			PurchasePrice: config.OrderSubmission.Price,
 			Amount:        config.OrderSubmission.Amount,
 		}
-		var r10 float64
-		r10, err = e.GetFeeByType(&feeType)
+		var getFeeByTypeResponse float64
+		getFeeByTypeResponse, err = e.GetFeeByType(&feeType)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -458,19 +520,20 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{feeType}),
 			Function:   "GetFeeByType-Trade",
 			Error:      msg,
-			Response:   jsonifyInterface([]interface{}{r10}),
+			Response:   jsonifyInterface([]interface{}{getFeeByTypeResponse}),
 		})
 
 		s := &order.Submit{
 			Pair:      p,
-			OrderSide: testOrderSide,
-			OrderType: testOrderType,
+			Side:      testOrderSide,
+			Type:      testOrderType,
 			Amount:    config.OrderSubmission.Amount,
 			Price:     config.OrderSubmission.Price,
 			ClientID:  config.OrderSubmission.OrderID,
+			AssetType: assetTypes[i],
 		}
-		var r11 order.SubmitResponse
-		r11, err = e.SubmitOrder(s)
+		var submitOrderResponse order.SubmitResponse
+		submitOrderResponse, err = e.SubmitOrder(s)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -480,19 +543,19 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{*s}),
 			Function:   "SubmitOrder",
 			Error:      msg,
-			Response:   jsonifyInterface([]interface{}{r11}),
+			Response:   jsonifyInterface([]interface{}{submitOrderResponse}),
 		})
 
 		modifyRequest := order.Modify{
-			OrderID:      config.OrderSubmission.OrderID,
-			Type:         testOrderType,
-			Side:         testOrderSide,
-			CurrencyPair: p,
-			Price:        config.OrderSubmission.Price,
-			Amount:       config.OrderSubmission.Amount,
+			ID:     config.OrderSubmission.OrderID,
+			Type:   testOrderType,
+			Side:   testOrderSide,
+			Pair:   p,
+			Price:  config.OrderSubmission.Price,
+			Amount: config.OrderSubmission.Amount,
 		}
-		var r12 string
-		r12, err = e.ModifyOrder(&modifyRequest)
+		var modifyOrderResponse string
+		modifyOrderResponse, err = e.ModifyOrder(&modifyRequest)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -502,13 +565,14 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{modifyRequest}),
 			Function:   "ModifyOrder",
 			Error:      msg,
-			Response:   r12,
+			Response:   modifyOrderResponse,
 		})
-		// r13
+
 		cancelRequest := order.Cancel{
-			Side:         testOrderSide,
-			CurrencyPair: p,
-			OrderID:      config.OrderSubmission.OrderID,
+			Side:      testOrderSide,
+			Pair:      p,
+			ID:        config.OrderSubmission.OrderID,
+			AssetType: assetTypes[i],
 		}
 		err = e.CancelOrder(&cancelRequest)
 		msg = ""
@@ -523,8 +587,30 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			Response:   jsonifyInterface([]interface{}{nil}),
 		})
 
-		var r14 order.CancelAllResponse
-		r14, err = e.CancelAllOrders(&cancelRequest)
+		var request []order.Cancel
+		request = append(request, order.Cancel{
+			Side:      testOrderSide,
+			Pair:      p,
+			ID:        config.OrderSubmission.OrderID,
+			AssetType: assetTypes[i],
+		})
+
+		var CancelBatchOrdersResponse order.CancelBatchResponse
+		CancelBatchOrdersResponse, err = e.CancelBatchOrders(request)
+		msg = ""
+		if err != nil {
+			msg = err.Error()
+			responseContainer.ErrorCount++
+		}
+		responseContainer.EndpointResponses = append(responseContainer.EndpointResponses, EndpointResponse{
+			SentParams: jsonifyInterface([]interface{}{cancelRequest}),
+			Function:   "CancelBatchOrders",
+			Error:      msg,
+			Response:   jsonifyInterface([]interface{}{CancelBatchOrdersResponse}),
+		})
+
+		var cancellAllOrdersResponse order.CancelAllResponse
+		cancellAllOrdersResponse, err = e.CancelAllOrders(&cancelRequest)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -534,11 +620,11 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{cancelRequest}),
 			Function:   "CancelAllOrders",
 			Error:      msg,
-			Response:   jsonifyInterface([]interface{}{r14}),
+			Response:   jsonifyInterface([]interface{}{cancellAllOrdersResponse}),
 		})
 
 		var r15 order.Detail
-		r15, err = e.GetOrderInfo(config.OrderSubmission.OrderID)
+		r15, err = e.GetOrderInfo(config.OrderSubmission.OrderID, p, assetTypes[i])
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -552,12 +638,12 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 		})
 
 		historyRequest := order.GetOrdersRequest{
-			OrderType:  testOrderType,
-			OrderSide:  testOrderSide,
-			Currencies: []currency.Pair{p},
+			Type:  testOrderType,
+			Side:  testOrderSide,
+			Pairs: []currency.Pair{p},
 		}
-		var r16 []order.Detail
-		r16, err = e.GetOrderHistory(&historyRequest)
+		var getOrderHistoryResponse []order.Detail
+		getOrderHistoryResponse, err = e.GetOrderHistory(&historyRequest)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -567,16 +653,16 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{historyRequest}),
 			Function:   "GetOrderHistory",
 			Error:      msg,
-			Response:   jsonifyInterface([]interface{}{r16}),
+			Response:   jsonifyInterface([]interface{}{getOrderHistoryResponse}),
 		})
 
 		orderRequest := order.GetOrdersRequest{
-			OrderType:  testOrderType,
-			OrderSide:  testOrderSide,
-			Currencies: []currency.Pair{p},
+			Type:  testOrderType,
+			Side:  testOrderSide,
+			Pairs: []currency.Pair{p},
 		}
-		var r17 []order.Detail
-		r17, err = e.GetActiveOrders(&orderRequest)
+		var getActiveOrdersResponse []order.Detail
+		getActiveOrdersResponse, err = e.GetActiveOrders(&orderRequest)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -586,11 +672,11 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{orderRequest}),
 			Function:   "GetActiveOrders",
 			Error:      msg,
-			Response:   jsonifyInterface([]interface{}{r17}),
+			Response:   jsonifyInterface([]interface{}{getActiveOrdersResponse}),
 		})
 
-		var r18 string
-		r18, err = e.GetDepositAddress(p.Base, "")
+		var getDepositAddressResponse string
+		getDepositAddressResponse, err = e.GetDepositAddress(p.Base, "")
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -600,7 +686,7 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{p.Base, ""}),
 			Function:   "GetDepositAddress",
 			Error:      msg,
-			Response:   r18,
+			Response:   getDepositAddressResponse,
 		})
 
 		feeType = exchange.FeeBuilder{
@@ -609,8 +695,8 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			PurchasePrice: config.OrderSubmission.Price,
 			Amount:        config.OrderSubmission.Amount,
 		}
-		var r19 float64
-		r19, err = e.GetFeeByType(&feeType)
+		var GetFeeByTypeResponse float64
+		GetFeeByTypeResponse, err = e.GetFeeByType(&feeType)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -620,18 +706,18 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{feeType}),
 			Function:   "GetFeeByType-Crypto-Withdraw",
 			Error:      msg,
-			Response:   jsonifyInterface([]interface{}{r19}),
+			Response:   jsonifyInterface([]interface{}{GetFeeByTypeResponse}),
 		})
 
 		withdrawRequest := withdraw.Request{
 			Currency: p.Quote,
-			Crypto: &withdraw.CryptoRequest{
+			Crypto: withdraw.CryptoRequest{
 				Address: withdrawAddressOverride,
 			},
 			Amount: config.OrderSubmission.Amount,
 		}
-		var r20 *withdraw.ExchangeResponse
-		r20, err = e.WithdrawCryptocurrencyFunds(&withdrawRequest)
+		var withdrawCryptocurrencyFundsResponse *withdraw.ExchangeResponse
+		withdrawCryptocurrencyFundsResponse, err = e.WithdrawCryptocurrencyFunds(&withdrawRequest)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -641,7 +727,7 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{withdrawRequest}),
 			Function:   "WithdrawCryptocurrencyFunds",
 			Error:      msg,
-			Response:   r20,
+			Response:   withdrawCryptocurrencyFundsResponse,
 		})
 
 		feeType = exchange.FeeBuilder{
@@ -652,8 +738,8 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			FiatCurrency:        currency.AUD,
 			BankTransactionType: exchange.WireTransfer,
 		}
-		var r21 float64
-		r21, err = e.GetFeeByType(&feeType)
+		var getFeeByTypeFiatResponse float64
+		getFeeByTypeFiatResponse, err = e.GetFeeByType(&feeType)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -663,14 +749,14 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{feeType}),
 			Function:   "GetFeeByType-FIAT-Withdraw",
 			Error:      msg,
-			Response:   jsonifyInterface([]interface{}{r21}),
+			Response:   jsonifyInterface([]interface{}{getFeeByTypeFiatResponse}),
 		})
 
 		withdrawRequestFiat := withdraw.Request{
 			Currency: p.Quote,
 			Amount:   config.OrderSubmission.Amount,
-			Fiat: &withdraw.FiatRequest{
-				Bank: &banking.Account{
+			Fiat: withdraw.FiatRequest{
+				Bank: banking.Account{
 					AccountName:    config.BankDetails.BankAccountName,
 					AccountNumber:  config.BankDetails.BankAccountNumber,
 					SWIFTCode:      config.BankDetails.SwiftCode,
@@ -696,8 +782,8 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 				IntermediaryBankCode:          config.BankDetails.IntermediaryBankCode,
 			},
 		}
-		var r22 *withdraw.ExchangeResponse
-		r22, err = e.WithdrawFiatFunds(&withdrawRequestFiat)
+		var withdrawFiatFundsResponse *withdraw.ExchangeResponse
+		withdrawFiatFundsResponse, err = e.WithdrawFiatFunds(&withdrawRequestFiat)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -707,11 +793,11 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{withdrawRequestFiat}),
 			Function:   "WithdrawFiatFunds",
 			Error:      msg,
-			Response:   r22,
+			Response:   withdrawFiatFundsResponse,
 		})
 
-		var r23 *withdraw.ExchangeResponse
-		r23, err = e.WithdrawFiatFundsToInternationalBank(&withdrawRequestFiat)
+		var withdrawFiatFundsInternationalResponse *withdraw.ExchangeResponse
+		withdrawFiatFundsInternationalResponse, err = e.WithdrawFiatFundsToInternationalBank(&withdrawRequestFiat)
 		msg = ""
 		if err != nil {
 			msg = err.Error()
@@ -721,7 +807,7 @@ func testWrappers(e exchange.IBotExchange, base *exchange.Base, config *Config) 
 			SentParams: jsonifyInterface([]interface{}{withdrawRequestFiat}),
 			Function:   "WithdrawFiatFundsToInternationalBank",
 			Error:      msg,
-			Response:   r23,
+			Response:   withdrawFiatFundsInternationalResponse,
 		})
 		response = append(response, responseContainer)
 	}
@@ -735,12 +821,7 @@ func jsonifyInterface(params []interface{}) json.RawMessage {
 
 func loadConfig() (Config, error) {
 	var config Config
-	file, err := os.OpenFile("wrapperconfig.json", os.O_RDONLY, os.ModePerm)
-	if err != nil {
-		return config, err
-	}
-	defer file.Close()
-	keys, err := ioutil.ReadAll(file)
+	keys, err := ioutil.ReadFile("wrapperconfig.json")
 	if err != nil {
 		return config, err
 	}
@@ -812,12 +893,11 @@ func outputToHTML(exchangeResponses []ExchangeResponses) {
 		return
 	}
 
-	defer file.Close()
 	err = tmpl.Execute(file, exchangeResponses)
 	if err != nil {
 		log.Print(err)
-		return
 	}
+	file.Close()
 }
 
 func outputToConsole(exchangeResponses []ExchangeResponses) {
@@ -829,7 +909,7 @@ func outputToConsole(exchangeResponses []ExchangeResponses) {
 				log.Printf("%v Result: %v", exchangeResponses[i].ExchangeName, k)
 				log.Printf("Function:\t%v", exchangeResponses[i].AssetPairResponses[j].EndpointResponses[k].Function)
 				log.Printf("AssetType:\t%v", exchangeResponses[i].AssetPairResponses[j].AssetType)
-				log.Printf("Currency:\t%v\n", exchangeResponses[i].AssetPairResponses[j].CurrencyPair)
+				log.Printf("Currency:\t%v\n", exchangeResponses[i].AssetPairResponses[j].Pair)
 				log.Printf("Wrapper Params:\t%s\n", exchangeResponses[i].AssetPairResponses[j].EndpointResponses[k].SentParams)
 				if exchangeResponses[i].AssetPairResponses[j].EndpointResponses[k].Error != "" {
 					totalErrors++
@@ -845,4 +925,23 @@ func outputToConsole(exchangeResponses []ExchangeResponses) {
 		}
 		log.Println()
 	}
+}
+
+// disruptFormatting adds in an unused delimiter and strange casing features to
+// ensure format currency pair is used throughout the code base.
+func disruptFormatting(p currency.Pair) (currency.Pair, error) {
+	base := p.Base.String()
+	if base == "" {
+		return currency.Pair{}, errors.New("cannot disrupt formatting as base is not populated")
+	}
+	quote := p.Quote.String()
+	if quote == "" {
+		return currency.Pair{}, errors.New("cannot disrupt formatting as quote is not populated")
+	}
+
+	return currency.Pair{
+		Base:      p.Base.Upper(),
+		Quote:     p.Quote.Lower(),
+		Delimiter: "-TEST-DELIM-",
+	}, nil
 }

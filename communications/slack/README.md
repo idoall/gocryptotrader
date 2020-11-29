@@ -14,7 +14,7 @@ This slack package is part of the GoCryptoTrader codebase.
 
 ## This is still in active development
 
-You can track ideas, planned features and what's in progresss on this Trello board: [https://trello.com/b/ZAhMhpOy/gocryptotrader](https://trello.com/b/ZAhMhpOy/gocryptotrader).
+You can track ideas, planned features and what's in progress on this Trello board: [https://trello.com/b/ZAhMhpOy/gocryptotrader](https://trello.com/b/ZAhMhpOy/gocryptotrader).
 
 Join our slack to discuss all things related to GoCryptoTrader! [GoCryptoTrader Slack](https://join.slack.com/t/gocryptotrader/shared_invite/enQtNTQ5NDAxMjA2Mjc5LTc5ZDE1ZTNiOGM3ZGMyMmY1NTAxYWZhODE0MWM5N2JlZDk1NDU0YTViYzk4NTk3OTRiMDQzNGQ1YTc4YmRlMTk)
 
@@ -29,7 +29,7 @@ app and share different types of data
 ### Current Features
 
 + Basic communication to your slack channel information includes:
-  - Working status of bot
+	- Working status of bot
 
 ### How to enable
 
@@ -46,10 +46,10 @@ s := new(slack.Slack)
 
 // Define slack configuration
 commsConfig := config.CommunicationsConfig{SlackConfig: config.SlackConfig{
-  Name: "Slack",
-	Enabled: true,
-	Verbose: false,
-	TargetChannel: "targetChan",
+	Name:              "Slack",
+	Enabled:           true,
+	Verbose:           false,
+	TargetChannel:     "targetChan",
 	VerificationToken: "slackGeneratedToken",
 }}
 

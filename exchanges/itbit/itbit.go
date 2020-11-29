@@ -2,6 +2,7 @@ package itbit
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,11 +39,6 @@ type ItBit struct {
 	exchange.Base
 }
 
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (i *ItBit) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
-}
-
 // GetTicker returns ticker info for a specified market.
 // currencyPair - example "XBTUSD" "XBTSGD" "XBTEUR"
 func (i *ItBit) GetTicker(currencyPair string) (Ticker, error) {
@@ -65,9 +61,13 @@ func (i *ItBit) GetOrderbook(currencyPair string) (OrderbookResponse, error) {
 //
 // currencyPair - example "XBTUSD" "XBTSGD" "XBTEUR"
 // timestamp - matchNumber, only executions after this will be returned
-func (i *ItBit) GetTradeHistory(currencyPair, timestamp string) (Trades, error) {
+func (i *ItBit) GetTradeHistory(currencyPair, tradeID string) (Trades, error) {
 	response := Trades{}
-	req := "trades?since=" + timestamp
+
+	var req = itbitTrades
+	if tradeID != "" {
+		req += "?since=" + tradeID
+	}
 	path := fmt.Sprintf("%s/%s/%s/%s", i.API.Endpoints.URL, itbitMarkets, currencyPair, req)
 
 	return response, i.SendHTTPRequest(path, &response)
@@ -279,7 +279,7 @@ func (i *ItBit) WalletTransfer(walletID, sourceWallet, destWallet string, amount
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (i *ItBit) SendHTTPRequest(path string, result interface{}) error {
-	return i.SendPayload(&request.Item{
+	return i.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -341,7 +341,7 @@ func (i *ItBit) SendAuthenticatedHTTPRequest(method, path string, params map[str
 		RequestID   string `json:"requestId"`
 	}{}
 
-	err = i.SendPayload(&request.Item{
+	err = i.SendPayload(context.Background(), &request.Item{
 		Method:        method,
 		Path:          urlPath,
 		Headers:       headers,

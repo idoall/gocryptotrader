@@ -1,13 +1,15 @@
 package exchange
 
 import (
+	"sync"
 	"time"
 
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/currency"
+	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/protocol"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
+	"github.com/idoall/gocryptotrader/exchanges/stream"
 )
 
 // Endpoint authentication types
@@ -107,28 +109,6 @@ type FeeBuilder struct {
 	Amount        float64
 }
 
-// TradeHistory holds exchange history data
-type TradeHistory struct {
-	Timestamp   time.Time
-	TID         int64
-	Price       float64
-	Amount      float64
-	Exchange    string
-	Type        string
-	Fee         float64
-	Description string
-}
-
-// Candle holds historic rate information. Modelled after the Coinbase historic rate structure
-type Candle struct {
-	Time   int64
-	Low    float64
-	High   float64
-	Open   float64
-	Close  float64
-	Volume float64
-}
-
 // FundHistory holds exchange funding history data
 type FundHistory struct {
 	ExchangeName      string
@@ -157,6 +137,8 @@ type Features struct {
 // FeaturesEnabled stores the exchange enabled features
 type FeaturesEnabled struct {
 	AutoPairUpdates bool
+	Kline           kline.ExchangeCapabilitiesEnabled
+	SaveTradeData   bool
 }
 
 // FeaturesSupported stores the exchanges supported features
@@ -166,6 +148,7 @@ type FeaturesSupported struct {
 	Websocket             bool
 	WebsocketCapabilities protocol.Features
 	WithdrawPermissions   uint32
+	Kline                 kline.ExchangeCapabilitiesSupported
 }
 
 // API stores the exchange API settings
@@ -218,7 +201,8 @@ type Base struct {
 	WebsocketResponseCheckTimeout time.Duration
 	WebsocketResponseMaxLimit     time.Duration
 	WebsocketOrderbookBufferLimit int64
-	Websocket                     *wshandler.Websocket
+	Websocket                     *stream.Websocket
 	*request.Requester
-	Config *config.ExchangeConfig
+	Config        *config.ExchangeConfig
+	settingsMutex sync.RWMutex
 }

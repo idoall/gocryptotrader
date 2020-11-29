@@ -4,16 +4,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/idoall/gocryptotrader/database"
 	"github.com/idoall/gocryptotrader/database/drivers"
-	"github.com/idoall/gocryptotrader/database/repository"
 	"github.com/idoall/gocryptotrader/database/testhelpers"
-	"github.com/thrasher-corp/goose"
 )
 
 func TestMain(m *testing.M) {
@@ -26,7 +23,6 @@ func TestMain(m *testing.M) {
 	}
 
 	t := m.Run()
-
 	err = os.RemoveAll(testhelpers.TempDir)
 	if err != nil {
 		fmt.Printf("Failed to remove temp db file: %v", err)
@@ -40,7 +36,7 @@ func TestAudit(t *testing.T) {
 		name   string
 		config *database.Config
 		runner func(t *testing.T)
-		closer func(dbConn *database.Db) error
+		closer func(dbConn *database.Instance) error
 		output interface{}
 	}{
 		{
@@ -91,12 +87,6 @@ func TestAudit(t *testing.T) {
 			dbConn, err := testhelpers.ConnectToDatabase(test.config)
 			if err != nil {
 				t.Fatal(err)
-			}
-
-			path := filepath.Join("..", "..", "migrations")
-			err = goose.Run("up", dbConn.SQL, repository.GetSQLDialect(), path, "")
-			if err != nil {
-				t.Fatalf("failed to run migrations %v", err)
 			}
 
 			if test.runner != nil {

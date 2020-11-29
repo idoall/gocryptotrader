@@ -2,6 +2,7 @@ package poloniex
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,13 +11,11 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 	"github.com/idoall/gocryptotrader/exchanges/request"
-	"github.com/idoall/gocryptotrader/exchanges/websocket/wshandler"
 )
 
 const (
@@ -48,19 +47,12 @@ const (
 	poloniexActiveLoans          = "returnActiveLoans"
 	poloniexLendingHistory       = "returnLendingHistory"
 	poloniexAutoRenew            = "toggleAutoRenew"
-
-	poloniexDateLayout = "2006-01-02 15:04:05"
+	poloniexMaxOrderbookDepth    = 100
 )
 
 // Poloniex is the overarching type across the poloniex package
 type Poloniex struct {
 	exchange.Base
-	WebsocketConn *wshandler.WebsocketConnection
-}
-
-// GetHistoricCandles returns rangesize number of candles for the given granularity and pair starting from the latest available
-func (p *Poloniex) GetHistoricCandles(pair currency.Pair, rangesize, granularity int64) ([]exchange.Candle, error) {
-	return nil, common.ErrNotYetImplemented
 }
 
 // GetTicker returns current ticker information
@@ -103,27 +95,29 @@ func (p *Poloniex) GetOrderbook(currencyPair string, depth int) (OrderbookAll, e
 		if resp.Error != "" {
 			return oba, fmt.Errorf("%s GetOrderbook() error: %s", p.Name, resp.Error)
 		}
-		ob := Orderbook{}
+		var ob Orderbook
 		for x := range resp.Asks {
-			data := resp.Asks[x]
-			price, err := strconv.ParseFloat(data[0].(string), 64)
+			price, err := strconv.ParseFloat(resp.Asks[x][0].(string), 64)
 			if err != nil {
 				return oba, err
 			}
-			amount := data[1].(float64)
-			ob.Asks = append(ob.Asks, OrderbookItem{Price: price, Amount: amount})
+			ob.Asks = append(ob.Asks, OrderbookItem{
+				Price:  price,
+				Amount: resp.Asks[x][1].(float64),
+			})
 		}
 
 		for x := range resp.Bids {
-			data := resp.Bids[x]
-			price, err := strconv.ParseFloat(data[0].(string), 64)
+			price, err := strconv.ParseFloat(resp.Bids[x][0].(string), 64)
 			if err != nil {
 				return oba, err
 			}
-			amount := data[1].(float64)
-			ob.Bids = append(ob.Bids, OrderbookItem{Price: price, Amount: amount})
+			ob.Bids = append(ob.Bids, OrderbookItem{
+				Price:  price,
+				Amount: resp.Bids[x][1].(float64),
+			})
 		}
-		oba.Data[currencyPair] = Orderbook{Bids: ob.Bids, Asks: ob.Asks}
+		oba.Data[currencyPair] = ob
 	} else {
 		vals.Set("currencyPair", "all")
 		resp := OrderbookResponseAll{}
@@ -150,28 +144,28 @@ func (p *Poloniex) GetOrderbook(currencyPair string, depth int) (OrderbookAll, e
 				if err != nil {
 					return oba, err
 				}
-				ob.Asks = append(ob.Asks, OrderbookItem{
+				ob.Bids = append(ob.Bids, OrderbookItem{
 					Price:  price,
 					Amount: orderbook.Bids[x][1].(float64),
 				})
 			}
-			oba.Data[currency] = Orderbook{Bids: ob.Bids, Asks: ob.Asks}
+			oba.Data[currency] = ob
 		}
 	}
 	return oba, nil
 }
 
 // GetTradeHistory returns trades history from poloniex
-func (p *Poloniex) GetTradeHistory(currencyPair, start, end string) ([]TradeHistory, error) {
+func (p *Poloniex) GetTradeHistory(currencyPair string, start, end int64) ([]TradeHistory, error) {
 	vals := url.Values{}
 	vals.Set("currencyPair", currencyPair)
 
-	if start != "" {
-		vals.Set("start", start)
+	if start > 0 {
+		vals.Set("start", strconv.FormatInt(start, 10))
 	}
 
-	if end != "" {
-		vals.Set("end", end)
+	if end > 0 {
+		vals.Set("end", strconv.FormatInt(end, 10))
 	}
 
 	var resp []TradeHistory
@@ -181,28 +175,42 @@ func (p *Poloniex) GetTradeHistory(currencyPair, start, end string) ([]TradeHist
 }
 
 // GetChartData returns chart data for a specific currency pair
-func (p *Poloniex) GetChartData(currencyPair, start, end, period string) ([]ChartData, error) {
+func (p *Poloniex) GetChartData(currencyPair string, start, end time.Time, period string) ([]ChartData, error) {
 	vals := url.Values{}
 	vals.Set("currencyPair", currencyPair)
 
-	if start != "" {
-		vals.Set("start", start)
+	if !start.IsZero() {
+		vals.Set("start", strconv.FormatInt(start.Unix(), 10))
 	}
 
-	if end != "" {
-		vals.Set("end", end)
+	if !end.IsZero() {
+		vals.Set("end", strconv.FormatInt(end.Unix(), 10))
 	}
 
 	if period != "" {
 		vals.Set("period", period)
 	}
 
+	var temp json.RawMessage
 	var resp []ChartData
-	path := fmt.Sprintf("%s/public?command=returnChartData&%s", p.API.Endpoints.URL, vals.Encode())
-
-	err := p.SendHTTPRequest(path, &resp)
+	path := p.API.Endpoints.URL + "/public?command=returnChartData&" + vals.Encode()
+	err := p.SendHTTPRequest(path, &temp)
 	if err != nil {
 		return nil, err
+	}
+
+	tempUnmarshal := json.Unmarshal(temp, &resp)
+	if tempUnmarshal != nil {
+		var errResp struct {
+			Error string `json:"error"`
+		}
+		errRet := json.Unmarshal(temp, &errResp)
+		if errRet != nil {
+			return nil, err
+		}
+		if errResp.Error != "" {
+			return nil, errors.New(errResp.Error)
+		}
 	}
 
 	return resp, nil
@@ -757,7 +765,7 @@ func (p *Poloniex) ToggleAutoRenew(orderNumber int64) (bool, error) {
 
 // SendHTTPRequest sends an unauthenticated HTTP request
 func (p *Poloniex) SendHTTPRequest(path string, result interface{}) error {
-	return p.SendPayload(&request.Item{
+	return p.SendPayload(context.Background(), &request.Item{
 		Method:        http.MethodGet,
 		Path:          path,
 		Result:        result,
@@ -777,7 +785,7 @@ func (p *Poloniex) SendAuthenticatedHTTPRequest(method, endpoint string, values 
 	headers := make(map[string]string)
 	headers["Content-Type"] = "application/x-www-form-urlencoded"
 	headers["Key"] = p.API.Credentials.Key
-	values.Set("nonce", p.Requester.GetNonce(true).String())
+	values.Set("nonce", strconv.FormatInt(time.Now().UnixNano(), 10))
 	values.Set("command", endpoint)
 
 	hmac := crypto.GetHMAC(crypto.HashSHA512,
@@ -788,14 +796,13 @@ func (p *Poloniex) SendAuthenticatedHTTPRequest(method, endpoint string, values 
 
 	path := fmt.Sprintf("%s/%s", p.API.Endpoints.URL, poloniexAPITradingEndpoint)
 
-	return p.SendPayload(&request.Item{
+	return p.SendPayload(context.Background(), &request.Item{
 		Method:        method,
 		Path:          path,
 		Headers:       headers,
 		Body:          bytes.NewBufferString(values.Encode()),
 		Result:        result,
 		AuthRequest:   true,
-		NonceEnabled:  true,
 		Verbose:       p.Verbose,
 		HTTPDebugging: p.HTTPDebugging,
 		HTTPRecording: p.HTTPRecording,
