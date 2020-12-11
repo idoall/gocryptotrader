@@ -4,6 +4,12 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
+	"time"
+
+	"github.com/idoall/gocryptotrader/currency"
+	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/order"
 )
 
 // const (
@@ -22,17 +28,60 @@ import (
 // )
 
 // SearchOrder 查询单个订单详情
-func (h *HUOBI) SearchOrder(orderID int64) (OrderInfo, error) {
+func (h *HUOBI) SearchOrder(orderID int64) (order.Detail, error) {
+	var orderDetail order.Detail
+
 	resp := struct {
 		Order OrderInfo `json:"data"`
 	}{}
-	err := h.SendAuthenticatedHTTPRequest(http.MethodGet,
+	if err := h.SendAuthenticatedHTTPRequest(http.MethodGet,
 		huobiGetOrders+"/"+strconv.FormatInt(orderID, 10),
 		url.Values{},
 		nil,
 		&resp,
-		false)
-	return resp.Order, err
+		false); err != nil {
+		return orderDetail, err
+	}
+
+	typeDetails := strings.Split(resp.Order.Type, "-")
+	orderSide, err := order.StringToOrderSide(typeDetails[0])
+	if err != nil {
+		return orderDetail, err
+	}
+
+	orderType, err := order.StringToOrderType(typeDetails[1])
+	if err != nil {
+		return orderDetail, err
+	}
+
+	orderStatus, err := order.StringToOrderStatus(resp.Order.State)
+	if err != nil {
+		return orderDetail, err
+	}
+
+	var p currency.Pair
+	var a asset.Item
+	p, a, err = h.GetRequestFormattedPairAndAssetType(resp.Order.Symbol)
+	if err != nil {
+		return orderDetail, err
+	}
+
+	orderDetail = order.Detail{
+		Exchange:  h.Name,
+		ID:        strconv.FormatInt(resp.Order.ID, 10),
+		AccountID: strconv.FormatInt(resp.Order.AccountID, 10),
+		Pair:      p,
+		Type:      orderType,
+		Side:      orderSide,
+		Date:      time.Unix(0, resp.Order.CreatedAt*int64(time.Millisecond)),
+		Status:    orderStatus,
+		Price:     resp.Order.Price,
+		Amount:    resp.Order.Amount,
+		Cost:      resp.Order.FieldCashAmount, //已成交总金额
+		Fee:       resp.Order.FieldFees,       //已成交手续费（买入为币，卖出为钱）
+		AssetType: a,
+	}
+	return orderDetail, err
 }
 
 // // GetContractAccountPositionInfo 查询用户帐号和持仓信息

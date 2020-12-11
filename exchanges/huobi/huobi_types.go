@@ -185,6 +185,7 @@ type OrderInfo struct {
 	Type             string  `json:"type"`
 	FieldAmount      float64 `json:"field-amount,string"`
 	FieldCashAmount  float64 `json:"field-cash-amount,string"`
+	FieldFees        float64 `json:"field-fees,string"`
 	FilledAmount     float64 `json:"filled-amount,string"`
 	FilledCashAmount float64 `json:"filled-cash-amount,string"`
 	FilledFees       float64 `json:"filled-fees,string"`
