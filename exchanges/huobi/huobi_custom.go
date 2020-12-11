@@ -21,7 +21,7 @@ import (
 // 	huobiContractAccountPositionInfo = "contract_account_position_info" // 查询用户帐号和持仓信息
 // )
 
-// SearchOrder 查询订单详情
+// SearchOrder 查询单个订单详情
 func (h *HUOBI) SearchOrder(orderID int64) (OrderInfo, error) {
 	resp := struct {
 		Order OrderInfo `json:"data"`
