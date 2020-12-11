@@ -1,5 +1,11 @@
 package huobi
 
+import (
+	"net/http"
+	"net/url"
+	"strconv"
+)
+
 // const (
 // 	HuobiContractAPIURL = "https://api.btcgateway.pro"
 
@@ -14,6 +20,20 @@ package huobi
 // 	huobiContractNewTriggerOrder     = "contract_trigger_orders"        //合约计划委托下单
 // 	huobiContractAccountPositionInfo = "contract_account_position_info" // 查询用户帐号和持仓信息
 // )
+
+// SearchOrder 查询订单详情
+func (h *HUOBI) SearchOrder(orderID int64) (OrderInfo, error) {
+	resp := struct {
+		Order OrderInfo `json:"data"`
+	}{}
+	err := h.SendAuthenticatedHTTPRequest(http.MethodGet,
+		huobiGetOrders+"/"+strconv.FormatInt(orderID, 10),
+		url.Values{},
+		nil,
+		&resp,
+		false)
+	return resp.Order, err
+}
 
 // // GetContractAccountPositionInfo 查询用户帐号和持仓信息
 // func (h *HUOBI) GetContractAccountPositionInfo(req SymbolBaseType) ([]ContractAccountPositionInfoResponse, error) {

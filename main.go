@@ -127,42 +127,42 @@ func main() {
 		log.Fatalf("Unable to initialise bot engine. Error: %s\n", err)
 	}
 
-	//{
-	//
-	//	var exch okex.OKEX
-	//exch.SetDefaults()
-	//	//获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
-	//	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Huobi")
-	//exch.API.AuthenticatedSupport = true
-	//exch.API.AuthenticatedWebsocketSupport = true
-	//exch.SkipAuthCheck = true
-	//exch.Verbose = true
-	//	logCfg := gctlog.GenDefaultSettings()
-	//	gctlog.GlobalLogConfig = &logCfg
-	//	exch.OKGroup.Verbose = exch.Verbose
-	//
-	//	info, err := exch.GetFuturesAccountOfAllCurrencies()
-	//	if err != nil {
-	//		panic(err)
-	//	} else {
-	//		fmt.Printf("%+v\n", info)
-	//	}
-	//	return
-	//	//--------历史委托信息
-	//	// req := huobi.ContractHisordersRequest{
-	//	// 	Symbol:     "BTC",
-	//	// 	TradeType:  huobi.TradeType0,
-	//	// 	Type:       huobi.ContractHisOrderType1,
-	//	// 	Status:     huobi.ContractOrderStatus0,
-	//	// 	CreateDate: 90,
-	//	// }
-	//	// if res, err := huobiExch.GetContractHisorders(req); err != nil {
-	//	// 	panic(err)
-	//	// } else {
-	//	// 	fmt.Println("res", res)
-	//	// }
-	//
-	//}
+	// {
+
+	// 	var exch huobi.HUOBI
+	// 	exch.SetDefaults()
+	// 	//获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
+	// 	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Huobi")
+	// 	exch.API.AuthenticatedSupport = true
+	// 	exch.API.AuthenticatedWebsocketSupport = true
+	// 	exch.SkipAuthCheck = true
+	// 	exch.Verbose = true
+	// 	logCfg := gctlog.GenDefaultSettings()
+	// 	gctlog.GlobalLogConfig = &logCfg
+	// 	// exch.OKGroup.Verbose = exch.Verbose
+
+	// 	info, err := exch.SearchOrder(165066274759436)
+	// 	if err != nil {
+	// 		panic(err)
+	// 	} else {
+	// 		fmt.Printf("%+v\n", info)
+	// 	}
+	// 	return
+	// 	//--------历史委托信息
+	// 	// req := huobi.ContractHisordersRequest{
+	// 	// 	Symbol:     "BTC",
+	// 	// 	TradeType:  huobi.TradeType0,
+	// 	// 	Type:       huobi.ContractHisOrderType1,
+	// 	// 	Status:     huobi.ContractOrderStatus0,
+	// 	// 	CreateDate: 90,
+	// 	// }
+	// 	// if res, err := huobiExch.GetContractHisorders(req); err != nil {
+	// 	// 	panic(err)
+	// 	// } else {
+	// 	// 	fmt.Println("res", res)
+	// 	// }
+
+	// }
 
 	gctscript.Setup()
 
