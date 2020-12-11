@@ -54,9 +54,14 @@ func (h *HUOBI) SearchOrder(orderID int64) (order.Detail, error) {
 		return orderDetail, err
 	}
 
-	orderStatus, err := order.StringToOrderStatus(resp.Order.State)
-	if err != nil {
-		return orderDetail, err
+	var orderStatus order.Status
+	if strings.EqualFold(resp.Order.State, "submitted") {
+		orderStatus = order.New
+	} else {
+		orderStatus, err = order.StringToOrderStatus(resp.Order.State)
+		if err != nil {
+			return orderDetail, err
+		}
 	}
 
 	var p currency.Pair
