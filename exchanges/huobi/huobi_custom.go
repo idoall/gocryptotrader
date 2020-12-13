@@ -57,6 +57,8 @@ func (h *HUOBI) SearchOrder(orderID int64) (order.Detail, error) {
 	var orderStatus order.Status
 	if strings.EqualFold(resp.Order.State, "submitted") {
 		orderStatus = order.New
+	} else if strings.EqualFold(resp.Order.State, "partial-filled") {
+		orderStatus = order.PartiallyFilled
 	} else {
 		orderStatus, err = order.StringToOrderStatus(resp.Order.State)
 		if err != nil {

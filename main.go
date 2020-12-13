@@ -141,7 +141,16 @@ func main() {
 	// 	gctlog.GlobalLogConfig = &logCfg
 	// 	exch.Setup(exchCfg)
 
-	// 	info, err := exch.SearchOrder(165074545980889)
+	// 	symbolPair := currency.NewPair(currency.NewCode("BTC"), currency.NewCode("USDT"))
+	// 	symbolPair.Delimiter = "-"
+
+	// 	info, err := exch.GetFeeByType(&exchange.FeeBuilder{
+	// 		FeeType:       exchange.CryptocurrencyTradeFee,
+	// 		Pair:          symbolPair,
+	// 		PurchasePrice: 1000,
+	// 		Amount:        10,
+	// 		IsMaker:       true,
+	// 	})
 	// 	if err != nil {
 	// 		panic(err)
 	// 	} else {
