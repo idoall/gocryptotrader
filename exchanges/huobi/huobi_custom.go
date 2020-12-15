@@ -12,20 +12,22 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/order"
 )
 
-// const (
-// 	HuobiContractAPIURL = "https://api.btcgateway.pro"
+const (
+	// HuobiContractAPIURL = "https://api.btcgateway.pro"
 
-// 	huobiContractInfo                = "contract_contract_info"
-// 	huobiContractAccountInfo         = "contract_account_info"
-// 	huobiGetContractKlineList        = "/market/history/kline"
-// 	huobiContractHisorders           = "contract_hisorders"             //获取历史委托
-// 	huobiContractMatchResults        = "contract_matchresults"          //获取历史成交记录
-// 	huobiContractOpenOrders          = "contract_openorders"            //获取当前未成效委托
-// 	huobiContractTriggerOpenOrders   = "contract_trigger_openorders"    //获取计划委托当前委托
-// 	huobiContractNewOrder            = "contract_order"                 //合约下单
-// 	huobiContractNewTriggerOrder     = "contract_trigger_orders"        //合约计划委托下单
-// 	huobiContractAccountPositionInfo = "contract_account_position_info" // 查询用户帐号和持仓信息
-// )
+	// huobiContractInfo                = "contract_contract_info"
+	// huobiContractAccountInfo         = "contract_account_info"
+	// huobiGetContractKlineList        = "/market/history/kline"
+	// huobiContractHisorders           = "contract_hisorders"             //获取历史委托
+	// huobiContractMatchResults        = "contract_matchresults"          //获取历史成交记录
+	// huobiContractOpenOrders          = "contract_openorders"            //获取当前未成效委托
+	// huobiContractTriggerOpenOrders   = "contract_trigger_openorders"    //获取计划委托当前委托
+	// huobiContractNewOrder            = "contract_order"                 //合约下单
+	// huobiContractNewTriggerOrder     = "contract_trigger_orders"        //合约计划委托下单
+	// huobiContractAccountPositionInfo = "contract_account_position_info" // 查询用户帐号和持仓信息
+
+	huobiAccountAssetValuation = "account/asset-valuation"
+)
 
 // SearchOrder 查询单个订单详情
 func (h *HUOBI) SearchOrder(orderID int64) (order.Detail, error) {
@@ -90,6 +92,39 @@ func (h *HUOBI) SearchOrder(orderID int64) (order.Detail, error) {
 		AssetType:   a,
 	}
 	return orderDetail, err
+}
+
+// GetAccountAssetValuation 获取账户资产估值
+func (h *HUOBI) GetAccountAssetValuation(accountType asset.Item, valuationCurrency string) (*AccountAssetValuationResponse, error) {
+	resp := struct {
+		Code int64 `json:"code"`
+		OK   bool  `json:"ok"`
+		Data struct {
+			Balance   string `json:"balance"`
+			TimeStamp int64  `json:"timestamp"`
+		} `json:"data"`
+	}{}
+	vals := url.Values{}
+	vals.Set("accountType", string(accountType))
+	if valuationCurrency != "" {
+		vals.Set("valuationCurrency", valuationCurrency)
+	}
+
+	err := h.SendAuthenticatedHTTPRequest(http.MethodGet, huobiAccountAssetValuation, vals, nil, &resp, true)
+	if err != nil {
+		return nil, err
+	}
+
+	var balance float64
+	if balance, err = strconv.ParseFloat(resp.Data.Balance, 64); err != nil {
+		return nil, err
+	}
+
+	return &AccountAssetValuationResponse{
+		Balance: balance,
+		Date:    time.Unix(0, resp.Data.TimeStamp*int64(time.Millisecond)),
+	}, err
+
 }
 
 // // GetContractAccountPositionInfo 查询用户帐号和持仓信息

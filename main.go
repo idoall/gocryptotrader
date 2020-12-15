@@ -144,13 +144,7 @@ func main() {
 	// 	symbolPair := currency.NewPair(currency.NewCode("BTC"), currency.NewCode("USDT"))
 	// 	symbolPair.Delimiter = "-"
 
-	// 	info, err := exch.GetFeeByType(&exchange.FeeBuilder{
-	// 		FeeType:       exchange.CryptocurrencyTradeFee,
-	// 		Pair:          symbolPair,
-	// 		PurchasePrice: 1000,
-	// 		Amount:        10,
-	// 		IsMaker:       true,
-	// 	})
+	// 	info, err := exch.GetAccountAssetValuation(asset.Spot, "CNY")
 	// 	if err != nil {
 	// 		panic(err)
 	// 	} else {
