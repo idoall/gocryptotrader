@@ -74,19 +74,20 @@ func (h *HUOBI) SearchOrder(orderID int64) (order.Detail, error) {
 	}
 
 	orderDetail = order.Detail{
-		Exchange:  h.Name,
-		ID:        strconv.FormatInt(resp.Order.ID, 10),
-		AccountID: strconv.FormatInt(resp.Order.AccountID, 10),
-		Pair:      p,
-		Type:      orderType,
-		Side:      orderSide,
-		Date:      time.Unix(0, resp.Order.CreatedAt*int64(time.Millisecond)),
-		Status:    orderStatus,
-		Price:     resp.Order.Price,
-		Amount:    resp.Order.Amount,
-		Cost:      resp.Order.FieldCashAmount, //已成交总金额
-		Fee:       resp.Order.FieldFees,       //已成交手续费（买入为币，卖出为钱）
-		AssetType: a,
+		Exchange:    h.Name,
+		ID:          strconv.FormatInt(resp.Order.ID, 10),
+		AccountID:   strconv.FormatInt(resp.Order.AccountID, 10),
+		Pair:        p,
+		Type:        orderType,
+		Side:        orderSide,
+		Date:        time.Unix(0, resp.Order.CreatedAt*int64(time.Millisecond)),
+		Status:      orderStatus,
+		Price:       resp.Order.Price,
+		Amount:      resp.Order.Amount,
+		Cost:        resp.Order.FieldCashAmount, //已成交总金额
+		Fee:         resp.Order.FieldFees,       //已成交手续费（买入为币，卖出为钱）
+		LastUpdated: time.Unix(0, resp.Order.FinishedAt*int64(time.Millisecond)),
+		AssetType:   a,
 	}
 	return orderDetail, err
 }
