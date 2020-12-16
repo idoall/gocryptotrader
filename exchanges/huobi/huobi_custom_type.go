@@ -2,8 +2,6 @@ package huobi
 
 import (
 	"time"
-
-	"github.com/idoall/gocryptotrader/exchanges/asset"
 )
 
 //----------合约用用户帐号信息相关
@@ -505,13 +503,6 @@ type ContractInfoResponseDataItem struct {
 	DeliveryDate   string  `json:"delivery_date"`
 	CreateDate     string  `json:"create_date"`
 	ContractStatus int     `json:"contract_status"`
-}
-
-// AccountAssetValuationRequestParams 获取账户资产估值请求参数.
-type AccountAssetValuationRequestParams struct {
-	AccountType       asset.Item `json:"accountType, string"` // spot：现货账户， margin：逐仓杠杆账户，otc：OTC 账户，super-margin：全仓杠杆账户
-	ValuationCurrency string     `json:"valuationCurrency"`   // 可选法币有：BTC、CNY、USD、JPY、KRW、GBP、TRY、EUR、RUB、VND、HKD、TWD、MYR、SGD、AED、SAR （大小写敏感）
-	SubUID            string     `json:"subUid"`              // 子用户的 UID，若不填，则返回API key所属用户的账户资产估值
 }
 
 // AccountAssetValuationResponse 获取账户资产估值返回数据.

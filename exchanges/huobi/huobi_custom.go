@@ -95,6 +95,8 @@ func (h *HUOBI) SearchOrder(orderID int64) (order.Detail, error) {
 }
 
 // GetAccountAssetValuation 获取账户资产估值
+// @accountType spot：现货账户， margin：逐仓杠杆账户，otc：OTC 账户，super-margin：全仓杠杆账户
+// @valuationCurrency 可选法币有：BTC、CNY、USD、JPY、KRW、GBP、TRY、EUR、RUB、VND、HKD、TWD、MYR、SGD、AED、SAR （大小写敏感）
 func (h *HUOBI) GetAccountAssetValuation(accountType asset.Item, valuationCurrency string) (*AccountAssetValuationResponse, error) {
 	resp := struct {
 		Code int64 `json:"code"`
