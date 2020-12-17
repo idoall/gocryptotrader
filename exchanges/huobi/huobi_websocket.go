@@ -149,6 +149,8 @@ func stringToOrderStatus(status string) (order.Status, error) {
 		return order.PartiallyFilled, nil
 	case "partial-canceled":
 		return order.PartiallyCancelled, nil
+	case "filled":
+		return order.Filled, nil
 	default:
 		return order.UnknownStatus,
 			errors.New(status + " not recognised as order status")
