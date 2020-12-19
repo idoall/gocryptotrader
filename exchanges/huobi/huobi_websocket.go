@@ -301,6 +301,7 @@ func (h *HUOBI) wsHandleData(respRaw []byte) error {
 			Status:          oStatus,
 			AssetType:       a,
 			Date:            time.Unix(0, response.Data.CreatedAt*int64(time.Millisecond)),
+			ClientID:        strconv.FormatInt(response.Data.CreatedAt, 10),
 			LastUpdated:     time.Unix(response.TS*1000, 0),
 			Pair:            p,
 		}
