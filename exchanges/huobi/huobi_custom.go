@@ -27,7 +27,23 @@ const (
 	// huobiContractAccountPositionInfo = "contract_account_position_info" // 查询用户帐号和持仓信息
 
 	huobiAccountAssetValuation = "account/asset-valuation"
+	huobiAccountGetUID         = "user/uid"
 )
+
+// GetUID 查询单个订单详情
+func (h *HUOBI) GetUID() (userID int64, err error) {
+	resp := struct {
+		Code int64 `json:"code"`
+		Data int64 `json:"data"`
+	}{}
+
+	err = h.SendAuthenticatedHTTPRequest(http.MethodGet, huobiAccountGetUID, url.Values{}, nil, &resp, true)
+	if err != nil {
+		return
+	}
+	userID = resp.Data
+	return
+}
 
 // SearchOrder 查询单个订单详情
 func (h *HUOBI) SearchOrder(orderID int64) (order.Detail, error) {

@@ -292,12 +292,15 @@ func (h *HUOBI) wsHandleData(respRaw []byte) error {
 			Amount:          response.Data.UnfilledAmount + response.Data.FilledAmount,
 			ExecutedAmount:  response.Data.FilledAmount,
 			RemainingAmount: response.Data.UnfilledAmount,
+			Cost:            response.Data.FilledCashAmount,
+			Fee:             response.Data.FilledFees,
 			Exchange:        h.Name,
 			ID:              orderID,
 			Type:            oType,
 			Side:            oSide,
 			Status:          oStatus,
 			AssetType:       a,
+			Date:            time.Unix(0, response.Data.CreatedAt*int64(time.Millisecond)),
 			LastUpdated:     time.Unix(response.TS*1000, 0),
 			Pair:            p,
 		}
@@ -308,6 +311,7 @@ func (h *HUOBI) wsHandleData(respRaw []byte) error {
 		if err != nil {
 			return err
 		}
+
 		h.Websocket.DataHandler <- response
 	case strings.Contains(init.Channel, "depth"):
 		var depth WsDepth

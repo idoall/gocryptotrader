@@ -521,9 +521,11 @@ type WsAuthenticatedOrdersUpdateResponseData struct {
 	Symbol           string  `json:"symbol"`
 	MatchID          int64   `json:"match-id"`
 	FilledCashAmount float64 `json:"filled-cash-amount,string"`
+	FilledFees       float64 `json:"filled-fees,string"`
 	Role             string  `json:"role"`
 	OrderState       string  `json:"order-state"`
 	OrderType        string  `json:"order-type"`
+	CreatedAt        int64   `json:"created-at"`
 }
 
 // WsAuthenticatedOrdersResponse response from Orders authenticated subscription
