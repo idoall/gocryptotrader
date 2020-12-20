@@ -392,6 +392,8 @@ func stringToOrderStatus(status string) (order.Status, error) {
 	switch status {
 	case "NEW":
 		return order.New, nil
+	case "CANCELED":
+		return order.Cancelled, nil
 	case "CANCELLED":
 		return order.Cancelled, nil
 	case "REJECTED":
