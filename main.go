@@ -13,7 +13,6 @@ import (
 	"github.com/idoall/gocryptotrader/core"
 	"github.com/idoall/gocryptotrader/dispatch"
 	"github.com/idoall/gocryptotrader/engine"
-	"github.com/idoall/gocryptotrader/exchanges/huobi"
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/gctscript"
@@ -130,29 +129,31 @@ func main() {
 
 	// {
 
-	var exch huobi.HUOBI
-	exch.SetDefaults()
-	//获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
-	exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Huobi")
-	exchCfg.Verbose = true
-	exch.API.AuthenticatedSupport = true
-	exch.API.AuthenticatedWebsocketSupport = true
-	exch.API.Credentials.ClientID = "123456"
-	exch.API.Credentials.Key = "da15420e-a9d09493-45ce3926-bg5t6ygr6y"
-	exch.API.Credentials.Secret = "2717b2ec-3a833b04-355e5bce-0f834"
-	exch.SkipAuthCheck = true
-	exch.Verbose = true
-	logCfg := gctlog.GenDefaultSettings()
-	gctlog.GlobalLogConfig = &logCfg
-	exch.Setup(exchCfg)
+	// var exch binance.Binance
+	// exch.SetDefaults()
+	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
+	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("binance")
+	// exchCfg.Verbose = true
+	// exch.API.AuthenticatedSupport = true
+	// exch.API.AuthenticatedWebsocketSupport = true
+	// exch.SkipAuthCheck = true
+	// exch.Verbose = true
+	// logCfg := gctlog.GenDefaultSettings()
+	// gctlog.GlobalLogConfig = &logCfg
+	// exch.Setup(exchCfg)
 
-	info, err := exch.GetUID()
-	if err != nil {
-		panic(err)
-	} else {
-		fmt.Printf("%+v\n", info)
-	}
-	return
+	// ba, err := exch.GetAccountSnapshot(binance.AccountSnapshotRequest{
+	// 	Type: asset.Spot,
+	// })
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	// fmt.Printf("%f\n", to)
+	// 	for _, v := range ba {
+	// 		fmt.Printf("%+v\n", v)
+	// 	}
+	// }
+	// return
 	// 	//--------历史委托信息
 	// 	// req := huobi.ContractHisordersRequest{
 	// 	// 	Symbol:     "BTC",

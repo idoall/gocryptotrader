@@ -634,7 +634,7 @@ type wsAccountInfo struct {
 	} `json:"data"`
 }
 
-type wsAccountPosition struct {
+type WSAccountPosition struct {
 	Stream string `json:"stream"`
 	Data   struct {
 		Currencies []struct {

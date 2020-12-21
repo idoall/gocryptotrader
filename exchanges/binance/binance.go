@@ -48,6 +48,8 @@ const (
 	allOrders    = "/api/v3/allOrders"
 	myTrades     = "/api/v3/myTrades"
 
+	accountSnapshot = "/sapi/v1/accountSnapshot"
+
 	// Withdraw API endpoints
 	withdrawEndpoint  = "/wapi/v3/withdraw.html"
 	depositHistory    = "/wapi/v3/depositHistory.html"
