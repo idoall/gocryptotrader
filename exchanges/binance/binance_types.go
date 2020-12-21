@@ -666,7 +666,7 @@ type wsOrderUpdate struct {
 		EventTime                         int64   `json:"E"`
 		IcebergQuantity                   float64 `json:"F,string"`
 		LastExecutedPrice                 float64 `json:"L,string"`
-		CommissionAsset                   float64 `json:"N"`
+		CommissionAsset                   string  `json:"N"`
 		OrderCreationTime                 int64   `json:"O"`
 		StopPrice                         float64 `json:"P,string"`
 		QuoteOrderQuantity                float64 `json:"Q,string"`
