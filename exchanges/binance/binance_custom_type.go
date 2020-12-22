@@ -21,6 +21,6 @@ type AccountSnapshotResponse struct {
 	Asset           asset.Item `json:"asset"`
 	Symbol          string     `json:"symbol"`
 	Free            float64    `json:"free"`
-	Locked          int64      `json:"locked"`
+	Locked          float64    `json:"locked"`
 	UpdateTime      time.Time  `json:"updateTime"`
 }

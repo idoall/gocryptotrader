@@ -132,24 +132,25 @@ func main() {
 	// var exch binance.Binance
 	// exch.SetDefaults()
 	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
-	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("binance")
+	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
 	// exchCfg.Verbose = true
 	// exch.API.AuthenticatedSupport = true
 	// exch.API.AuthenticatedWebsocketSupport = true
+
 	// exch.SkipAuthCheck = true
 	// exch.Verbose = true
 	// logCfg := gctlog.GenDefaultSettings()
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
-	// ba, err := exch.GetAccountSnapshot(binance.AccountSnapshotRequest{
+	// req := binance.AccountSnapshotRequest{
 	// 	Type: asset.Spot,
-	// })
+	// }
+	// list, err := exch.GetAccountSnapshot(req)
 	// if err != nil {
 	// 	panic(err)
 	// } else {
-	// 	// fmt.Printf("%f\n", to)
-	// 	for _, v := range ba {
+	// 	for _, v := range list {
 	// 		fmt.Printf("%+v\n", v)
 	// 	}
 	// }

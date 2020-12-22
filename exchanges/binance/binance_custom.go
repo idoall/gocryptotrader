@@ -61,8 +61,12 @@ func (b *Binance) GetAccountSnapshot(arg AccountSnapshotRequest) (snapshot []Acc
 		if free, err = strconv.ParseFloat(v.Data.Balances[0].Free, 64); err != nil {
 			return
 		}
-		var locked int64
-		if locked, err = strconv.ParseInt(v.Data.Balances[0].Locked, 10, 64); err != nil {
+		// var locked int64
+		// if locked, err = strconv.ParseInt(v.Data.Balances[0].Locked, 10, 64); err != nil {
+		// 	return
+		// }
+		var locked float64
+		if locked, err = strconv.ParseFloat(v.Data.Balances[0].Locked, 64); err != nil {
 			return
 		}
 		var updateTime time.Time
