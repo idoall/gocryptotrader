@@ -143,16 +143,13 @@ func main() {
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
-	// req := binance.AccountSnapshotRequest{
-	// 	Type: asset.Spot,
-	// }
-	// list, err := exch.GetAccountSnapshot(req)
+	// list, err := exch.Ping()
 	// if err != nil {
 	// 	panic(err)
 	// } else {
-	// 	for _, v := range list {
-	// 		fmt.Printf("%+v\n", v)
-	// 	}
+	// 	// for _, v := range list {
+	// 	fmt.Printf("%+v\n", list)
+	// 	// }
 	// }
 	// return
 	// 	//--------历史委托信息

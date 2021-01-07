@@ -11,6 +11,16 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 )
 
+// Ping 测试服务器连通性
+func (b *Binance) Ping() (ping bool, err error) {
+
+	path := b.API.Endpoints.URL + pingServer
+	if err = b.SendHTTPRequest(path, limitDefault, nil); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // GetAccountSnapshot 查询每日资产快照 (USER_DATA)
 func (b *Binance) GetAccountSnapshot(arg AccountSnapshotRequest) (snapshot []AccountSnapshotResponse, err error) {
 

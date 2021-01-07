@@ -6,6 +6,10 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 )
 
+const (
+	pingServer = "/api/v3/ping"
+)
+
 // AccountSnapshotRequest 查询每日资产快照 (USER_DATA)
 type AccountSnapshotRequest struct {
 	Type      asset.Item `json:"type"`
