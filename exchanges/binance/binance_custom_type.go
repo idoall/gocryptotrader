@@ -31,6 +31,84 @@ const (
 	binanceFutureOpenOrders = "/fapi/v1/openOrders"
 	// 调整开仓杠杆
 	binanceFutureLeverage = "/fapi/v1/leverage"
+	// 获取账户损益资金流水(USER_DATA)
+	binanceFutureIncome = "/fapi/v1/income"
+
+	// 用户万向划转
+	binanceTransfer = "/sapi/v1/asset/transfer"
+)
+
+type FutureIncomeResponse struct {
+	Code       int        `json:"code"`
+	Msg        string     `json:"msg"`
+	Symbol     string     `json:"symbol"`     //交易对
+	IncomeType IncomeType `json:"incomeType"` // 收益类型
+	Asset      string     `json:"asset"`
+	Info       string     `json:"info"`
+	Time       int64      `json:"time"`
+	TranId     string     `json:"tranId,string"`
+	TradeId    string     `json:"tradeId"`
+}
+
+type FutureIncomeRequest struct {
+	Symbol     string     `json:"symbol"`     //交易对
+	IncomeType IncomeType `json:"incomeType"` // 收益类型
+	StartTime  int64      `json:"startTime"`
+	EndTime    int64      `json:"endTime"`
+	Limit      int64      `json:"limit"`
+}
+
+// IncomeType收益类型
+type IncomeType string
+
+const (
+	IncomeType_TRANSFER        = IncomeType("TRANSFER")
+	IncomeType_WELCOME_BONUS   = IncomeType("WELCOME_BONUS")
+	IncomeType_REALIZED_PNL    = IncomeType("REALIZED_PNL")
+	IncomeType_FUNDING_FEE     = IncomeType("FUNDING_FEE")
+	IncomeType_COMMISSION      = IncomeType("COMMISSION")
+	IncomeType_INSURANCE_CLEAR = IncomeType("INSURANCE_CLEAR")
+	IncomeType_ALL             = IncomeType("")
+)
+
+// TransferType 用户万向划转 类型
+type TransferType string
+
+const (
+	//MAIN_C2C 现货钱包转向C2C钱包
+	TransferType_MAIN_C2C = TransferType("MAIN_C2C")
+	//MAIN_UMFUTURE 现货钱包转向U本位合约钱包
+	TransferType_MAIN_UMFUTURE = TransferType("MAIN_UMFUTURE")
+	//MAIN_CMFUTURE 现货钱包转向币本位合约钱包
+	TransferType_MAIN_CMFUTURE = TransferType("MAIN_CMFUTURE")
+	//MAIN_MARGIN 现货钱包转向杠杆全仓钱包
+	TransferType_MAIN_MARGIN = TransferType("MAIN_MARGIN")
+	//MAIN_MINING 现货钱包转向矿池钱包
+	TransferType_MAIN_MINING = TransferType("MAIN_MINING")
+	//C2C_MAIN C2C钱包转向现货钱包
+	TransferType_C2C_MAIN = TransferType("C2C_MAIN")
+	//C2C_UMFUTURE C2C钱包转向U本位合约钱包
+	TransferType_C2C_UMFUTURE = TransferType("C2C_UMFUTURE")
+	//C2C_MINING C2C钱包转向矿池钱包
+	TransferType_C2C_MINING = TransferType("C2C_MINING")
+	//UMFUTURE_MAIN U本位合约钱包转向现货钱包
+	TransferType_UMFUTURE_MAIN = TransferType("UMFUTURE_MAIN")
+	//UMFUTURE_C2C U本位合约钱包转向C2C钱包
+	TransferType_UMFUTURE_C2C = TransferType("UMFUTURE_C2C")
+	//UMFUTURE_MARGIN U本位合约钱包转向杠杆全仓钱包
+	TransferType_UMFUTURE_MARGIN = TransferType("UMFUTURE_MARGIN")
+	//CMFUTURE_MAIN 币本位合约钱包转向现货钱包
+	TransferType_CMFUTURE_MAIN = TransferType("CMFUTURE_MAIN")
+	//MARGIN_MAIN 杠杆全仓钱包转向现货钱包
+	TransferType_MARGIN_MAIN = TransferType("MARGIN_MAIN")
+	//MARGIN_UMFUTURE 杠杆全仓钱包转向U本位合约钱包
+	TransferType_MARGIN_UMFUTURE = TransferType("MARGIN_UMFUTURE")
+	//MINING_MAIN 矿池钱包转向现货钱包
+	TransferType_MINING_MAIN = TransferType("MINING_MAIN")
+	//TransferType_MINING_UMFUTURE MINING_UMFUTURE 矿池钱包转向U本位合约钱包
+	TransferType_MINING_UMFUTURE = TransferType("MINING_UMFUTURE")
+	// TransferType_MINING_C2CMINING_C2C 矿池钱包转向C2C钱包
+	TransferType_MINING_C2C = TransferType("MINING_C2C")
 )
 
 type FutureLeverageResponse struct {
@@ -76,6 +154,30 @@ type FutureQueryOrderData struct {
 	// UpdateTime          int64   `json:"updateTime"`
 }
 
+// PositionSide 持仓方向
+type PositionSide string
+
+const (
+	// PositionSideBOTH 单一持仓方向
+	PositionSideBOTH = PositionSide("BOTH")
+	// PositionSideLONG 多头(双向持仓下)
+	PositionSideLONG = PositionSide("LONG")
+	// PositionSideSHORT 空头(双向持仓下)
+	PositionSideSHORT = PositionSide("SHORT")
+)
+
+// ContractType 合约类型
+type ContractType string
+
+const (
+	// ContractTypePERPETUAL 永续合约
+	ContractTypePERPETUAL = ContractType("PERPETUAL")
+	// ContractTypeCURRENT_MONTH 当月交割合约
+	ContractTypeCURRENT_MONTH = ContractType("CURRENT_MONTH")
+	// PositionSideSHORT 次月交割合约
+	ContractTypeNEXT_MONTH = ContractType("NEXT_MONTH")
+)
+
 // FutureNewOrderRequest request type
 type FutureNewOrderRequest struct {
 	// Symbol (currency pair to trade)
@@ -83,9 +185,9 @@ type FutureNewOrderRequest struct {
 	// Side Buy or Sell
 	Side string
 	// 持仓方向，单向持仓模式下非必填，默认且仅可填BOTH;在双向持仓模式下必填,且仅可选择 LONG 或 SHORT
-	PositionSide string
-	// TradeType (market or limit order)
-	TradeType RequestParamsOrderType
+	PositionSide PositionSide
+	// Type 订单类型 LIMIT, MARKET, STOP, TAKE_PROFIT, STOP_MARKET, TAKE_PROFIT_MARKET, TRAILING_STOP_MARKET
+	Type RequestParamsOrderType
 	// true, false; 非双开模式下默认false；双开模式下不接受此参数； 使用closePosition不支持此参数。
 	ReduceOnly string
 	// 下单数量,使用closePosition不支持此参数
@@ -150,7 +252,7 @@ type FutureFundingRateResponeItem struct {
 // KlinesContractRequestParams represents Klines request data.
 type KlinesContractRequestParams struct {
 	Pair         string // Required field; example LTCBTC, BTCUSDT
-	contractType asset.Item
+	contractType ContractType
 	Interval     string // Time interval period
 	Limit        int    // Default 500; max 500.
 	StartTime    int64

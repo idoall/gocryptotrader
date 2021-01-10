@@ -20,10 +20,6 @@ const (
 	Binary                 = Item("binary")
 	PerpetualContract      = Item("perpetualcontract")
 	PerpetualSwap          = Item("perpetualswap")
-	PERPETUAL              = Item("PERPETUAL")          //币安U本位合约永续合约
-	PERPETUAL_CurrentMonth = Item("CURRENT_MONTH")      //币安U本位合约当月交割合约
-	PERPETUAL_NextMonth    = Item("NEXT_MONTH")         //币安U本位合约次月交割合约
-	PERPETUAL_Contract     = Item("PERPETUAL_CONTRACT") //币安币本位合约次月交割合约
 	Futures                = Item("futures")
 	Future                 = Item("future")
 	UpsideProfitContract   = Item("upsideprofitcontract")

@@ -15,6 +15,53 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/kline"
 )
 
+// IncomeFuture 获取账户损益资金流水
+func (b *Binance) IncomeFuture(req FutureIncomeRequest) ([]FutureIncomeResponse, error) {
+	var resp []FutureIncomeResponse
+
+	path := futureApiURL + binanceFutureIncome
+
+	params := url.Values{}
+	if req.Symbol != "" {
+		params.Set("symbol", strings.ToUpper(req.Symbol))
+	}
+	if req.IncomeType != IncomeType_ALL {
+		params.Set("incomeType", string(req.IncomeType))
+	}
+	if req.StartTime != 0 {
+		params.Set("startTime", strconv.FormatInt(req.StartTime, 10))
+	}
+	if req.EndTime != 0 {
+		params.Set("endTime", strconv.FormatInt(req.EndTime, 10))
+	}
+	if req.Limit != 0 {
+		params.Set("limit", strconv.FormatInt(req.Limit, 10))
+	}
+
+	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
+		return resp, err
+	}
+
+	return resp, nil
+}
+
+// Transfer 用户万向划转
+func (b *Binance) Transfer(transferType TransferType, symbolBase string, amount float64) (tranId int64, err error) {
+	path := fmt.Sprintf("%s%s", apiURL, binanceTransfer)
+
+	params := url.Values{}
+	params.Set("type", string(transferType))
+	params.Set("asset", symbolBase)
+	params.Set("amount", strconv.FormatFloat(amount, 'f', -1, 64))
+
+	type response struct {
+		TranId int64 `json:'tranId'`
+	}
+	var resp response
+	err = b.SendAuthHTTPRequest(http.MethodPost, path, params, limitOrder, &resp)
+	return resp.TranId, err
+}
+
 // FutureLeverage 调整开仓杠杆
 func (b *Binance) FutureLeverage(symbol string, leverage int, resp *FutureLeverageResponse) error {
 	path := fmt.Sprintf("%s%s", futureApiURL, binanceFutureNewOrder)
@@ -92,11 +139,11 @@ func (b *Binance) newOrderFuture(o *FutureNewOrderRequest, resp *FutureNewOrderR
 	params := url.Values{}
 	params.Set("symbol", o.Symbol)
 	params.Set("side", o.Side)
-	params.Set("type", string(o.TradeType))
+	params.Set("type", string(o.Type))
 
 	params.Set("quantity", strconv.FormatFloat(o.Quantity, 'f', -1, 64))
 
-	if o.TradeType == BinanceRequestParamsOrderLimit {
+	if o.Type == BinanceRequestParamsOrderLimit {
 		params.Set("price", strconv.FormatFloat(o.Price, 'f', -1, 64))
 	}
 	if o.TimeInForce != "" {
@@ -160,7 +207,7 @@ func (b *Binance) GetFutureFundingRate(symbol currency.Pair, start, end, limit i
 }
 
 // GetHistoricCandlesFuture returns candles between a time period for a set time interval
-func (b *Binance) GetHistoricCandlesFuture(pair currency.Pair, a asset.Item, start, end time.Time, interval kline.Interval) (kline.Item, error) {
+func (b *Binance) GetHistoricCandlesFuture(pair currency.Pair, contractType ContractType, start, end time.Time, interval kline.Interval) (kline.Item, error) {
 	// if err := b.ValidateKline(pair, a, interval); err != nil {
 	// 	return kline.Item{}, err
 	// }
@@ -176,7 +223,7 @@ func (b *Binance) GetHistoricCandlesFuture(pair currency.Pair, a asset.Item, sta
 	req := KlinesContractRequestParams{
 		Interval:     b.FormatExchangeKlineInterval(interval),
 		Pair:         pair.String(),
-		contractType: a,
+		contractType: contractType,
 		StartTime:    start.Unix() * 1000,
 		EndTime:      end.Unix() * 1000,
 		Limit:        int(b.Features.Enabled.Kline.ResultLimit),
@@ -185,7 +232,7 @@ func (b *Binance) GetHistoricCandlesFuture(pair currency.Pair, a asset.Item, sta
 	ret := kline.Item{
 		Exchange: b.Name,
 		Pair:     pair,
-		Asset:    a,
+		Asset:    asset.Future,
 		Interval: interval,
 	}
 
