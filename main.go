@@ -11,8 +11,10 @@ import (
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/core"
+	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/dispatch"
 	"github.com/idoall/gocryptotrader/engine"
+	"github.com/idoall/gocryptotrader/exchanges/binance"
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/gctscript"
@@ -129,29 +131,68 @@ func main() {
 
 	// {
 
-	// var exch binance.Binance
-	// exch.SetDefaults()
-	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
-	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
-	// exchCfg.Verbose = true
-	// exch.API.AuthenticatedSupport = true
-	// exch.API.AuthenticatedWebsocketSupport = true
+	var exch binance.Binance
+	exch.SetDefaults()
+	//获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
+	exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
+	exchCfg.Verbose = true
+	exch.API.AuthenticatedSupport = true
+	exch.API.AuthenticatedWebsocketSupport = true
 
-	// exch.SkipAuthCheck = true
-	// exch.Verbose = true
-	// logCfg := gctlog.GenDefaultSettings()
-	// gctlog.GlobalLogConfig = &logCfg
-	// exch.Setup(exchCfg)
+	exch.SkipAuthCheck = true
+	exch.Verbose = true
+	logCfg := gctlog.GenDefaultSettings()
+	gctlog.GlobalLogConfig = &logCfg
+	exch.Setup(exchCfg)
 
-	// list, err := exch.Ping()
+	// obj, err := exch.GetExchangeInfo(asset.PERPETUAL_Contract)
 	// if err != nil {
 	// 	panic(err)
 	// } else {
-	// 	// for _, v := range list {
-	// 	fmt.Printf("%+v\n", list)
-	// 	// }
+	// 	for _, v := range obj.Symbols {
+	// 		if v.Symbol == "BTCUSDT" {
+	// 			fmt.Printf("%+v\n", v)
+	// 		}
+	// 	}
 	// }
-	// return
+
+	// 获取永续合约当前价格
+	// symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
+	// symbol.Delimiter = ""
+	// startTime := time.Now().Add(-time.Minute * 20)
+	// list, err := exch.GetFutureHistoricCandles(symbol, asset.PERPETUAL, startTime, time.Now(), kline.FiveMin)
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	for _, v := range list.Candles {
+	// 		fmt.Printf("%+v\n", v)
+	// 	}
+	// }
+
+	// 最新标记价格和资金费率
+	symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
+	symbol.Delimiter = ""
+	list, err := exch.GetFuturePremiumIndex(symbol)
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Printf("%+v\n", list)
+
+	}
+
+	// 最新标记价格和资金费率
+	// symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
+	// symbol.Delimiter = ""
+	// list, err := exch.GetFutureFundingRate(symbol, 0, 0, 0)
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	for _, v := range list {
+	// 		fmt.Printf("%+v\n", v)
+	// 	}
+
+	// }
+	return
 	// 	//--------历史委托信息
 	// 	// req := huobi.ContractHisordersRequest{
 	// 	// 	Symbol:     "BTC",

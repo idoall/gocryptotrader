@@ -280,7 +280,7 @@ func (b *Binance) Run() {
 
 // FetchTradablePairs returns a list of the exchanges tradable pairs
 func (b *Binance) FetchTradablePairs(a asset.Item) ([]string, error) {
-	info, err := b.GetExchangeInfo()
+	info, err := b.GetExchangeInfo(a)
 	if err != nil {
 		return nil, err
 	}

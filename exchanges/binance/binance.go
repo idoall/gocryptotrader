@@ -18,6 +18,7 @@ import (
 	"github.com/idoall/gocryptotrader/common/crypto"
 	"github.com/idoall/gocryptotrader/currency"
 	exchange "github.com/idoall/gocryptotrader/exchanges"
+	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/log"
 )
@@ -72,9 +73,19 @@ type Binance struct {
 
 // GetExchangeInfo returns exchange information. Check binance_types for more
 // information
-func (b *Binance) GetExchangeInfo() (ExchangeInfo, error) {
+func (b *Binance) GetExchangeInfo(assetType asset.Item) (ExchangeInfo, error) {
 	var resp ExchangeInfo
-	path := b.API.Endpoints.URL + exchangeInfo
+
+	var path string
+	if assetType != asset.PERPETUAL {
+		path = b.API.Endpoints.URL + exchangeInfo
+	} else if assetType == asset.Future {
+		path = futureApiURL + futureExchangeInfo
+	} else if assetType == asset.PERPETUAL_Contract {
+		path = perpetualContractApiURL + PerpetualExchangeInfo
+	} else {
+		path = apiURL + PerpetualExchangeInfo
+	}
 
 	return resp, b.SendHTTPRequest(path, limitDefault, &resp)
 }
