@@ -143,17 +143,17 @@ func main() {
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
-	// 下合约订单
+	// // 下合约订单
 	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""
 	// oresp, err := exch.NewOrderFuture(&binance.FutureNewOrderRequest{
 	// 	Symbol:       symbolFuturePair.String(),
-	// 	Side:         order.Buy,
+	// 	Side:         order.Sell,
 	// 	Type:         binance.BinanceRequestParamsOrderLimit,
 	// 	PositionSide: binance.PositionSideSHORT,
 	// 	TimeInForce:  binance.BinanceRequestParamsTimeGTC,
-	// 	Quantity:     1.0,
-	// 	Price:        200.0,
+	// 	Quantity:     0.01,
+	// 	Price:        1500.0,
 	// })
 	// if err != nil {
 	// 	panic(err)

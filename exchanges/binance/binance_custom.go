@@ -298,6 +298,7 @@ func (b *Binance) newOrderFuture(o *FutureNewOrderRequest) (result *FutureNewOrd
 	params.Set("symbol", o.Symbol)
 	params.Set("side", string(o.Side))
 	params.Set("type", string(o.Type))
+	params.Set("positionSide", string(o.PositionSide))
 
 	params.Set("quantity", strconv.FormatFloat(o.Quantity, 'f', -1, 64))
 
