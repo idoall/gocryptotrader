@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/idoall/gocryptotrader/exchanges/asset"
+	"github.com/idoall/gocryptotrader/exchanges/order"
 )
 
 const (
@@ -27,26 +28,57 @@ const (
 	binanceFutureNewOrder = "/fapi/v1/order"
 	//查询订单 (TRADE)
 	binanceFutureQueryOrder = "/fapi/v1/order"
+	// 撤销订单 (TRADE)
+	binanceFutureCancelOrder = "/fapi/v1/order"
 	// 查看当前全部挂单
 	binanceFutureOpenOrders = "/fapi/v1/openOrders"
 	// 调整开仓杠杆
 	binanceFutureLeverage = "/fapi/v1/leverage"
 	// 获取账户损益资金流水(USER_DATA)
 	binanceFutureIncome = "/fapi/v1/income"
+	// 用户持仓风险V2 (USER_DATA)
+	binanceFuturePositionRisk = "/fapi/v2/positionRisk"
 
 	// 用户万向划转
 	binanceTransfer = "/sapi/v1/asset/transfer"
 )
 
+// PositionRiskResponse 用户持仓风险
+type PositionRiskResponse struct {
+	EntryPrice       float64      `json:"entryPrice,string"` //开仓均价
+	MarginType       MarginType   `json:"marginType"`        //逐仓模式或全仓模式
+	IsAutoAddMargin  bool         `json:"isAutoAddMargin, string"`
+	IsolatedMargin   float64      `json:"isolatedMargin, string"`   //  逐仓保证金
+	Leverage         int          `json:"leverage, string"`         // 当前杠杆倍数
+	LiquidationPrice float64      `json:"liquidationPrice, string"` // 参考强平价格
+	MarkPrice        float64      `json:"markPrice, string"`        // 当前标记价格
+	MaxNotionalValue float64      `json:"maxNotionalValue, string"` // 当前杠杆倍数允许的名义价值上限
+	PositionAmt      float64      `json:"positionAmt, string"`      // 头寸数量，符号代表多空方向, 正数为多，负数为空
+	Symbol           string       `json:"symbol"`                   // 交易对
+	UnRealizedProfit float64      `json:"unRealizedProfit, string"` // 持仓未实现盈亏
+	PositionSide     PositionSide `json:"positionSide"`             //  持仓方向
+}
+
+// MarginType 保证金模式
+type MarginType string
+
+const (
+	// MarginType_ISOLATED 逐仓
+	MarginType_ISOLATED = MarginType("ISOLATED")
+	// MarginType_CROSSED 全仓
+	MarginType_CROSSED = MarginType("CROSSED")
+)
+
 type FutureIncomeResponse struct {
 	Code       int        `json:"code"`
 	Msg        string     `json:"msg"`
-	Symbol     string     `json:"symbol"`     //交易对
-	IncomeType IncomeType `json:"incomeType"` // 收益类型
+	Symbol     string     `json:"symbol"`         //交易对
+	Income     float64    `json:"income, string"` //资金流数量，正数代表流入，负数代表流出
+	IncomeType IncomeType `json:"incomeType"`     // 收益类型
 	Asset      string     `json:"asset"`
-	Info       string     `json:"info"`
-	Time       int64      `json:"time"`
-	TranId     string     `json:"tranId,string"`
+	Info       string     `json:"info,string"`
+	Time       time.Time  `json:"time"`
+	TranId     int64      `json:"tranId,string"`
 	TradeId    string     `json:"tradeId"`
 }
 
@@ -57,6 +89,14 @@ type FutureIncomeRequest struct {
 	EndTime    int64      `json:"endTime"`
 	Limit      int64      `json:"limit"`
 }
+
+// WorkingType 条件价格触发类型 (workingType)
+type WorkingType string
+
+const (
+	WorkingType_MARK_PRICE     = WorkingType("MARK_PRICE")
+	WorkingType_CONTRACT_PRICE = WorkingType("CONTRACT_PRICE")
+)
 
 // IncomeType收益类型
 type IncomeType string
@@ -119,39 +159,29 @@ type FutureLeverageResponse struct {
 
 // FutureQueryOrderData holds query order data
 type FutureQueryOrderData struct {
-	AvgPrice      float64 `json:"avgPrice,string"`    // 平均成交价
-	ClientOrderID string  `json:"clientOrderId"`      // 用户自定义的订单号
-	CumQuote      float64 `json:"cumQuote,string"`    //成交金额
-	ExecutedQty   float64 `json:"executedQty,string"` //成交量
-	OrderID       int64   `json:"orderId"`
-	OrigQty       float64 `json:"origQty,string"` // 原始委托数量
-	OrigType      string  `json:"origType"`
-	Price         float64 `json:"price,string"`
-	ReduceOnly    bool    `json:"reduceOnly"` // 是否仅减仓
-	Side          string  `json:"side"`
-	PositionSide  string  `json:"positionSide"` // 持仓方向
-	Status        string  `json:"status"`
-	StopPrice     float64 `json:"stopPrice,string"` // 触发价，对`TRAILING_STOP_MARKET`无效
-	ClosePosition bool    `json:"closePosition"`    // 是否条件全平仓
-	Symbol        string  `json:"symbol"`
-	Time          float64 `json:"time"`                 // 订单时间
-	TimeInForce   string  `json:"timeInForce"`          // 有效方法
-	Type          string  `json:"type"`                 //订单类型
-	ActivatePrice float64 `json:"activatePrice,string"` // 跟踪止损激活价格, 仅`TRAILING_STOP_MARKET` 订单返回此字段
-	PriceRate     float64 `json:"priceRate,string"`     // 跟踪止损回调比例, 仅`TRAILING_STOP_MARKET` 订单返回此字段
-	UpdateTime    int64   `json:"updateTime"`
-	WorkingType   string  `json:"workingType"`  // 条件价格触发类型
-	PriceProtect  bool    `json:"priceProtect"` // 是否开启条件单触发保护
-
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
-	// // StopPrice           float64 `json:"stopPrice,string"`
-	// IcebergQty          float64 `json:"icebergQty,string"`
-	// IsWorking           bool    `json:"isWorking"`
-	// CummulativeQuoteQty float64 `json:"cummulativeQuoteQty,string"`
-	// OrderListID         int64   `json:"orderListId"`
-	// OrigQuoteOrderQty   float64 `json:"origQuoteOrderQty,string"`
-	// UpdateTime          int64   `json:"updateTime"`
+	AvgPrice      float64                    `json:"avgPrice,string"`    // 平均成交价
+	ClientOrderID string                     `json:"clientOrderId"`      // 用户自定义的订单号
+	CumQuote      float64                    `json:"cumQuote,string"`    //成交金额
+	ExecutedQty   float64                    `json:"executedQty,string"` //成交量
+	OrderID       int64                      `json:"orderId"`
+	OrigQty       float64                    `json:"origQty,string"` // 原始委托数量
+	OrigType      string                     `json:"origType"`
+	Price         float64                    `json:"price,string"`
+	ReduceOnly    bool                       `json:"reduceOnly"` // 是否仅减仓
+	Side          order.Side                 `json:"side"`
+	PositionSide  PositionSide               `json:"positionSide"` // 持仓方向
+	Status        order.Status               `json:"status"`
+	StopPrice     float64                    `json:"stopPrice,string"` // 触发价，对`TRAILING_STOP_MARKET`无效
+	ClosePosition bool                       `json:"closePosition"`    // 是否条件全平仓
+	Symbol        string                     `json:"symbol"`
+	Time          time.Time                  `json:"time"`                 // 订单时间
+	TimeInForce   RequestParamsTimeForceType `json:"timeInForce"`          // 有效方法
+	Type          string                     `json:"type"`                 //订单类型
+	ActivatePrice float64                    `json:"activatePrice,string"` // 跟踪止损激活价格, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+	PriceRate     float64                    `json:"priceRate,string"`     // 跟踪止损回调比例, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+	UpdateTime    time.Time                  `json:"updateTime"`
+	WorkingType   WorkingType                `json:"workingType"`  // 条件价格触发类型
+	PriceProtect  bool                       `json:"priceProtect"` // 是否开启条件单触发保护
 }
 
 // PositionSide 持仓方向
@@ -183,7 +213,7 @@ type FutureNewOrderRequest struct {
 	// Symbol (currency pair to trade)
 	Symbol string
 	// Side Buy or Sell
-	Side string
+	Side order.Side
 	// 持仓方向，单向持仓模式下非必填，默认且仅可填BOTH;在双向持仓模式下必填,且仅可选择 LONG 或 SHORT
 	PositionSide PositionSide
 	// Type 订单类型 LIMIT, MARKET, STOP, TAKE_PROFIT, STOP_MARKET, TAKE_PROFIT_MARKET, TRAILING_STOP_MARKET
@@ -215,32 +245,30 @@ type FutureNewOrderRequest struct {
 
 // FutureNewOrderResponse is the return structured response from the exchange
 type FutureNewOrderResponse struct {
-	Code          int     `json:"code"`
-	Msg           string  `json:"msg"`
 	Symbol        string  `json:"symbol"` //交易对
 	OrderID       int64   `json:"orderId"`
 	ClientOrderID string  `json:"clientOrderId"`
-	AvgPrice      int64   `json:"avgPrice"`       //平均成交价
-	Price         float64 `json:"price,string"`   //委托价格
-	OrigQty       float64 `json:"origQty,string"` //原始委托数量
+	AvgPrice      float64 `json:"avgPrice, string"` //平均成交价
+	Price         float64 `json:"price,string"`     //委托价格
+	OrigQty       float64 `json:"origQty,string"`   //原始委托数量
 	CumQty        float64 `json:"cumQty,string"`
 	CumQuote      float64 `json:"cumQuote,string"` //成交金额
 	// The cumulative amount of the quote that has been spent (with a BUY order) or received (with a SELL order).
-	ExecutedQty   float64 `json:"executedQty,string"` //成交量
-	Status        string  `json:"status"`             //订单状态
-	TimeInForce   string  `json:"timeInForce"`        //有效方法
-	Type          string  `json:"type"`               //订单类型
-	Side          string  `json:"side"`               //买卖方向
-	PositionSide  string  `json:"positionSide"`       //持仓方向
-	StopPrice     string  `json:"stopPrice"`          //触发价，对`TRAILING_STOP_MARKET`无效
-	ClosePosition string  `json:"closePosition"`      //是否条件全平仓
-	OrigType      string  `json:"origType"`           //触发前订单类型
-	ActivatePrice string  `json:"activatePrice"`      //跟踪止损激活价格, 仅`TRAILING_STOP_MARKET` 订单返回此字段
-	PriceRate     string  `json:"priceRate"`          //跟踪止损回调比例, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+	ExecutedQty   float64                    `json:"executedQty,string"` //成交量
+	Status        order.Status               `json:"status"`             //订单状态
+	TimeInForce   RequestParamsTimeForceType `json:"timeInForce"`        //有效方法
+	Type          order.Type                 `json:"type"`               //订单类型
+	Side          order.Side                 `json:"side"`               //买卖方向
+	PositionSide  string                     `json:"positionSide"`       //持仓方向
+	StopPrice     string                     `json:"stopPrice"`          //触发价，对`TRAILING_STOP_MARKET`无效
+	ClosePosition bool                       `json:"closePosition"`      //是否条件全平仓
+	OrigType      string                     `json:"origType"`           //触发前订单类型
+	ActivatePrice string                     `json:"activatePrice"`      //跟踪止损激活价格, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+	PriceRate     string                     `json:"priceRate"`          //跟踪止损回调比例, 仅`TRAILING_STOP_MARKET` 订单返回此字段
 
-	UpdateTime   string `json:"updateTime"`   // 更新时间
-	WorkingType  string `json:"workingType"`  // 条件价格触发类型
-	PriceProtect bool   `json:"priceProtect"` // 是否开启条件单触发保护
+	UpdateTime   time.Time   `json:"updateTime"`   // 更新时间
+	WorkingType  WorkingType `json:"workingType"`  // 条件价格触发类型
+	PriceProtect bool        `json:"priceProtect"` // 是否开启条件单触发保护
 }
 
 type FutureFundingRateResponeItem struct {

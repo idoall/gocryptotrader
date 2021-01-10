@@ -143,6 +143,60 @@ func main() {
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
+	// 下合约订单
+	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// oresp, err := exch.NewOrderFuture(&binance.FutureNewOrderRequest{
+	// 	Symbol:       symbolFuturePair.String(),
+	// 	Side:         order.Buy,
+	// 	Type:         binance.BinanceRequestParamsOrderLimit,
+	// 	PositionSide: binance.PositionSideSHORT,
+	// 	TimeInForce:  binance.BinanceRequestParamsTimeGTC,
+	// 	Quantity:     1.0,
+	// 	Price:        200.0,
+	// })
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	fmt.Printf("oresp:%+v\n", oresp)
+	// }
+	// return
+
+	// 查询合约订单
+	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// oresp, err := exch.QueryOrderFuture(symbolFuturePair.String(), 8389765490780171484, "")
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	fmt.Printf("oresp:%+v\n", oresp)
+	// }
+	// return
+
+	// 查询打开的订单
+	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// list, err := exch.OpenOrdersFuture(symbolFuturePair.String())
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	for _, v := range list {
+	// 		fmt.Printf("OpenOrdersFuture:%+v", v)
+	// 	}
+	// }
+	// return
+
+	// 取消合约订单
+	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// oresp, err := exch.CancelExistingOrderFuture(symbolFuturePair.String(), 8389765490780171484, "")
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	fmt.Printf("oresp:%+v\n", oresp)
+	// }
+	// return
+
 	// 获取合约K线
 	// symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
 	// symbol.Delimiter = ""
@@ -173,6 +227,7 @@ func main() {
 	// 		fmt.Printf("%+v\n", v)
 	// 	}
 	// }
+	// return
 
 	// 获取永续合约当前价格
 	// symbol, _ := currency.NewPairFromStrings("BTC", "USDT")

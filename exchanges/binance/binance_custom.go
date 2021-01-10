@@ -1,7 +1,6 @@
 package binance
 
 import (
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,11 +12,51 @@ import (
 	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/kline"
+	"github.com/idoall/gocryptotrader/exchanges/order"
 )
+
+// PositionRiskFuture 用户持仓风险V2 (USER_DATA)
+func (b *Binance) PositionRiskFuture(req FutureIncomeRequest) ([]PositionRiskResponse, error) {
+
+	path := futureApiURL + binanceFuturePositionRisk
+
+	params := url.Values{}
+	if req.Symbol != "" {
+		params.Set("symbol", strings.ToUpper(req.Symbol))
+	}
+
+	var resp []PositionRiskResponse
+	var err error
+	if err = b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
+		return resp, err
+	}
+
+	return resp, nil
+}
+
+// CancelExistingOrderFuture sends a cancel order to Binance
+// 取消订单
+func (b *Binance) CancelExistingOrderFuture(symbol string, orderID int64, origClientOrderID string) (CancelOrderResponse, error) {
+	var resp CancelOrderResponse
+
+	path := futureApiURL + binanceFutureCancelOrder
+
+	params := url.Values{}
+	params.Set("symbol", symbol)
+
+	if orderID != 0 {
+		params.Set("orderId", strconv.FormatInt(orderID, 10))
+	}
+
+	if origClientOrderID != "" {
+		params.Set("origClientOrderId", origClientOrderID)
+	}
+
+	return resp, b.SendAuthHTTPRequest(http.MethodDelete, path, params, limitOrder, &resp)
+}
 
 // IncomeFuture 获取账户损益资金流水
 func (b *Binance) IncomeFuture(req FutureIncomeRequest) ([]FutureIncomeResponse, error) {
-	var resp []FutureIncomeResponse
 
 	path := futureApiURL + binanceFutureIncome
 
@@ -38,11 +77,33 @@ func (b *Binance) IncomeFuture(req FutureIncomeRequest) ([]FutureIncomeResponse,
 		params.Set("limit", strconv.FormatInt(req.Limit, 10))
 	}
 
-	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
-		return resp, err
+	var result []FutureIncomeResponse
+	var resp []interface{}
+	var err error
+	if err = b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
+		return result, err
 	}
 
-	return resp, nil
+	for _, v := range resp {
+		p := FutureIncomeResponse{}
+
+		mapObj := v.(map[string]interface{})
+
+		p.Symbol = mapObj["symbol"].(string)
+		p.IncomeType = IncomeType(mapObj["incomeType"].(string))
+		if p.Income, err = strconv.ParseFloat(mapObj["income"].(string), 64); err != nil {
+			return nil, err
+		}
+		p.Asset = mapObj["asset"].(string)
+		p.Info = mapObj["info"].(string)
+		p.Time = time.Unix(0, int64(mapObj["time"].(float64))*int64(time.Millisecond))
+		p.TranId = int64(mapObj["tranId"].(float64))
+		p.TradeId = mapObj["tradeId"].(string)
+
+		result = append(result, p)
+	}
+
+	return result, nil
 }
 
 // Transfer 用户万向划转
@@ -74,8 +135,34 @@ func (b *Binance) FutureLeverage(symbol string, leverage int, resp *FutureLevera
 }
 
 // QueryOrderFuture returns information on a past order
-func (b *Binance) QueryOrderFuture(symbol, origClientOrderID string, orderID int64) (FutureQueryOrderData, error) {
-	var resp FutureQueryOrderData
+func (b *Binance) QueryOrderFuture(symbol string, orderID int64, origClientOrderID string) (FutureQueryOrderData, error) {
+
+	type Response struct {
+		AvgPrice      float64                    `json:"avgPrice,string"`    // 平均成交价
+		ClientOrderID string                     `json:"clientOrderId"`      // 用户自定义的订单号
+		CumQuote      float64                    `json:"cumQuote,string"`    //成交金额
+		ExecutedQty   float64                    `json:"executedQty,string"` //成交量
+		OrderID       int64                      `json:"orderId"`
+		OrigQty       float64                    `json:"origQty,string"` // 原始委托数量
+		OrigType      string                     `json:"origType"`
+		Price         float64                    `json:"price,string"`
+		ReduceOnly    bool                       `json:"reduceOnly"` // 是否仅减仓
+		Side          order.Side                 `json:"side"`
+		PositionSide  PositionSide               `json:"positionSide"` // 持仓方向
+		Status        order.Status               `json:"status"`
+		StopPrice     float64                    `json:"stopPrice,string"` // 触发价，对`TRAILING_STOP_MARKET`无效
+		ClosePosition bool                       `json:"closePosition"`    // 是否条件全平仓
+		Symbol        string                     `json:"symbol"`
+		Time          float64                    `json:"time"`                 // 订单时间
+		TimeInForce   RequestParamsTimeForceType `json:"timeInForce"`          // 有效方法
+		Type          string                     `json:"type"`                 //订单类型
+		ActivatePrice float64                    `json:"activatePrice,string"` // 跟踪止损激活价格, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+		PriceRate     float64                    `json:"priceRate,string"`     // 跟踪止损回调比例, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+		UpdateTime    int64                      `json:"updateTime"`
+		WorkingType   WorkingType                `json:"workingType"`  // 条件价格触发类型
+		PriceProtect  bool                       `json:"priceProtect"` // 是否开启条件单触发保护
+	}
+	var resp Response
 
 	path := futureApiURL + binanceFutureQueryOrder
 
@@ -88,21 +175,70 @@ func (b *Binance) QueryOrderFuture(symbol, origClientOrderID string, orderID int
 		params.Set("orderId", strconv.FormatInt(orderID, 10))
 	}
 
+	var result FutureQueryOrderData
 	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
-		return resp, err
+		return result, err
+	}
+	result = FutureQueryOrderData{
+		AvgPrice:      resp.AvgPrice,
+		ClientOrderID: resp.ClientOrderID,
+		CumQuote:      resp.CumQuote,
+		ExecutedQty:   resp.ExecutedQty,
+		OrderID:       resp.OrderID,
+		OrigQty:       resp.OrigQty,
+		OrigType:      resp.OrigType,
+		Price:         resp.Price,
+		ReduceOnly:    resp.ReduceOnly,
+		Side:          resp.Side,
+		PositionSide:  resp.PositionSide,
+		Status:        resp.Status,
+		StopPrice:     resp.StopPrice,
+		ClosePosition: resp.ClosePosition,
+		Symbol:        resp.Symbol,
+		TimeInForce:   resp.TimeInForce,
+		Type:          resp.Type,
+		ActivatePrice: resp.ActivatePrice,
+		PriceRate:     resp.PriceRate,
+		WorkingType:   resp.WorkingType,
+		PriceProtect:  resp.PriceProtect,
+		Time:          time.Unix(0, int64(resp.Time)*int64(time.Millisecond)),
+		UpdateTime:    time.Unix(0, resp.UpdateTime*int64(time.Millisecond)),
 	}
 
-	if resp.Code != 0 {
-		return resp, errors.New(resp.Msg)
-	}
-	return resp, nil
+	return result, nil
 }
 
 // OpenOrdersFuture Current open orders. Get all open orders on a symbol.
 // Careful when accessing this with no symbol: The number of requests counted against the rate limiter
 // is significantly higher
 func (b *Binance) OpenOrdersFuture(symbol string) ([]FutureQueryOrderData, error) {
-	var resp []FutureQueryOrderData
+	type Response struct {
+		AvgPrice      float64                    `json:"avgPrice,string"`    // 平均成交价
+		ClientOrderID string                     `json:"clientOrderId"`      // 用户自定义的订单号
+		CumQuote      float64                    `json:"cumQuote,string"`    //成交金额
+		ExecutedQty   float64                    `json:"executedQty,string"` //成交量
+		OrderID       int64                      `json:"orderId"`
+		OrigQty       float64                    `json:"origQty,string"` // 原始委托数量
+		OrigType      string                     `json:"origType"`
+		Price         float64                    `json:"price,string"`
+		ReduceOnly    bool                       `json:"reduceOnly"` // 是否仅减仓
+		Side          order.Side                 `json:"side"`
+		PositionSide  PositionSide               `json:"positionSide"` // 持仓方向
+		Status        order.Status               `json:"status"`
+		StopPrice     float64                    `json:"stopPrice,string"` // 触发价，对`TRAILING_STOP_MARKET`无效
+		ClosePosition bool                       `json:"closePosition"`    // 是否条件全平仓
+		Symbol        string                     `json:"symbol"`
+		Time          float64                    `json:"time"`                 // 订单时间
+		TimeInForce   RequestParamsTimeForceType `json:"timeInForce"`          // 有效方法
+		Type          string                     `json:"type"`                 //订单类型
+		ActivatePrice float64                    `json:"activatePrice,string"` // 跟踪止损激活价格, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+		PriceRate     float64                    `json:"priceRate,string"`     // 跟踪止损回调比例, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+		UpdateTime    int64                      `json:"updateTime"`
+		WorkingType   WorkingType                `json:"workingType"`  // 条件价格触发类型
+		PriceProtect  bool                       `json:"priceProtect"` // 是否开启条件单触发保护
+	}
+	var respList []Response
+	var result []FutureQueryOrderData
 
 	path := futureApiURL + binanceFutureOpenOrders
 
@@ -112,33 +248,55 @@ func (b *Binance) OpenOrdersFuture(symbol string) ([]FutureQueryOrderData, error
 		params.Set("symbol", strings.ToUpper(symbol))
 	}
 
-	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, openOrdersLimit(symbol), &resp); err != nil {
-		return resp, err
+	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, openOrdersLimit(symbol), &respList); err != nil {
+		return result, err
+	}
+	for _, resp := range respList {
+		result = append(result, FutureQueryOrderData{
+			AvgPrice:      resp.AvgPrice,
+			ClientOrderID: resp.ClientOrderID,
+			CumQuote:      resp.CumQuote,
+			ExecutedQty:   resp.ExecutedQty,
+			OrderID:       resp.OrderID,
+			OrigQty:       resp.OrigQty,
+			OrigType:      resp.OrigType,
+			Price:         resp.Price,
+			ReduceOnly:    resp.ReduceOnly,
+			Side:          resp.Side,
+			PositionSide:  resp.PositionSide,
+			Status:        resp.Status,
+			StopPrice:     resp.StopPrice,
+			ClosePosition: resp.ClosePosition,
+			Symbol:        resp.Symbol,
+			TimeInForce:   resp.TimeInForce,
+			Type:          resp.Type,
+			ActivatePrice: resp.ActivatePrice,
+			PriceRate:     resp.PriceRate,
+			WorkingType:   resp.WorkingType,
+			PriceProtect:  resp.PriceProtect,
+			Time:          time.Unix(0, int64(resp.Time)*int64(time.Millisecond)),
+			UpdateTime:    time.Unix(0, resp.UpdateTime*int64(time.Millisecond)),
+		})
 	}
 
-	return resp, nil
+	return result, nil
 }
 
 // NewFutureOrder sends a new order to Binance
-func (b *Binance) NewOrderFuture(o *FutureNewOrderRequest) (FutureNewOrderResponse, error) {
-	var resp FutureNewOrderResponse
-	if err := b.newOrderFuture(o, &resp); err != nil {
+func (b *Binance) NewOrderFuture(o *FutureNewOrderRequest) (resp *FutureNewOrderResponse, err error) {
+
+	if resp, err = b.newOrderFuture(o); err != nil {
 		return resp, err
 	}
-
-	if resp.Code != 0 {
-		return resp, errors.New(resp.Msg)
-	}
-
 	return resp, nil
 }
 
-func (b *Binance) newOrderFuture(o *FutureNewOrderRequest, resp *FutureNewOrderResponse) error {
+func (b *Binance) newOrderFuture(o *FutureNewOrderRequest) (result *FutureNewOrderResponse, err error) {
 	path := fmt.Sprintf("%s%s", futureApiURL, binanceFutureNewOrder)
 
 	params := url.Values{}
 	params.Set("symbol", o.Symbol)
-	params.Set("side", o.Side)
+	params.Set("side", string(o.Side))
 	params.Set("type", string(o.Type))
 
 	params.Set("quantity", strconv.FormatFloat(o.Quantity, 'f', -1, 64))
@@ -161,7 +319,62 @@ func (b *Binance) newOrderFuture(o *FutureNewOrderRequest, resp *FutureNewOrderR
 	if o.NewOrderRespType != "" {
 		params.Set("newOrderRespType", o.NewOrderRespType)
 	}
-	return b.SendAuthHTTPRequest(http.MethodPost, path, params, limitOrder, resp)
+	type Response struct {
+		Symbol        string  `json:"symbol"` //交易对
+		OrderID       int64   `json:"orderId"`
+		ClientOrderID string  `json:"clientOrderId"`
+		AvgPrice      string  `json:"avgPrice, string"` //平均成交价
+		Price         float64 `json:"price,string"`     //委托价格
+		OrigQty       float64 `json:"origQty,string"`   //原始委托数量
+		CumQty        float64 `json:"cumQty,string"`
+		CumQuote      float64 `json:"cumQuote,string"` //成交金额
+		// The cumulative amount of the quote that has been spent (with a BUY order) or received (with a SELL order).
+		ExecutedQty   float64                    `json:"executedQty,string"` //成交量
+		Status        order.Status               `json:"status"`             //订单状态
+		TimeInForce   RequestParamsTimeForceType `json:"timeInForce"`        //有效方法
+		Type          order.Type                 `json:"type"`               //订单类型
+		Side          order.Side                 `json:"side"`               //买卖方向
+		PositionSide  string                     `json:"positionSide"`       //持仓方向
+		StopPrice     string                     `json:"stopPrice"`          //触发价，对`TRAILING_STOP_MARKET`无效
+		ClosePosition bool                       `json:"closePosition"`      //是否条件全平仓
+		OrigType      string                     `json:"origType"`           //触发前订单类型
+		ActivatePrice string                     `json:"activatePrice"`      //跟踪止损激活价格, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+		PriceRate     string                     `json:"priceRate"`          //跟踪止损回调比例, 仅`TRAILING_STOP_MARKET` 订单返回此字段
+
+		UpdateTime   int64       `json:"updateTime"`   // 更新时间
+		WorkingType  WorkingType `json:"workingType"`  // 条件价格触发类型
+		PriceProtect bool        `json:"priceProtect"` // 是否开启条件单触发保护
+	}
+	var resp Response
+	if err = b.SendAuthHTTPRequest(http.MethodPost, path, params, limitOrder, &resp); err != nil {
+		return result, err
+	}
+
+	result = &FutureNewOrderResponse{
+		Symbol:        resp.Symbol,
+		OrderID:       resp.OrderID,
+		ClientOrderID: resp.ClientOrderID,
+		Price:         resp.Price,
+		OrigQty:       resp.OrigQty,
+		CumQty:        resp.CumQty,
+		CumQuote:      resp.CumQuote,
+		ExecutedQty:   resp.ExecutedQty,
+		Status:        resp.Status,
+		TimeInForce:   resp.TimeInForce,
+		Type:          resp.Type,
+		Side:          resp.Side,
+		PositionSide:  resp.PositionSide,
+		StopPrice:     resp.StopPrice,
+		ClosePosition: resp.ClosePosition,
+		OrigType:      resp.OrigType,
+		ActivatePrice: resp.ActivatePrice,
+		PriceRate:     resp.PriceRate,
+		UpdateTime:    time.Unix(0, resp.UpdateTime*int64(time.Millisecond)),
+	}
+	if result.AvgPrice, err = strconv.ParseFloat(resp.AvgPrice, 64); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 // GetFutureFundingRate 查询资金费率历史
