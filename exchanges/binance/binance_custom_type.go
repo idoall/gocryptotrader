@@ -49,10 +49,10 @@ type PositionRiskResponse struct {
 	MarginType       MarginType   `json:"marginType"`        //逐仓模式或全仓模式
 	IsAutoAddMargin  bool         `json:"isAutoAddMargin, string"`
 	IsolatedMargin   float64      `json:"isolatedMargin, string"`   //  逐仓保证金
-	Leverage         int          `json:"leverage, string"`         // 当前杠杆倍数
+	Leverage         int64        `json:"leverage, string"`         // 当前杠杆倍数
 	LiquidationPrice float64      `json:"liquidationPrice, string"` // 参考强平价格
 	MarkPrice        float64      `json:"markPrice, string"`        // 当前标记价格
-	MaxNotionalValue float64      `json:"maxNotionalValue, string"` // 当前杠杆倍数允许的名义价值上限
+	MaxNotionalValue int64        `json:"maxNotionalValue, string"` // 当前杠杆倍数允许的名义价值上限
 	PositionAmt      float64      `json:"positionAmt, string"`      // 头寸数量，符号代表多空方向, 正数为多，负数为空
 	Symbol           string       `json:"symbol"`                   // 交易对
 	UnRealizedProfit float64      `json:"unRealizedProfit, string"` // 持仓未实现盈亏

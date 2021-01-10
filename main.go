@@ -143,7 +143,20 @@ func main() {
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
-	// // 下合约订单
+	// 查看持仓风险
+	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// list, err := exch.PositionRiskFuture(symbolFuturePair.String())
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	for _, v := range list {
+	// 		fmt.Printf("v:%+v\n", v)
+	// 	}
+	// }
+	// return
+
+	// 下合约订单
 	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""
 	// oresp, err := exch.NewOrderFuture(&binance.FutureNewOrderRequest{

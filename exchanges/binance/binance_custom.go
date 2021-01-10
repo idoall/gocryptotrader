@@ -16,22 +16,56 @@ import (
 )
 
 // PositionRiskFuture 用户持仓风险V2 (USER_DATA)
-func (b *Binance) PositionRiskFuture(req FutureIncomeRequest) ([]PositionRiskResponse, error) {
+func (b *Binance) PositionRiskFuture(symbol string) ([]PositionRiskResponse, error) {
 
 	path := futureApiURL + binanceFuturePositionRisk
 
 	params := url.Values{}
-	if req.Symbol != "" {
-		params.Set("symbol", strings.ToUpper(req.Symbol))
-	}
+	params.Set("symbol", strings.ToUpper(symbol))
 
-	var resp []PositionRiskResponse
+	var result []PositionRiskResponse
+	var resp []interface{}
 	var err error
 	if err = b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
-		return resp, err
+		return result, err
+	}
+	for _, v := range resp {
+		p := PositionRiskResponse{}
+
+		mapObj := v.(map[string]interface{})
+
+		p.Symbol = mapObj["symbol"].(string)
+		if p.PositionAmt, err = strconv.ParseFloat(mapObj["positionAmt"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.EntryPrice, err = strconv.ParseFloat(mapObj["entryPrice"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.MarkPrice, err = strconv.ParseFloat(mapObj["markPrice"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.LiquidationPrice, err = strconv.ParseFloat(mapObj["liquidationPrice"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.Leverage, err = strconv.ParseInt(mapObj["leverage"].(string), 10, 64); err != nil {
+			return nil, err
+		}
+		if p.MaxNotionalValue, err = strconv.ParseInt(mapObj["maxNotionalValue"].(string), 10, 64); err != nil {
+			return nil, err
+		}
+		p.MarginType = MarginType(mapObj["marginType"].(string))
+		if p.IsolatedMargin, err = strconv.ParseFloat(mapObj["isolatedMargin"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.IsAutoAddMargin, err = strconv.ParseBool(mapObj["isAutoAddMargin"].(string)); err != nil {
+			return nil, err
+		}
+		p.PositionSide = PositionSide(mapObj["positionSide"].(string))
+
+		result = append(result, p)
 	}
 
-	return resp, nil
+	return result, nil
 }
 
 // CancelExistingOrderFuture sends a cancel order to Binance
