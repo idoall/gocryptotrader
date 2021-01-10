@@ -11,7 +11,6 @@ import (
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/core"
-	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/dispatch"
 	"github.com/idoall/gocryptotrader/engine"
 	"github.com/idoall/gocryptotrader/exchanges/binance"
@@ -170,15 +169,15 @@ func main() {
 	// }
 
 	// 最新标记价格和资金费率
-	symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
-	symbol.Delimiter = ""
-	list, err := exch.GetFuturePremiumIndex(symbol)
-	if err != nil {
-		panic(err)
-	} else {
-		fmt.Printf("%+v\n", list)
+	// symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
+	// symbol.Delimiter = ""
+	// list, err := exch.GetFuturePremiumIndex(symbol)
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	fmt.Printf("%+v\n", list)
 
-	}
+	// }
 
 	// 最新标记价格和资金费率
 	// symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
@@ -192,7 +191,7 @@ func main() {
 	// 	}
 
 	// }
-	return
+	// return
 	// 	//--------历史委托信息
 	// 	// req := huobi.ContractHisordersRequest{
 	// 	// 	Symbol:     "BTC",

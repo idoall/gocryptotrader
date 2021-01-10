@@ -189,7 +189,7 @@ func (b *Binance) GetHistoricCandlesFuture(pair currency.Pair, a asset.Item, sta
 		Interval: interval,
 	}
 
-	candles, err := b.GetFutureSpotKline(req)
+	candles, err := b.GetSpotKlineFuture(req)
 	if err != nil {
 		return kline.Item{}, err
 	}
