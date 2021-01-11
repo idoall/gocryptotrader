@@ -413,18 +413,20 @@ func (b *Binance) newOrderFuture(o *FutureNewOrderRequest) (result *FutureNewOrd
 }
 
 // GetFutureFundingRate 查询资金费率历史
-func (b *Binance) GetFutureFundingRate(symbol currency.Pair, start, end, limit int64) ([]FutureFundingRateResponeItem, error) {
+func (b *Binance) GetFutureFundingRate(req FutureFundingRateRequest) ([]FutureFundingRateResponeItem, error) {
 
 	params := url.Values{}
-	params.Set("symbol", symbol.String())
-	if limit != 0 {
-		params.Set("limit", strconv.FormatInt(limit, 10))
+	if req.Symbol.String() != "" {
+		params.Set("symbol", req.Symbol.String())
 	}
-	if start != 0 {
-		params.Set("startTime", strconv.FormatInt(start, 10))
+	if req.Limit != 0 {
+		params.Set("limit", strconv.FormatInt(req.Limit, 10))
 	}
-	if end != 0 {
-		params.Set("endTime", strconv.FormatInt(end, 10))
+	if req.StartTime != 0 {
+		params.Set("startTime", strconv.FormatInt(req.StartTime, 10))
+	}
+	if req.EndTime != 0 {
+		params.Set("endTime", strconv.FormatInt(req.EndTime, 10))
 	}
 
 	path := fmt.Sprintf("%s%s?%s", futureApiURL, binanceFutureFundingRate, params.Encode())

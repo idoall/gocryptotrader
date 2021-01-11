@@ -3,6 +3,7 @@ package binance
 import (
 	"time"
 
+	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 )
@@ -69,9 +70,20 @@ const (
 	MarginType_CROSSED = MarginType("CROSSED")
 )
 
+type FutureFundingRateRequest struct {
+	Symbol    currency.Pair `json:"symbol"` //交易对
+	StartTime int64         `json:"startTime"`
+	EndTime   int64         `json:"endTime"`
+	Limit     int64         `json:"limit"`
+}
+
+type FutureFundingRateResponeItem struct {
+	Symbol      string    `json:"symbol"`
+	FundingRate float64   `json:"fundingRate"`
+	FundingTime time.Time `json:"fundingTime"`
+}
+
 type FutureIncomeResponse struct {
-	Code       int        `json:"code"`
-	Msg        string     `json:"msg"`
 	Symbol     string     `json:"symbol"`         //交易对
 	Income     float64    `json:"income, string"` //资金流数量，正数代表流入，负数代表流出
 	IncomeType IncomeType `json:"incomeType"`     // 收益类型
@@ -269,12 +281,6 @@ type FutureNewOrderResponse struct {
 	UpdateTime   time.Time   `json:"updateTime"`   // 更新时间
 	WorkingType  WorkingType `json:"workingType"`  // 条件价格触发类型
 	PriceProtect bool        `json:"priceProtect"` // 是否开启条件单触发保护
-}
-
-type FutureFundingRateResponeItem struct {
-	Symbol      string    `json:"symbol"`
-	FundingRate float64   `json:"fundingRate"`
-	FundingTime time.Time `json:"fundingTime"`
 }
 
 // KlinesContractRequestParams represents Klines request data.
