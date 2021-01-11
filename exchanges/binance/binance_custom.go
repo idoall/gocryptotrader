@@ -158,14 +158,28 @@ func (b *Binance) Transfer(transferType TransferType, symbolBase string, amount 
 }
 
 // FutureLeverage 调整开仓杠杆
-func (b *Binance) FutureLeverage(symbol string, leverage int, resp *FutureLeverageResponse) error {
-	path := fmt.Sprintf("%s%s", futureApiURL, binanceFutureNewOrder)
+func (b *Binance) FutureLeverage(symbol string, leverage int) (*FutureLeverageResponse, error) {
+	path := fmt.Sprintf("%s%s", futureApiURL, binanceFutureLeverage)
 
 	params := url.Values{}
 	params.Set("symbol", symbol)
 	params.Set("leverage", strconv.FormatInt(int64(leverage), 10))
 
-	return b.SendAuthHTTPRequest(http.MethodPost, path, params, limitOrder, resp)
+	var resp interface{}
+	err := b.SendAuthHTTPRequest(http.MethodPost, path, params, limitOrder, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	mapObj := resp.(map[string]interface{})
+
+	result := &FutureLeverageResponse{}
+	result.Symbol = mapObj["symbol"].(string)
+	result.Leverage = int(mapObj["leverage"].(float64))
+	if result.MaxNotionalValue, err = strconv.ParseInt(mapObj["maxNotionalValue"].(string), 10, 64); err != nil {
+		return nil, err
+	}
+	return result, err
 }
 
 // QueryOrderFuture returns information on a past order

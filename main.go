@@ -143,6 +143,17 @@ func main() {
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
+	// // 设置杠杆倍数
+	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// futureLeverageResponse, err := exch.FutureLeverage(symbolFuturePair.String(), 10)
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	fmt.Printf("v:%+v\n", futureLeverageResponse)
+	// }
+	// return
+
 	// 查看持仓风险
 	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""

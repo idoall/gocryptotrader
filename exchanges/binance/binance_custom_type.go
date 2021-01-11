@@ -164,9 +164,9 @@ const (
 )
 
 type FutureLeverageResponse struct {
-	Leverage         int    `json:"leverage,string"`  // 平均成交价
-	MaxNotionalValue int64  `json:"maxNotionalValue"` // 用户自定义的订单号
-	Symbol           string `json:"symbol"`           //成交金额
+	Leverage         int    `json:"leverage,string"`          // 平均成交价
+	MaxNotionalValue int64  `json:"maxNotionalValue, string"` // 用户自定义的订单号
+	Symbol           string `json:"symbol"`                   //成交金额
 }
 
 // FutureQueryOrderData holds query order data
