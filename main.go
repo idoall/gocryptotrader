@@ -143,7 +143,22 @@ func main() {
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
-	// // 设置杠杆倍数
+	// //获取交易规则和交易对
+	// list, err := exch.GetExchangeInfo(asset.Spot)
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	for _, v := range list.Symbols {
+	// 		if v.BaseAsset == "ETH" && v.QuoteAsset == "USDT" {
+	// 			for _, vv := range v.Filters {
+	// 				fmt.Printf("MinQty[%f]%+v\n", vv.MinQty, vv)
+	// 			}
+	// 		}
+	// 	}
+	// }
+	// return
+
+	// 设置杠杆倍数
 	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""
 	// futureLeverageResponse, err := exch.FutureLeverage(symbolFuturePair.String(), 10)
@@ -243,7 +258,14 @@ func main() {
 
 	// }
 	// 获取账户损益资金流水
-	// list, err := exch.IncomeFuture(binance.FutureIncomeRequest{Symbol: "BTCUSDT"})
+	// todayTimeStat := "2021-01-11 20:40:10"
+	// loc, _ := time.LoadLocation("Local") //重要：获取时区
+	// timeStat, _ := time.ParseInLocation("2006-01-02 15:04:05", todayTimeStat, loc)
+	// timeStatID := timeStat.UnixNano() / int64(time.Millisecond)
+	// fmt.Println("")
+	// // 1610381770000
+	// // 1610380800000
+	// list, err := exch.IncomeFuture(binance.FutureIncomeRequest{Symbol: "ETHUSDT", StartTime: timeStatID})
 	// if err != nil {
 	// 	panic(err)
 	// } else {

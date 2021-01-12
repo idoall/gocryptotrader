@@ -77,7 +77,7 @@ func (b *Binance) GetExchangeInfo(assetType asset.Item) (ExchangeInfo, error) {
 	var resp ExchangeInfo
 
 	var path string
-	if assetType != asset.Spot {
+	if assetType == asset.Spot {
 		path = b.API.Endpoints.URL + exchangeInfo
 	} else if assetType == asset.Future {
 		path = futureApiURL + futureExchangeInfo
