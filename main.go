@@ -143,18 +143,62 @@ func main() {
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
-	// //获取交易规则和交易对
+	// 获取资金费率表
+	// list, err := exch.GetFutureFundingRate(binance.FutureFundingRateRequest{
+	// 	Limit: 1,
+	// })
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	for _, v := range list {
+	// 		fmt.Printf("%+v\n", v)
+	// 	}
+
+	// }
+	// return
+
+	// 获取用户手续费率
+	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+
+	// symbolPair := currency.NewPair(currency.NewCode("SXP"), currency.NewCode("USDT"))
+	// // symbolPair.Delimiter = "-"
+	// list, err := exch.MarginTypeFuture(symbolPair, binance.MarginType_CROSSED)
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+
+	// 	fmt.Printf("%+v\n", list)
+
+	// }
+	// return
+
+	//获取交易规则和交易对
 	// list, err := exch.GetExchangeInfo(asset.Spot)
 	// if err != nil {
 	// 	panic(err)
 	// } else {
+	// 	minPrice := 0
+	// 	minBase := 0
+	// 	minQuoue := 0
 	// 	for _, v := range list.Symbols {
 	// 		if v.BaseAsset == "ETH" && v.QuoteAsset == "USDT" {
+	// 			fmt.Printf("%+v\n", v)
 	// 			for _, vv := range v.Filters {
-	// 				fmt.Printf("MinQty[%f]%+v\n", vv.MinQty, vv)
+	// 				if vv.FilterType == "PRICE_FILTER" {
+	// 					minPrice = len(strings.Split(decimal.NewFromFloat(vv.MinPrice).String(), ".")[1])
+	// 				}
+	// 				if vv.FilterType == "LOT_SIZE" {
+	// 					minBase = len(strings.Split(decimal.NewFromFloat(vv.MinQty).String(), ".")[1])
+	// 				}
+
 	// 			}
+	// 			minQuoue = v.QuotePrecision
 	// 		}
 	// 	}
+	// 	fmt.Printf("minPrice:%d\n", minPrice)
+	// 	fmt.Printf("minBase:%d\n", minBase)
+	// 	fmt.Printf("minQuoue:%d\n", minQuoue)
 	// }
 	// return
 

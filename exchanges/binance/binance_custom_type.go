@@ -39,10 +39,23 @@ const (
 	binanceFutureIncome = "/fapi/v1/income"
 	// 用户持仓风险V2 (USER_DATA)
 	binanceFuturePositionRisk = "/fapi/v2/positionRisk"
+	// 变换逐全仓模式 (USER_DATA)
+	binanceFutureMarginType = "/fapi/v1/marginType"
 
 	// 用户万向划转
 	binanceTransfer = "/sapi/v1/asset/transfer"
+
+	// 交易手续费率查询
+	binanceSpotTradeFee   = "/wapi/v3/tradeFee.html"
+	binanceFutureTradeFee = "/fapi/v1/commissionRate"
 )
+
+// CommissionRateResponse 交易手续费率
+type CommissionRateResponse struct {
+	Symbol string
+	Maker  float64
+	Taker  float64
+}
 
 // PositionRiskResponse 用户持仓风险
 type PositionRiskResponse struct {

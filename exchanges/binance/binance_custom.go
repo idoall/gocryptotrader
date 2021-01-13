@@ -15,6 +15,85 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/order"
 )
 
+// MarginTypeFuture 变换逐全仓模式
+func (b *Binance) MarginTypeFuture(symbol currency.Pair, marginType MarginType) (flag bool, err error) {
+	path := fmt.Sprintf("%s%s", futureApiURL, binanceFutureMarginType)
+
+	params := url.Values{}
+	params.Set("symbol", symbol.String())
+	params.Set("marginType", string(marginType))
+
+	type response struct {
+		Code int    `json:"code"`
+		Msg  string `json:"msg"`
+	}
+	var resp response
+	err = b.SendAuthHTTPRequest(http.MethodPost, path, params, limitOrder, &resp)
+	if strings.Index(err.Error(), "{\"code\":-4046,\"msg\":\"No need to change margin type.\"}") != -1 {
+		return true, nil
+	} else if !strings.EqualFold(err.Error(), "success") {
+		return false, err
+	}
+	return true, nil
+}
+
+// GetCommissionRate 用户手续费率
+func (b *Binance) GetCommissionRate(assetType asset.Item, symbol string) (CommissionRateResponse, error) {
+
+	path := futureApiURL + binanceFutureTradeFee
+	if assetType == asset.Spot {
+		path = b.API.Endpoints.URL + binanceSpotTradeFee
+	}
+
+	params := url.Values{}
+	params.Set("symbol", strings.ToUpper(symbol))
+
+	var result CommissionRateResponse
+	var resp []interface{}
+	var err error
+	if err = b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
+		return result, err
+	}
+
+	// for _, v := range resp {
+	// 	p := PositionRiskResponse{}
+
+	// 	mapObj := v.(map[string]interface{})
+
+	// 	p.Symbol = mapObj["symbol"].(string)
+	// 	if p.PositionAmt, err = strconv.ParseFloat(mapObj["positionAmt"].(string), 64); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	if p.EntryPrice, err = strconv.ParseFloat(mapObj["entryPrice"].(string), 64); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	if p.MarkPrice, err = strconv.ParseFloat(mapObj["markPrice"].(string), 64); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	if p.LiquidationPrice, err = strconv.ParseFloat(mapObj["liquidationPrice"].(string), 64); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	if p.Leverage, err = strconv.ParseInt(mapObj["leverage"].(string), 10, 64); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	if p.MaxNotionalValue, err = strconv.ParseInt(mapObj["maxNotionalValue"].(string), 10, 64); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	p.MarginType = MarginType(mapObj["marginType"].(string))
+	// 	if p.IsolatedMargin, err = strconv.ParseFloat(mapObj["isolatedMargin"].(string), 64); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	if p.IsAutoAddMargin, err = strconv.ParseBool(mapObj["isAutoAddMargin"].(string)); err != nil {
+	// 		return nil, err
+	// 	}
+	// 	p.PositionSide = PositionSide(mapObj["positionSide"].(string))
+
+	// 	result = append(result, p)
+	// }
+
+	return result, nil
+}
+
 // PositionRiskFuture 用户持仓风险V2 (USER_DATA)
 func (b *Binance) PositionRiskFuture(symbol string) ([]PositionRiskResponse, error) {
 
