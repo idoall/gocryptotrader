@@ -210,8 +210,18 @@ func (b *Binance) IncomeFuture(req FutureIncomeRequest) ([]FutureIncomeResponse,
 		p.Asset = mapObj["asset"].(string)
 		p.Info = mapObj["info"].(string)
 		p.Time = time.Unix(0, int64(mapObj["time"].(float64))*int64(time.Millisecond))
-		p.TranId = int64(mapObj["tranId"].(float64))
-		p.TradeId = mapObj["tradeId"].(string)
+		if mapObj["tranId"] == nil {
+			p.TranId = 0
+		} else {
+			p.TranId = int64(mapObj["tranId"].(float64))
+		}
+		if mapObj["tradeId"].(string) == "" {
+			p.TradeId = 0
+		} else {
+			if p.TradeId, err = strconv.ParseInt(mapObj["tradeId"].(string), 10, 64); err != nil {
+				return nil, err
+			}
+		}
 
 		result = append(result, p)
 	}

@@ -104,7 +104,7 @@ type FutureIncomeResponse struct {
 	Info       string     `json:"info,string"`
 	Time       time.Time  `json:"time"`
 	TranId     int64      `json:"tranId,string"`
-	TradeId    string     `json:"tradeId"`
+	TradeId    int64      `json:"tradeId"`
 }
 
 type FutureIncomeRequest struct {
