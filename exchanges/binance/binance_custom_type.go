@@ -45,6 +45,8 @@ const (
 	binanceFuturePositionMargin = "/fapi/v1/positionMargin"
 	// 逐仓保证金变动历史 (TRADE)
 	binanceFuturePositionMarginHistory = "/fapi/v1/positionMargin/history"
+	// 持仓ADL队列估算 (USER_DATA)
+	binanceFutureAdlQuantile = "/fapi/v1/adlQuantile"
 
 	// 用户万向划转
 	binanceTransfer = "/sapi/v1/asset/transfer"
@@ -53,6 +55,17 @@ const (
 	binanceSpotTradeFee   = "/wapi/v3/tradeFee.html"
 	binanceFutureTradeFee = "/fapi/v1/commissionRate"
 )
+
+// AdlQuantileResponse 持仓ADL队列估算 (USER_DATA)
+type AdlQuantileResponse struct {
+	Symbol      string `json:"symbol"`
+	AdlQuantile struct {
+		LONG  float64 `json:"LONG"`
+		SHORT float64 `json:"SHORT"`
+		HEDGE float64 `json:"HEDGE"`
+		BOTH  float64 `json:"BOTH"`
+	} `json:"adlQuantile"`
+}
 
 // PositionMarginHistoryResponse 逐仓保证金变动历史 (TRADE)
 type PositionMarginHistoryResponse struct {

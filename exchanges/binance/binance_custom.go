@@ -15,6 +15,40 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/order"
 )
 
+// ADLQuantile 持仓ADL队列估算
+func (b *Binance) ADLQuantile(symbol currency.Pair) (*AdlQuantileResponse, error) {
+
+	path := futureApiURL + binanceFutureAdlQuantile
+
+	params := url.Values{}
+	params.Set("symbol", symbol.String())
+
+	var result *AdlQuantileResponse
+	var resp interface{}
+	var err error
+	if err = b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
+		return result, err
+	}
+	p := &AdlQuantileResponse{}
+
+	mapObj := resp.(map[string]interface{})
+
+	p.Symbol = mapObj["symbol"].(string)
+
+	adlObj := mapObj["adlQuantile"].(map[string]interface{})
+	p.AdlQuantile.LONG = adlObj["LONG"].(float64)
+	p.AdlQuantile.SHORT = adlObj["SHORT"].(float64)
+
+	if adlObj["HEDGE"] != nil {
+		p.AdlQuantile.HEDGE = adlObj["HEDGE"].(float64)
+	}
+	if mapObj["BOTH"] != nil {
+		p.AdlQuantile.BOTH = adlObj["BOTH"].(float64)
+	}
+
+	return p, nil
+}
+
 // PositionMarginHistory 逐仓保证金变动历史 (TRADE)
 func (b *Binance) PositionMarginHistory(req PositionMarginHistoryRequest) ([]PositionMarginHistoryResponse, error) {
 

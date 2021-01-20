@@ -143,6 +143,17 @@ func main() {
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
+	// // 持仓ADL队列估算
+	// symbolFuturePair := currency.NewPair(currency.NewCode("XLM"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// list, err := exch.ADLQuantile(symbolFuturePair)
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	fmt.Printf("%+v\n", list)
+	// }
+	// return
+
 	// 调整逐仓保证金
 	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""
