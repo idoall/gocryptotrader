@@ -11,8 +11,10 @@ import (
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/core"
+	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/dispatch"
 	"github.com/idoall/gocryptotrader/engine"
+	"github.com/idoall/gocryptotrader/exchanges/binance"
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/gctscript"
@@ -129,30 +131,32 @@ func main() {
 
 	// {
 
-	// var exch binance.Binance
-	// exch.SetDefaults()
-	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
-	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
-	// exchCfg.Verbose = true
-	// exch.API.AuthenticatedSupport = true
-	// exch.API.AuthenticatedWebsocketSupport = true
+	var exch binance.Binance
+	exch.SetDefaults()
+	//获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
+	exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
+	exchCfg.Verbose = true
+	exch.API.AuthenticatedSupport = true
+	exch.API.AuthenticatedWebsocketSupport = true
+	exch.API.Credentials.Key = "2IxPmRnMFGsQpBgWadVPC02ooCMtFky6auwFrz33JInPQtJz16CX4vCDkPPMROGq"
+	exch.API.Credentials.Secret = "VWWfjG1UHYoYFmEh4pxzdzEmOOKQ3MMdNHxqvW48qzqPxNX9PYqNO1qsLqtJxher"
 
-	// exch.SkipAuthCheck = true
-	// exch.Verbose = true
-	// logCfg := gctlog.GenDefaultSettings()
-	// gctlog.GlobalLogConfig = &logCfg
-	// exch.Setup(exchCfg)
+	exch.SkipAuthCheck = true
+	exch.Verbose = true
+	logCfg := gctlog.GenDefaultSettings()
+	gctlog.GlobalLogConfig = &logCfg
+	exch.Setup(exchCfg)
 
-	// // 持仓ADL队列估算
-	// symbolFuturePair := currency.NewPair(currency.NewCode("XLM"), currency.NewCode("USDT"))
-	// symbolFuturePair.Delimiter = ""
-	// list, err := exch.ADLQuantile(symbolFuturePair)
-	// if err != nil {
-	// 	panic(err)
-	// } else {
-	// 	fmt.Printf("%+v\n", list)
-	// }
-	// return
+	// 持仓ADL队列估算
+	symbolFuturePair := currency.NewPair(currency.NewCode("XLM"), currency.NewCode("USDT"))
+	symbolFuturePair.Delimiter = ""
+	list, err := exch.ADLQuantile(symbolFuturePair)
+	if err != nil {
+		panic(err)
+	} else {
+		fmt.Printf("%+v\n", list)
+	}
+	return
 
 	// 调整逐仓保证金
 	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))

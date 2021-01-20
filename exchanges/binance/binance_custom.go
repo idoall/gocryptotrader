@@ -30,9 +30,11 @@ func (b *Binance) ADLQuantile(symbol currency.Pair) (*AdlQuantileResponse, error
 		return result, err
 	}
 	p := &AdlQuantileResponse{}
-
 	mapObj := resp.(map[string]interface{})
 
+	if mapObj["symbol"] == nil {
+		return nil, nil
+	}
 	p.Symbol = mapObj["symbol"].(string)
 
 	adlObj := mapObj["adlQuantile"].(map[string]interface{})
