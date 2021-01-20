@@ -41,6 +41,10 @@ const (
 	binanceFuturePositionRisk = "/fapi/v2/positionRisk"
 	// 变换逐全仓模式 (USER_DATA)
 	binanceFutureMarginType = "/fapi/v1/marginType"
+	// 调整逐仓保证金 (TRADE)
+	binanceFuturePositionMargin = "/fapi/v1/positionMargin"
+	// 逐仓保证金变动历史 (TRADE)
+	binanceFuturePositionMarginHistory = "/fapi/v1/positionMargin/history"
 
 	// 用户万向划转
 	binanceTransfer = "/sapi/v1/asset/transfer"
@@ -48,6 +52,43 @@ const (
 	// 交易手续费率查询
 	binanceSpotTradeFee   = "/wapi/v3/tradeFee.html"
 	binanceFutureTradeFee = "/fapi/v1/commissionRate"
+)
+
+// PositionMarginHistoryResponse 逐仓保证金变动历史 (TRADE)
+type PositionMarginHistoryResponse struct {
+	Amount       float64            `json:"amount"` // 保证金资金
+	Symbol       string             `json:"symbol"`
+	Asset        string             `json:"asset"` //  持仓方向
+	Type         PositionMarginType `json:"type"`
+	Time         time.Time          `json:"time"`
+	PositionSide PositionSide       `json:"positionSide"` //  持仓方向
+}
+
+// PositionMarginHistoryRequest 逐仓保证金变动历史 (TRADE)
+type PositionMarginHistoryRequest struct {
+	Symbol    currency.Pair `json:"symbol"`
+	Type      int           `json:"type"`
+	StartTime int64         `json:"startTime"`
+	EndTime   int64         `json:"endTime"`
+	Limit     int64         `json:"limit"`
+}
+
+// PositionMarginRequest 调整逐仓保证金
+type PositionMarginRequest struct {
+	Symbol       currency.Pair      `json:"symbol"`
+	PositionSide PositionSide       `json:"positionSide"` //  持仓方向
+	Amount       float64            `json:"amount"`       // 保证金资金
+	Type         PositionMarginType `json:"type"`
+}
+
+// PositionMarginType 调整逐仓保证金-调整方向
+type PositionMarginType int
+
+const (
+	// PositionMarginTypeAdd 增加逐仓保证金
+	PositionMarginTypeAdd = PositionMarginType(1)
+	// PositionMarginTypeSub 减少逐仓保证金
+	PositionMarginTypeSub = PositionMarginType(2)
 )
 
 // CommissionRateResponse 交易手续费率

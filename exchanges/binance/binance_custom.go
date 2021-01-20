@@ -15,6 +15,72 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/order"
 )
 
+// PositionMarginHistory 逐仓保证金变动历史 (TRADE)
+func (b *Binance) PositionMarginHistory(req PositionMarginHistoryRequest) ([]PositionMarginHistoryResponse, error) {
+
+	path := futureApiURL + binanceFuturePositionMarginHistory
+
+	params := url.Values{}
+	params.Set("symbol", req.Symbol.String())
+	if req.Type != 0 {
+		params.Set("type", strconv.FormatInt(int64(req.Type), 10))
+	}
+	if req.StartTime != 0 {
+		params.Set("startTime", strconv.FormatInt(req.StartTime, 10))
+	}
+	if req.EndTime != 0 {
+		params.Set("endTime", strconv.FormatInt(req.EndTime, 10))
+	}
+	if req.Limit != 0 {
+		params.Set("limit", strconv.FormatInt(req.Limit, 10))
+	}
+
+	var result []PositionMarginHistoryResponse
+	var resp []interface{}
+	var err error
+	if err = b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
+		return result, err
+	}
+
+	for _, v := range resp {
+		p := PositionMarginHistoryResponse{}
+
+		mapObj := v.(map[string]interface{})
+
+		p.Asset = mapObj["asset"].(string)
+		p.Symbol = mapObj["symbol"].(string)
+		if p.Amount, err = strconv.ParseFloat(mapObj["amount"].(string), 64); err != nil {
+			return nil, err
+		}
+
+		p.Type = PositionMarginType(int(mapObj["type"].(float64)))
+		p.PositionSide = PositionSide(mapObj["positionSide"].(string))
+		p.Time = time.Unix(0, int64(mapObj["time"].(float64))*int64(time.Millisecond))
+
+		result = append(result, p)
+	}
+
+	return result, nil
+}
+
+// PositionMargin 调整逐仓保证金
+func (b *Binance) PositionMargin(req PositionMarginRequest) (bool, error) {
+	path := fmt.Sprintf("%s%s", futureApiURL, binanceFuturePositionMargin)
+
+	params := url.Values{}
+	params.Set("symbol", req.Symbol.String())
+	params.Set("amount", strconv.FormatFloat(req.Amount, 'f', -1, 64))
+	params.Set("type", strconv.FormatInt(int64(req.Type), 10))
+	params.Set("positionSide", string(req.PositionSide))
+
+	var resp interface{}
+	err := b.SendAuthHTTPRequest(http.MethodPost, path, params, limitOrder, &resp)
+	if strings.EqualFold(err.Error(), "Successfully modify position margin.") {
+		return true, nil
+	}
+	return false, err
+}
+
 // MarginTypeFuture 变换逐全仓模式
 func (b *Binance) MarginTypeFuture(symbol currency.Pair, marginType MarginType) (flag bool, err error) {
 	path := fmt.Sprintf("%s%s", futureApiURL, binanceFutureMarginType)

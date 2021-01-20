@@ -143,6 +143,39 @@ func main() {
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 
+	// 调整逐仓保证金
+	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// list, err := exch.PositionMargin(binance.PositionMarginRequest{
+	// 	Symbol:       symbolFuturePair,
+	// 	PositionSide: binance.PositionSideSHORT,
+	// 	Type:         binance.PositionMarginTypeSub,
+	// 	Amount:       10,
+	// })
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// fmt.Printf("%+v\n", list)
+	// }
+
+	// 逐仓保证金变动历史 (TRADE)
+	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// list, err := exch.PositionMarginHistory(binance.PositionMarginHistoryRequest{
+	// 	Symbol: symbolFuturePair,
+	// 	// PositionSide: binance.PositionSideSHORT,
+	// 	// Type:         binance.PositionMarginTypeAdd,
+	// 	// Amount:       10,
+	// })
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	for _, v := range list {
+	// 		fmt.Printf("%+v\n", v)
+	// 	}
+	// }
+	// return
+
 	// 获取资金费率表
 	// list, err := exch.GetFutureFundingRate(binance.FutureFundingRateRequest{
 	// 	Limit: 1,
@@ -309,7 +342,7 @@ func main() {
 	// fmt.Println("")
 	// // 1610381770000
 	// // 1610380800000
-	// list, err := exch.IncomeFuture(binance.FutureIncomeRequest{Symbol: "ETHUSDT", StartTime: timeStatID})
+	// list, err := exch.IncomeFuture(binance.FutureIncomeRequest{})
 	// if err != nil {
 	// 	panic(err)
 	// } else {
