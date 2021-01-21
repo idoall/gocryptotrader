@@ -179,6 +179,7 @@ func (b *Binance) wsHandleData(respRaw []byte) error {
 				b.Websocket.DataHandler <- data
 			case "executionReport":
 				var data wsOrderUpdate
+				fmt.Printf("executionReport:%+v\n", string(respRaw))
 				err := json.Unmarshal(respRaw, &data)
 				if err != nil {
 					return fmt.Errorf("%v - Could not convert to executionReport structure %s",
