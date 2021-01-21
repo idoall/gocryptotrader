@@ -186,6 +186,7 @@ func (b *Binance) wsHandleData(respRaw []byte) error {
 						b.Name,
 						err)
 				}
+				fmt.Printf("executionReport-data:%+v\n", data)
 				var orderID = strconv.FormatInt(data.Data.OrderID, 10)
 				oType, err := order.StringToOrderType(data.Data.OrderType)
 				if err != nil {

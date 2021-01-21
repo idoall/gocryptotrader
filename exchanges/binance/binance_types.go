@@ -681,6 +681,7 @@ type wsOrderUpdate struct {
 		TimeInForce                       string  `json:"f"`
 		OrderListID                       int64   `json:"g"`
 		OrderID                           int64   `json:"i"`
+		None                              int64   `json:"I"`
 		LastExecutedQuantity              float64 `json:"l,string"`
 		IsMaker                           bool    `json:"m"`
 		Commission                        float64 `json:"n,string"`
