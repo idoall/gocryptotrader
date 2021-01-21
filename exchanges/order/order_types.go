@@ -115,6 +115,7 @@ type ModifyResponse struct {
 // Each exchange has their own requirements, so not all fields
 // are required to be populated
 type Detail struct {
+	OrderID           int64
 	ImmediateOrCancel bool
 	HiddenOrder       bool
 	FillOrKill        bool
