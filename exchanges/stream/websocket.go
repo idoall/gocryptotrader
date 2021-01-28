@@ -170,6 +170,7 @@ func (w *Websocket) SetupNewConnection(c ConnectionSetup) error {
 // Connect initiates a websocket connection by using a package defined connection
 // function
 func (w *Websocket) Connect() error {
+
 	if w.connector == nil {
 		return errors.New("websocket connect function not set, cannot continue")
 	}
@@ -206,7 +207,6 @@ func (w *Websocket) Connect() error {
 	w.setConnectedStatus(true)
 	w.setConnectingStatus(false)
 	w.setInit(true)
-
 	if !w.IsConnectionMonitorRunning() {
 		w.connectionMonitor()
 	}

@@ -159,6 +159,7 @@ func (p Pairs) Add(pair Pair) Pairs {
 		return p
 	}
 	p = append(p, pair)
+
 	return p
 }
 

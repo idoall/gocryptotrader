@@ -54,7 +54,21 @@ const (
 	// 交易手续费率查询
 	binanceSpotTradeFee   = "/wapi/v3/tradeFee.html"
 	binanceFutureTradeFee = "/fapi/v1/commissionRate"
+
+	userAccountFutureStream = "/fapi/v1/listenKey"
 )
+
+// MarkPriceStream holds the ticker stream data
+type MarkPriceStream struct {
+	EventType            string  `json:"e"`
+	EventTime            int64   `json:"E"`
+	Symbol               string  `json:"s"`
+	MarkPrice            float64 `json:"p,string"`
+	IndexPrice           float64 `json:"i,string"`
+	EstimatedSettlePrice float64 `json:"P,string"`
+	LastFundingRate      float64 `json:"r,string"`
+	NextFundingTime      int64   `json:"T"`
+}
 
 // AdlQuantileResponse 持仓ADL队列估算 (USER_DATA)
 type AdlQuantileResponse struct {
@@ -362,7 +376,7 @@ type KlinesContractRequestParams struct {
 
 // PreminuIndexResponse represents Klines request data.
 type PreminuIndexResponse struct {
-	Synbol          string    `json:"symbol"`          // Required field; example LTCBTC, BTCUSDT
+	Symbol          string    `json:"symbol"`          // Required field; example LTCBTC, BTCUSDT
 	MarkPrice       float64   `json:"markPrice"`       // 标记价格
 	IndexPrice      float64   `json:"indexPrice"`      // 指数价格
 	LastFundingRate float64   `json:"lastFundingRate"` // 最近更新的资金费率

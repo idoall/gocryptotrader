@@ -151,6 +151,7 @@ func (b *Binance) SetDefaults() {
 	b.API.Endpoints.URLDefault = apiURL
 	b.API.Endpoints.URL = b.API.Endpoints.URLDefault
 	b.Websocket = stream.New()
+	b.WebsocketFuture = stream.New()
 	b.API.Endpoints.WebsocketURL = binanceDefaultWebsocketURL
 	b.WebsocketResponseMaxLimit = exchange.DefaultWebsocketResponseMaxLimit
 	b.WebsocketResponseCheckTimeout = exchange.DefaultWebsocketResponseCheckTimeout
@@ -168,26 +169,59 @@ func (b *Binance) Setup(exch *config.ExchangeConfig) error {
 	if err != nil {
 		return err
 	}
+	{
+		err = b.Websocket.Setup(&stream.WebsocketSetup{
+			Enabled:                          exch.Features.Enabled.Websocket,
+			Verbose:                          exch.Verbose,
+			AuthenticatedWebsocketAPISupport: exch.API.AuthenticatedWebsocketSupport,
+			WebsocketTimeout:                 exch.WebsocketTrafficTimeout,
+			DefaultURL:                       binanceDefaultWebsocketURL,
+			ExchangeName:                     exch.Name,
+			RunningURL:                       exch.API.Endpoints.WebsocketURL,
+			Connector:                        b.WsConnect,
+			Subscriber:                       b.Subscribe,
+			UnSubscriber:                     b.Unsubscribe,
+			GenerateSubscriptions:            b.GenerateSubscriptions,
+			Features:                         &b.Features.Supports.WebsocketCapabilities,
+			OrderbookBufferLimit:             exch.WebsocketOrderbookBufferLimit,
+			SortBuffer:                       true,
+			SortBufferByUpdateIDs:            true,
+		})
 
-	err = b.Websocket.Setup(&stream.WebsocketSetup{
-		Enabled:                          exch.Features.Enabled.Websocket,
-		Verbose:                          exch.Verbose,
-		AuthenticatedWebsocketAPISupport: exch.API.AuthenticatedWebsocketSupport,
-		WebsocketTimeout:                 exch.WebsocketTrafficTimeout,
-		DefaultURL:                       binanceDefaultWebsocketURL,
-		ExchangeName:                     exch.Name,
-		RunningURL:                       exch.API.Endpoints.WebsocketURL,
-		Connector:                        b.WsConnect,
-		Subscriber:                       b.Subscribe,
-		UnSubscriber:                     b.Unsubscribe,
-		GenerateSubscriptions:            b.GenerateSubscriptions,
-		Features:                         &b.Features.Supports.WebsocketCapabilities,
-		OrderbookBufferLimit:             exch.WebsocketOrderbookBufferLimit,
-		SortBuffer:                       true,
-		SortBufferByUpdateIDs:            true,
-	})
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
+	}
+	{
+
+		err = b.WebsocketFuture.Setup(&stream.WebsocketSetup{
+			Enabled:                          exch.Features.Enabled.Websocket,
+			Verbose:                          exch.Verbose,
+			AuthenticatedWebsocketAPISupport: exch.API.AuthenticatedWebsocketSupport,
+			WebsocketTimeout:                 exch.WebsocketTrafficTimeout,
+			DefaultURL:                       binanceDefaultWebsocketFutureURL,
+			ExchangeName:                     exch.Name + "2",
+			RunningURL:                       binanceDefaultWebsocketFutureURL,
+			Connector:                        b.WsConnectFuture,
+			Subscriber:                       b.SubscribeFuture,
+			UnSubscriber:                     b.UnsubscribeFuture,
+			GenerateSubscriptions:            b.GenerateSubscriptionsFuture,
+			Features:                         &b.Features.Supports.WebsocketCapabilities,
+			OrderbookBufferLimit:             exch.WebsocketOrderbookBufferLimit,
+			SortBuffer:                       true,
+			SortBufferByUpdateIDs:            true,
+		})
+		if err != nil {
+			return err
+		}
+
+		err = b.WebsocketFuture.SetupNewConnection(stream.ConnectionSetup{
+			ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
+			ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	return b.Websocket.SetupNewConnection(stream.ConnectionSetup{

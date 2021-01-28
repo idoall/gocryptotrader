@@ -30,12 +30,14 @@ var listenKey string
 
 // WsConnect initiates a websocket connection
 func (b *Binance) WsConnect() error {
+
 	if !b.Websocket.IsEnabled() || !b.IsEnabled() {
 		return errors.New(stream.WebsocketNotEnabled)
 	}
 
 	var dialer websocket.Dialer
 	var err error
+	// fmt.Println(b.Websocket.CanUseAuthenticatedEndpoints())
 	if b.Websocket.CanUseAuthenticatedEndpoints() {
 		listenKey, err = b.GetWsAuthStreamKey()
 		if err != nil {
@@ -48,6 +50,7 @@ func (b *Binance) WsConnect() error {
 			// cleans on failed connection
 			clean := strings.Split(b.Websocket.GetWebsocketURL(), "?streams=")
 			authPayload := clean[0] + "?streams=" + listenKey
+
 			err = b.Websocket.SetWebsocketURL(authPayload, false, false)
 			if err != nil {
 				return err
@@ -83,7 +86,7 @@ func (b *Binance) WsConnect() error {
 			return err
 		}
 	}
-
+	fmt.Println("readdata")
 	go b.wsReadData()
 
 	subs, err := b.GenerateSubscriptions()

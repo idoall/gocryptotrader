@@ -134,6 +134,8 @@ func main() {
 	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
 	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
 	// exchCfg.Verbose = true
+	// exchCfg.Features.Enabled.Websocket = true
+	// exchCfg.AuthenticatedWebsocketAPISupport = &exchCfg.Features.Enabled.Websocket
 	// exch.API.AuthenticatedSupport = true
 	// exch.API.AuthenticatedWebsocketSupport = true
 
@@ -142,8 +144,38 @@ func main() {
 	// logCfg := gctlog.GenDefaultSettings()
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
+	// exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
 
-	// // 持仓ADL队列估算
+	// exch.CurrencyPairs.Pairs[asset.Future] = &currency.PairStore{
+	// 	RequestFormat: &currency.PairFormat{
+	// 		Uppercase: true,
+	// 	},
+	// 	ConfigFormat: &currency.PairFormat{
+	// 		Uppercase: true,
+	// 	},
+	// }
+	// if err = exch.CurrencyPairs.SetAssetEnabled(asset.Future, true); err != nil {
+	// 	panic("exch.CurrencyPairs.SetAssetEnabled Error")
+	// }
+	// symbolPair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolPair.Delimiter = ""
+	// exch.CurrencyPairs.Pairs[asset.Future].Available = exch.CurrencyPairs.Pairs[asset.Future].Available.Add(symbolPair)
+	// exch.CurrencyPairs.Pairs[asset.Future].Enabled = exch.CurrencyPairs.Pairs[asset.Future].Enabled.Add(symbolPair)
+	// // err = exch.CurrencyPairs.EnablePair(asset.Future, symbolPair)
+	// // if err != nil {
+	// // 	panic(err)
+	// // }
+	// go func() {
+
+	// 	err = exch.WebsocketFuture.Connect()
+	// 	if err != nil {
+	// 		panic(err)
+	// 	}
+	// }()
+	// interruptx := signaler.WaitForInterrupt()
+	// gctlog.Infof(gctlog.Global, "Captured %v, shutdown requested.\n", interruptx)
+	// return
+	// 持仓ADL队列估算
 	// symbolFuturePair := currency.NewPair(currency.NewCode("XLM"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""
 	// list, err := exch.ADLQuantile(symbolFuturePair)

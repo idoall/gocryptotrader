@@ -20,6 +20,7 @@ import (
 	exchange "github.com/idoall/gocryptotrader/exchanges"
 	"github.com/idoall/gocryptotrader/exchanges/asset"
 	"github.com/idoall/gocryptotrader/exchanges/request"
+	"github.com/idoall/gocryptotrader/exchanges/stream"
 	"github.com/idoall/gocryptotrader/log"
 )
 
@@ -69,6 +70,8 @@ type Binance struct {
 
 	// Valid string list that is required by the exchange
 	validLimits []int
+
+	WebsocketFuture *stream.Websocket
 }
 
 // GetExchangeInfo returns exchange information. Check binance_types for more
