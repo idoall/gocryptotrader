@@ -245,7 +245,7 @@ func (b *Binance) wsHandleDataFuture(respRaw []byte) error {
 			b.WebsocketFuture.DataHandler <- stream.KlineData{
 				Timestamp:  time.Unix(0, kline.EventTime*int64(time.Millisecond)),
 				Pair:       pair,
-				AssetType:  asset.Spot,
+				AssetType:  asset.Future,
 				Exchange:   b.Name,
 				StartTime:  time.Unix(0, kline.Kline.StartTime*int64(time.Millisecond)),
 				CloseTime:  time.Unix(0, kline.Kline.CloseTime*int64(time.Millisecond)),
