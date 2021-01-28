@@ -227,7 +227,22 @@ func (b *Binance) wsHandleDataFuture(respRaw []byte) error {
 					b.Name,
 					err)
 			}
-			b.WebsocketFuture.DataHandler <- _stream
+			pair, err := currency.NewPairFromFormattedPairs(_stream.Symbol, pairs, format)
+			if err != nil {
+				return err
+			}
+			b.WebsocketFuture.DataHandler <- MarkPriceStreamResponse{
+				Symbol:               pair,
+				EventType:            _stream.EventType,
+				EventTime:            time.Unix(0, _stream.EventTime*int64(time.Millisecond)),
+				MarkPrice:            _stream.MarkPrice,
+				IndexPrice:           _stream.IndexPrice,
+				EstimatedSettlePrice: _stream.EstimatedSettlePrice,
+				LastFundingRate:      _stream.LastFundingRate,
+				NextFundingTime:      time.Unix(0, _stream.NextFundingTime*int64(time.Millisecond)),
+				AssetType:            asset.Future,
+				Exchange:             b.Name,
+			}
 		case "kline":
 			var kline KlineStream
 			err := json.Unmarshal(respRaw, &kline)

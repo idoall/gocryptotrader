@@ -60,14 +60,27 @@ const (
 
 // MarkPriceStream holds the ticker stream data
 type MarkPriceStream struct {
-	EventType            string  `json:"e"`
-	EventTime            int64   `json:"E"`
-	Symbol               string  `json:"s"`
-	MarkPrice            float64 `json:"p,string"`
-	IndexPrice           float64 `json:"i,string"`
-	EstimatedSettlePrice float64 `json:"P,string"`
-	LastFundingRate      float64 `json:"r,string"`
-	NextFundingTime      int64   `json:"T"`
+	EventType            string  `json:"e"`        // 事件类型
+	EventTime            int64   `json:"E"`        // 事件时间
+	Symbol               string  `json:"s"`        // 交易对
+	MarkPrice            float64 `json:"p,string"` // 标记价格
+	IndexPrice           float64 `json:"i,string"` // 现货指数价格
+	EstimatedSettlePrice float64 `json:"P,string"` // 预估结算价,仅在结算前最后一小时有参考价值
+	LastFundingRate      float64 `json:"r,string"` // 资金费率
+	NextFundingTime      int64   `json:"T"`        // 下次资金时间
+}
+
+type MarkPriceStreamResponse struct {
+	AssetType            asset.Item
+	Exchange             string
+	EventType            string        // 事件类型
+	EventTime            time.Time     // 事件时间
+	Symbol               currency.Pair // 交易对
+	MarkPrice            float64       // 标记价格
+	IndexPrice           float64       // 现货指数价格
+	EstimatedSettlePrice float64       // 预估结算价,仅在结算前最后一小时有参考价值
+	LastFundingRate      float64       // 资金费率
+	NextFundingTime      time.Time     // 下次资金时间
 }
 
 // AdlQuantileResponse 持仓ADL队列估算 (USER_DATA)
