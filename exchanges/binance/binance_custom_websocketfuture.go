@@ -266,7 +266,6 @@ func (b *Binance) wsHandleDataFuture(respRaw []byte) error {
 					b.Name,
 					err)
 			}
-			fmt.Printf("markPriceUpdate:%+v\n", string(respRaw))
 			pair, err := currency.NewPairFromFormattedPairs(_stream.Symbol, pairs, format)
 			if err != nil {
 				return err
