@@ -133,14 +133,14 @@ func main() {
 	// exch.SetDefaults()
 	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
 	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
-	// exchCfg.Verbose = true
+	// exchCfg.Verbose = false
 	// exchCfg.Features.Enabled.Websocket = true
 	// exchCfg.AuthenticatedWebsocketAPISupport = &exchCfg.Features.Enabled.Websocket
 	// exch.API.AuthenticatedSupport = true
 	// exch.API.AuthenticatedWebsocketSupport = true
 
 	// exch.SkipAuthCheck = true
-	// exch.Verbose = true
+	// exch.Verbose = false
 	// logCfg := gctlog.GenDefaultSettings()
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)

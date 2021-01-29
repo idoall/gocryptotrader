@@ -86,7 +86,7 @@ func (b *Binance) WsConnect() error {
 			return err
 		}
 	}
-	fmt.Println("readdata")
+
 	go b.wsReadData()
 
 	subs, err := b.GenerateSubscriptions()

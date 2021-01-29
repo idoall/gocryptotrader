@@ -70,6 +70,59 @@ type MarkPriceStream struct {
 	NextFundingTime      int64   `json:"T"`        // 下次资金时间
 }
 
+// AccountUpdateStream holds the ticker stream data
+type AccountUpdateStream struct {
+	EventType          string `json:"e"` // 事件类型
+	EventTime          int64  `json:"E"` // 事件时间
+	TimeStamp          int64  `json:"T"` // 撮合时间
+	AccountUpdateEvent struct {
+		EventCause string `json:"m"` // 事件推出原因
+		Balance    []struct {
+			Asset         string  `json:"a"`         // 资产名称
+			WalletBalance float64 `json:"wb,string"` // 钱包余额
+			RealyBalance  float64 `json:"cw,string"` // 除去逐仓仓位保证金的钱包余额
+		} `json:"B"` // 余额信息
+		Position []struct {
+			Symbol                string  `json:"s"`         // 交易对
+			PositionAmt           float64 `json:"pa,string"` // 仓位
+			EntryPrice            float64 `json:"ep,string"` // 入仓价格
+			RealizedProfitAndLoss float64 `json:"cr,string"` // (费前)累计实现损益
+			UnRealizedProfit      float64 `json:"up,string"` // 持仓未实现盈亏
+			MarginType            string  `json:"mt"`        // 保证金模式
+			IsolatedMargin        float64 `json:"iw,string"` // 若为逐仓，仓位保证金
+			PositionSide          string  `json:"ps"`        // 若为逐仓，仓位保证金
+		} `json:"P"` // 持仓信息
+	} `json:"a"` // 账户更新事件
+}
+
+type AccountUpdateEventBalance struct {
+	Asset         string  `json:"a"`         // 资产名称
+	WalletBalance float64 `json:"wb,string"` // 钱包余额
+	RealyBalance  float64 `json:"cw,string"` // 除去逐仓仓位保证金的钱包余额
+}
+
+type AccountUpdateEventPosition struct {
+	Symbol                currency.Pair `json:"s"`         // 交易对
+	PositionAmt           float64       `json:"pa,string"` // 仓位
+	EntryPrice            float64       `json:"ep,string"` // 入仓价格
+	RealizedProfitAndLoss float64       `json:"cr,string"` // (费前)累计实现损益
+	UnRealizedProfit      float64       `json:"up,string"` // 持仓未实现盈亏
+	MarginType            MarginType    `json:"mt"`        // 保证金模式
+	IsolatedMargin        float64       `json:"iw,string"` // 若为逐仓，仓位保证金
+	PositionSide          PositionSide  `json:"ps"`        // 若为逐仓，仓位保证金
+}
+
+type AccountUpdateStreamResponse struct {
+	EventType          string    `json:"e"` // 事件类型
+	EventTime          time.Time `json:"E"` // 事件时间
+	TimeStamp          time.Time `json:"T"` // 撮合时间
+	AccountUpdateEvent struct {
+		EventCause string                       // 事件推出原因
+		Balance    []AccountUpdateEventBalance  // 余额信息
+		Position   []AccountUpdateEventPosition // 持仓信息
+	} // 账户更新事件
+}
+
 type MarkPriceStreamResponse struct {
 	AssetType            asset.Item
 	Exchange             string
