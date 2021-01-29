@@ -51,6 +51,78 @@ func (b *Binance) ADLQuantile(symbol currency.Pair) (*AdlQuantileResponse, error
 	return p, nil
 }
 
+// ForceOrders 用户强平单历史 (USER_DATA)
+func (b *Binance) ForceOrders(symbol string, startTime, endTime, limit int64) ([]FutureQueryOrderData, error) {
+	type Response struct {
+		OrderID       int64                      `json:"orderId"`
+		Symbol        string                     `json:"symbol"`
+		Status        order.Status               `json:"status"`
+		ClientOrderID string                     `json:"clientOrderId"` // 用户自定义的订单号
+		Price         float64                    `json:"price,string"`
+		AvgPrice      float64                    `json:"avgPrice,string"`    // 平均成交价
+		OrigQty       float64                    `json:"origQty,string"`     // 原始委托数量
+		ExecutedQty   float64                    `json:"executedQty,string"` //成交量
+		CumQuote      float64                    `json:"cumQuote,string"`    //成交金额
+		TimeInForce   RequestParamsTimeForceType `json:"timeInForce"`        // 有效方法
+		OrderType     string                     `json:"origType"`
+		ReduceOnly    bool                       `json:"reduceOnly"`    // 是否仅减仓
+		ClosePosition bool                       `json:"closePosition"` // 是否条件全平仓
+		Side          order.Side                 `json:"side"`
+		PositionSide  PositionSide               `json:"positionSide"`     // 持仓方向
+		StopPrice     float64                    `json:"stopPrice,string"` // 触发价，对`TRAILING_STOP_MARKET`无效
+		WorkingType   WorkingType                `json:"workingType"`      // 条件价格触发类型
+		Time          float64                    `json:"time"`             // 订单时间
+		UpdateTime    int64                      `json:"updateTime"`
+	}
+	var respList []Response
+	var result []FutureQueryOrderData
+
+	path := futureApiURL + binanceFutureForceOrder
+
+	params := url.Values{}
+
+	if symbol != "" {
+		params.Set("symbol", strings.ToUpper(symbol))
+	}
+	if startTime != 0 {
+		params.Set("startTime", strconv.FormatInt(startTime, 10))
+	}
+	if endTime != 0 {
+		params.Set("endTime", strconv.FormatInt(startTime, 10))
+	}
+	if limit != 0 {
+		params.Set("limit", strconv.FormatInt(limit, 10))
+	}
+
+	if err := b.SendAuthHTTPRequest(http.MethodGet, path, params, openOrdersLimit(symbol), &respList); err != nil {
+		return result, err
+	}
+	for _, resp := range respList {
+		result = append(result, FutureQueryOrderData{
+			AvgPrice:      resp.AvgPrice,
+			ClientOrderID: resp.ClientOrderID,
+			CumQuote:      resp.CumQuote,
+			ExecutedQty:   resp.ExecutedQty,
+			OrderID:       resp.OrderID,
+			OrigQty:       resp.OrigQty,
+			OrigType:      resp.OrderType,
+			Price:         resp.Price,
+			ReduceOnly:    resp.ReduceOnly,
+			Side:          resp.Side,
+			PositionSide:  resp.PositionSide,
+			Status:        resp.Status,
+			StopPrice:     resp.StopPrice,
+			ClosePosition: resp.ClosePosition,
+			Symbol:        resp.Symbol,
+			TimeInForce:   resp.TimeInForce,
+			WorkingType:   resp.WorkingType,
+			Time:          time.Unix(0, int64(resp.Time)*int64(time.Millisecond)),
+			UpdateTime:    time.Unix(0, resp.UpdateTime*int64(time.Millisecond)),
+		})
+	}
+	return result, nil
+}
+
 // PositionMarginHistory 逐仓保证金变动历史 (TRADE)
 func (b *Binance) PositionMarginHistory(req PositionMarginHistoryRequest) ([]PositionMarginHistoryResponse, error) {
 

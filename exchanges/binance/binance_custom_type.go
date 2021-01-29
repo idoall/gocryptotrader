@@ -47,6 +47,8 @@ const (
 	binanceFuturePositionMarginHistory = "/fapi/v1/positionMargin/history"
 	// 持仓ADL队列估算 (USER_DATA)
 	binanceFutureAdlQuantile = "/fapi/v1/adlQuantile"
+	// 用户强平单历史 (USER_DATA)
+	binanceFutureForceOrder = "/fapi/v1/forceOrders"
 
 	// 用户万向划转
 	binanceTransfer = "/sapi/v1/asset/transfer"

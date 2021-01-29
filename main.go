@@ -146,35 +146,19 @@ func main() {
 	// exch.Setup(exchCfg)
 	// exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
 
-	// exch.CurrencyPairs.Pairs[asset.Future] = &currency.PairStore{
-	// 	RequestFormat: &currency.PairFormat{
-	// 		Uppercase: true,
-	// 	},
-	// 	ConfigFormat: &currency.PairFormat{
-	// 		Uppercase: true,
-	// 	},
-	// }
-	// if err = exch.CurrencyPairs.SetAssetEnabled(asset.Future, true); err != nil {
-	// 	panic("exch.CurrencyPairs.SetAssetEnabled Error")
-	// }
-	// symbolPair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
-	// symbolPair.Delimiter = ""
-	// exch.CurrencyPairs.Pairs[asset.Future].Available = exch.CurrencyPairs.Pairs[asset.Future].Available.Add(symbolPair)
-	// exch.CurrencyPairs.Pairs[asset.Future].Enabled = exch.CurrencyPairs.Pairs[asset.Future].Enabled.Add(symbolPair)
-	// // err = exch.CurrencyPairs.EnablePair(asset.Future, symbolPair)
-	// // if err != nil {
-	// // 	panic(err)
-	// // }
-	// go func() {
-
-	// 	err = exch.WebsocketFuture.Connect()
-	// 	if err != nil {
-	// 		panic(err)
+	// // 测试用户强平单历史 (USER_DATA)
+	// symbolFuturePair := currency.NewPair(currency.NewCode("XLM"), currency.NewCode("USDT"))
+	// symbolFuturePair.Delimiter = ""
+	// list, err := exch.ForceOrders("ETHUSDT", 0, 0, 0)
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	for _, v := range list {
+	// 		fmt.Printf("%+v\n", v)
 	// 	}
-	// }()
-	// interruptx := signaler.WaitForInterrupt()
-	// gctlog.Infof(gctlog.Global, "Captured %v, shutdown requested.\n", interruptx)
+	// }
 	// return
+
 	// 持仓ADL队列估算
 	// symbolFuturePair := currency.NewPair(currency.NewCode("XLM"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""
