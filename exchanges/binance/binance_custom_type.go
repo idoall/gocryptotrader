@@ -113,9 +113,12 @@ type AccountUpdateEventPosition struct {
 }
 
 type AccountUpdateStreamResponse struct {
-	EventType          string    `json:"e"` // 事件类型
-	EventTime          time.Time `json:"E"` // 事件时间
-	TimeStamp          time.Time `json:"T"` // 撮合时间
+	EventType string    `json:"e"` // 事件类型
+	EventTime time.Time `json:"E"` // 事件时间
+	TimeStamp time.Time `json:"T"` // 撮合时间
+
+	AssetType          asset.Item
+	Exchange           string
 	AccountUpdateEvent struct {
 		EventCause string                       // 事件推出原因
 		Balance    []AccountUpdateEventBalance  // 余额信息

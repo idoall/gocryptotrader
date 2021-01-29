@@ -219,7 +219,8 @@ func (b *Binance) wsHandleDataFuture(respRaw []byte) error {
 			o.EventTime = time.Unix(0, data.EventTime*int64(time.Millisecond))
 			o.TimeStamp = time.Unix(0, data.TimeStamp*int64(time.Millisecond))
 			o.AccountUpdateEvent.EventCause = data.AccountUpdateEvent.EventCause
-
+			o.Exchange = b.GetName()
+			o.AssetType = asset.Future
 			for _, v := range data.AccountUpdateEvent.Balance {
 				o.AccountUpdateEvent.Balance = append(o.AccountUpdateEvent.Balance, AccountUpdateEventBalance{
 					Asset:         v.Asset,
