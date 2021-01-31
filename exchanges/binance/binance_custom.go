@@ -291,6 +291,9 @@ func (b *Binance) PositionRiskFuture(symbol string) ([]PositionRiskResponse, err
 		if p.PositionAmt, err = strconv.ParseFloat(mapObj["positionAmt"].(string), 64); err != nil {
 			return nil, err
 		}
+		if p.UnRealizedProfit, err = strconv.ParseFloat(mapObj["unRealizedProfit"].(string), 64); err != nil {
+			return nil, err
+		}
 		if p.EntryPrice, err = strconv.ParseFloat(mapObj["entryPrice"].(string), 64); err != nil {
 			return nil, err
 		}

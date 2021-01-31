@@ -49,6 +49,8 @@ const (
 	binanceFutureAdlQuantile = "/fapi/v1/adlQuantile"
 	// 用户强平单历史 (USER_DATA)
 	binanceFutureForceOrder = "/fapi/v1/forceOrders"
+	// 账户余额V2 (USER_DATA)
+	binanceFutureBalance = "/fapi/v2/balance"
 
 	// 用户万向划转
 	binanceTransfer = "/sapi/v1/asset/transfer"

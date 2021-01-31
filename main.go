@@ -133,20 +133,20 @@ func main() {
 	// exch.SetDefaults()
 	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
 	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
-	// exchCfg.Verbose = false
+	// exchCfg.Verbose = true
 	// exchCfg.Features.Enabled.Websocket = true
 	// exchCfg.AuthenticatedWebsocketAPISupport = &exchCfg.Features.Enabled.Websocket
 	// exch.API.AuthenticatedSupport = true
 	// exch.API.AuthenticatedWebsocketSupport = true
 
 	// exch.SkipAuthCheck = true
-	// exch.Verbose = false
+	// exch.Verbose = true
 	// logCfg := gctlog.GenDefaultSettings()
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
 	// exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
 
-	// // 测试用户强平单历史 (USER_DATA)
+	// 测试用户强平单历史 (USER_DATA)
 	// symbolFuturePair := currency.NewPair(currency.NewCode("XLM"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""
 	// list, err := exch.ForceOrders("ETHUSDT", 0, 0, 0)
@@ -274,7 +274,7 @@ func main() {
 	// return
 
 	// 查看持仓风险
-	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
+	// symbolFuturePair := currency.NewPair(currency.NewCode("SXP"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""
 	// list, err := exch.PositionRiskFuture(symbolFuturePair.String())
 	// if err != nil {
