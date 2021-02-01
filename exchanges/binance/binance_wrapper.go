@@ -200,7 +200,7 @@ func (b *Binance) Setup(exch *config.ExchangeConfig) error {
 			AuthenticatedWebsocketAPISupport: exch.API.AuthenticatedWebsocketSupport,
 			WebsocketTimeout:                 exch.WebsocketTrafficTimeout,
 			DefaultURL:                       binanceDefaultWebsocketFutureURL,
-			ExchangeName:                     exch.Name + "2",
+			ExchangeName:                     exch.Name,
 			RunningURL:                       binanceDefaultWebsocketFutureURL,
 			Connector:                        b.WsConnectFuture,
 			Subscriber:                       b.SubscribeFuture,
