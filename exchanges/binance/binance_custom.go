@@ -15,6 +15,21 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/order"
 )
 
+// FutureAccount 账户信息V2 (USER_DATA)
+func (b *Binance) FutureAccount() (*AccountInfoFuture, error) {
+
+	path := futureApiURL + binanceFutureAccount
+
+	params := url.Values{}
+
+	var resp AccountInfoFuture
+	var err error
+	if err = b.SendAuthHTTPRequest(http.MethodGet, path, params, limitOrder, &resp); err != nil {
+		return nil, err
+	}
+	return &resp, nil
+}
+
 // ADLQuantile 持仓ADL队列估算
 func (b *Binance) ADLQuantile(symbol currency.Pair) (*AdlQuantileResponse, error) {
 

@@ -146,6 +146,15 @@ func main() {
 	// exch.Setup(exchCfg)
 	// exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
 
+	// FutureAccount 账户信息V2 (USER_DATA)
+	// list, err := exch.FutureAccount()
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	fmt.Printf("%+v\n", list)
+	// }
+	// return
+
 	// 测试用户强平单历史 (USER_DATA)
 	// symbolFuturePair := currency.NewPair(currency.NewCode("XLM"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""

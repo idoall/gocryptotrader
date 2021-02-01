@@ -51,6 +51,8 @@ const (
 	binanceFutureForceOrder = "/fapi/v1/forceOrders"
 	// 账户余额V2 (USER_DATA)
 	binanceFutureBalance = "/fapi/v2/balance"
+	// 账户信息V2 (USER_DATA)
+	binanceFutureAccount = "/fapi/v2/account"
 
 	// 用户万向划转
 	binanceTransfer = "/sapi/v1/asset/transfer"
@@ -61,6 +63,53 @@ const (
 
 	userAccountFutureStream = "/fapi/v1/listenKey"
 )
+
+// AccountInfoFuture U本位合约	账户信息V2 (
+type AccountInfoFuture struct {
+	FeeTier                     int     `json:"feeTier"`                            // 手续费等级
+	CanTrade                    bool    `json:"canTrade"`                           // 是否可以交易
+	CanDeposit                  bool    `json:"canDeposit"`                         // 是否可以入金
+	CanWithdraw                 bool    `json:"canWithdraw"`                        // 是否可以出金
+	UpdateTime                  int64   `json:"updateTime"`                         // 现货指数价格
+	TotalInitialMargin          float64 `json:"totalInitialMargin,string"`          // 但前所需起始保证金总额(存在逐仓请忽略), 仅计算usdt资产
+	TotalMaintMargin            float64 `json:"totalMaintMargin,string"`            // 维持保证金总额, 仅计算usdt资产
+	TotalWalletBalance          float64 `json:"totalWalletBalance,string"`          // 账户总余额, 仅计算usdt资产
+	TotalUnrealizedProfit       float64 `json:"totalUnrealizedProfit,string"`       // 持仓未实现盈亏总额, 仅计算usdt资产
+	TotalMarginBalance          float64 `json:"totalMarginBalance,string"`          // 保证金总余额, 仅计算usdt资产
+	TotalPositionInitialMargin  float64 `json:"totalPositionInitialMargin,string"`  // 持仓所需起始保证金(基于最新标记价格), 仅计算usdt资产
+	TotalOpenOrderInitialMargin float64 `json:"totalOpenOrderInitialMargin,string"` // 当前挂单所需起始保证金(基于最新标记价格), 仅计算usdt资产
+	TotalCrossWalletBalance     float64 `json:"totalCrossWalletBalance,string"`     // 全仓账户余额, 仅计算usdt资产
+	AvailableBalance            float64 `json:"availableBalance,string"`            // 可用余额, 仅计算usdt资产
+	MaxWithdrawAmount           float64 `json:"maxWithdrawAmount,string"`           // 最大可转出余额, 仅计算usdt资产
+	Assets                      []struct {
+		Asset                  string  `json:"asset"`                         //资产
+		WalletBalance          float64 `json:"walletBalance,string"`          //余额
+		UnrealizedProfit       float64 `json:"unrealizedProfit,string"`       // 未实现盈亏
+		MarginBalance          float64 `json:"marginBalance,string"`          // 保证金余额
+		MaintMargin            float64 `json:"maintMargin,string"`            // 维持保证金
+		InitialMargin          float64 `json:"initialMargin,string"`          // 当前所需起始保证金
+		PositionInitialMargin  float64 `json:"positionInitialMargin,string"`  // 持仓所需起始保证金(基于最新标记价格)
+		PpenOrderInitialMargin float64 `json:"openOrderInitialMargin,string"` // 当前挂单所需起始保证金(基于最新标记价格)
+		CrossWalletBalance     float64 `json:"crossWalletBalance,string"`     //全仓账户余额
+		CrossUnPnl             float64 `json:"crossUnPnl,string"`             // 全仓持仓未实现盈亏
+		AvailableBalance       float64 `json:"availableBalance,string"`       // 可用余额
+		MaxWithdrawAmount      float64 `json:"maxWithdrawAmount,string"`      // 最大可转出余额
+	} `json:"assets"`
+	Positions []struct {
+		Symbol                 string       `json:"symbol"`                        // 交易对
+		InitialMargin          float64      `json:"initialMargin,string"`          // 当前所需起始保证金(基于最新标记价格)
+		MaintMargin            float64      `json:"maintMargin,string"`            //维持保证金
+		UnrealizedProfit       float64      `json:"unrealizedProfit,string"`       // 持仓未实现盈亏
+		PositionInitialMargin  float64      `json:"positionInitialMargin,string"`  // 持仓所需起始保证金(基于最新标记价格)
+		OpenOrderInitialMargin float64      `json:"openOrderInitialMargin,string"` // 当前挂单所需起始保证金(基于最新标记价格)
+		Leverage               float64      `json:"leverage,string"`               // 杠杆倍率
+		Isolated               bool         `json:"isolated"`                      // 是否是逐仓模式
+		EntryPrice             float64      `json:"entryPrice,string"`             // 持仓成本价
+		MaxNotional            float64      `json:"maxNotional,string"`            // 当前杠杆下用户可用的最大名义价值
+		PositionSide           PositionSide `json:"positionSide"`                  // 持仓方向
+		PositionAmt            float64      `json:"positionAmt,string"`            // 仓位
+	} `json:"positions"` // 头寸，将返回所有市场symbol
+}
 
 // MarkPriceStream holds the ticker stream data
 type MarkPriceStream struct {
