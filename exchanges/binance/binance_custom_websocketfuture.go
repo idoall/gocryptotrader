@@ -256,7 +256,7 @@ func (b *Binance) wsHandleDataFuture(respRaw []byte) error {
 			b.WebsocketFuture.DataHandler <- o
 		case "ORDER_TRADE_UPDATE":
 
-			fmt.Printf("订单/交易 更新推送:%+v\n", string(respRaw))
+			// fmt.Printf("订单/交易 更新推送:%+v\n", string(respRaw))
 		case "markPriceUpdate":
 			var _stream MarkPriceStream
 			err := json.Unmarshal(respRaw, &_stream)
