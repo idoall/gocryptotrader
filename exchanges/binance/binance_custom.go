@@ -652,9 +652,9 @@ func (b *Binance) GetFundingRate(assetType asset.Item, req FundingRateRequest) (
 
 	var path string
 	if assetType == asset.Future { // U本位合约
-		path = fmt.Sprintf("%s/%s/v%s/%s", futureApiURL, binanceFutureRESTBasePath, binanceAPIVersion, binanceContractFundingRate)
+		path = fmt.Sprintf("%s/%s/v%s/%s?%s", futureApiURL, binanceFutureRESTBasePath, binanceAPIVersion, binanceContractFundingRate, params.Encode())
 	} else if assetType == asset.PerpetualContract { // 币本位合约
-		path = fmt.Sprintf("%s/%s/v%s/%s", perpetualApiURL, binancePerpetualRESTBasePath, binanceAPIVersion, binanceContractFundingRate)
+		path = fmt.Sprintf("%s/%s/v%s/%s?%s", perpetualApiURL, binancePerpetualRESTBasePath, binanceAPIVersion, binanceContractFundingRate, params.Encode())
 	} else {
 		return nil, fmt.Errorf("Error assetType")
 	}

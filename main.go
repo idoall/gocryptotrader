@@ -11,11 +11,8 @@ import (
 	"github.com/idoall/gocryptotrader/common"
 	"github.com/idoall/gocryptotrader/config"
 	"github.com/idoall/gocryptotrader/core"
-	"github.com/idoall/gocryptotrader/currency"
 	"github.com/idoall/gocryptotrader/dispatch"
 	"github.com/idoall/gocryptotrader/engine"
-	"github.com/idoall/gocryptotrader/exchanges/asset"
-	"github.com/idoall/gocryptotrader/exchanges/binance"
 	"github.com/idoall/gocryptotrader/exchanges/request"
 	"github.com/idoall/gocryptotrader/exchanges/trade"
 	"github.com/idoall/gocryptotrader/gctscript"
@@ -132,24 +129,22 @@ func main() {
 
 	// {
 
-	var exch binance.Binance
-	exch.SetDefaults()
-	//获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
-	exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
-	exchCfg.Verbose = true
-	exchCfg.Features.Enabled.Websocket = true
-	exchCfg.AuthenticatedWebsocketAPISupport = &exchCfg.Features.Enabled.Websocket
-	exch.API.AuthenticatedSupport = true
-	exch.API.AuthenticatedWebsocketSupport = true
-	exch.API.Credentials.Key = "2IxPmRnMFGsQpBgWadVPC02ooCMtFky6auwFrz33JInPQtJz16CX4vCDkPPMROGq"
-	exch.API.Credentials.Secret = "VWWfjG1UHYoYFmEh4pxzdzEmOOKQ3MMdNHxqvW48qzqPxNX9PYqNO1qsLqtJxher"
+	// var exch binance.Binance
+	// exch.SetDefaults()
+	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
+	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
+	// exchCfg.Verbose = true
+	// exchCfg.Features.Enabled.Websocket = true
+	// exchCfg.AuthenticatedWebsocketAPISupport = &exchCfg.Features.Enabled.Websocket
+	// exch.API.AuthenticatedSupport = true
+	// exch.API.AuthenticatedWebsocketSupport = true
 
-	exch.SkipAuthCheck = true
-	exch.Verbose = true
-	logCfg := gctlog.GenDefaultSettings()
-	gctlog.GlobalLogConfig = &logCfg
-	exch.Setup(exchCfg)
-	exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
+	// exch.SkipAuthCheck = true
+	// exch.Verbose = true
+	// logCfg := gctlog.GenDefaultSettings()
+	// gctlog.GlobalLogConfig = &logCfg
+	// exch.Setup(exchCfg)
+	// exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
 
 	// FutureAccount 账户信息V2 (USER_DATA)
 	// list, err := exch.GetContractAccount(asset.PerpetualContract)
@@ -252,31 +247,15 @@ func main() {
 	// return
 
 	//获取交易规则和交易对
-	// list, err := exch.GetExchangeInfo(asset.Spot)
+	// list, err := exch.GetExchangeInfo(asset.PerpetualContract)
 	// if err != nil {
 	// 	panic(err)
 	// } else {
-	// 	minPrice := 0
-	// 	minBase := 0
-	// 	minQuoue := 0
-	// 	for _, v := range list.Symbols {
-	// 		if v.BaseAsset == "ETH" && v.QuoteAsset == "USDT" {
-	// 			fmt.Printf("%+v\n", v)
-	// 			for _, vv := range v.Filters {
-	// 				if vv.FilterType == "PRICE_FILTER" {
-	// 					minPrice = len(strings.Split(decimal.NewFromFloat(vv.MinPrice).String(), ".")[1])
-	// 				}
-	// 				if vv.FilterType == "LOT_SIZE" {
-	// 					minBase = len(strings.Split(decimal.NewFromFloat(vv.MinQty).String(), ".")[1])
-	// 				}
 
-	// 			}
-	// 			minQuoue = v.QuotePrecision
-	// 		}
+	// 	for _, v := range list.Symbols {
+	// 		fmt.Printf("%s %s \t%+v\t%s\n", v.BaseAsset, v.QuoteAsset, v.Symbol, v.ContractType)
+
 	// 	}
-	// 	fmt.Printf("minPrice:%d\n", minPrice)
-	// 	fmt.Printf("minBase:%d\n", minBase)
-	// 	fmt.Printf("minQuoue:%d\n", minQuoue)
 	// }
 	// return
 
@@ -413,21 +392,24 @@ func main() {
 	// }
 	// return
 	// 最新标记价格和资金费率
-	symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
-	symbol.Delimiter = ""
-	list, err := exch.GetPremiumIndex(asset.Future, symbol)
-	if err != nil {
-		panic(err)
-	} else {
-		fmt.Printf("%+v\n", list)
-
-	}
-	return
-
-	// 最新标记价格和资金费率
 	// symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
 	// symbol.Delimiter = ""
-	// list, err := exch.GetFutureFundingRate(symbol, 0, 0, 0)
+	// list, err := exch.GetPremiumIndex(asset.Future, symbol)
+	// if err != nil {
+	// 	panic(err)
+	// } else {
+	// 	fmt.Printf("%+v\n", list)
+
+	// }
+	// return
+
+	// 最新标记价格和资金费率
+	// symbol, _ := currency.NewPairFromStrings("BTCUSD", "PERP")
+	// symbol.Delimiter = "_"
+	// list, err := exch.GetFundingRate(asset.PerpetualContract, binance.FundingRateRequest{
+	// 	Symbol: symbol,
+	// 	Limit:  540,
+	// })
 	// if err != nil {
 	// 	panic(err)
 	// } else {
