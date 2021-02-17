@@ -328,20 +328,20 @@ const (
 	MarginType_CROSSED = MarginType("CROSSED")
 )
 
-type FutureFundingRateRequest struct {
+type FundingRateRequest struct {
 	Symbol    currency.Pair `json:"symbol"` //交易对
 	StartTime int64         `json:"startTime"`
 	EndTime   int64         `json:"endTime"`
 	Limit     int64         `json:"limit"`
 }
 
-type FutureFundingRateResponeItem struct {
+type FundingRateResponeItem struct {
 	Symbol      string    `json:"symbol"`
 	FundingRate float64   `json:"fundingRate"`
 	FundingTime time.Time `json:"fundingTime"`
 }
 
-type FutureIncomeResponse struct {
+type IncomeResponse struct {
 	Symbol     string     `json:"symbol"`         //交易对
 	Income     float64    `json:"income, string"` //资金流数量，正数代表流入，负数代表流出
 	IncomeType IncomeType `json:"incomeType"`     // 收益类型
@@ -352,7 +352,7 @@ type FutureIncomeResponse struct {
 	TradeId    int64      `json:"tradeId"`
 }
 
-type FutureIncomeRequest struct {
+type IncomeRequest struct {
 	Symbol     string     `json:"symbol"`     //交易对
 	IncomeType IncomeType `json:"incomeType"` // 收益类型
 	StartTime  int64      `json:"startTime"`

@@ -115,7 +115,7 @@ func (b *Binance) ADLQuantile(assetType asset.Item, symbol currency.Pair) (*AdlQ
 }
 
 // Income 获取账户损益资金流水
-func (b *Binance) Income(assetType asset.Item, req FutureIncomeRequest) ([]FutureIncomeResponse, error) {
+func (b *Binance) Income(assetType asset.Item, req IncomeRequest) ([]IncomeResponse, error) {
 
 	params := url.Values{}
 	if req.Symbol != "" {
@@ -134,7 +134,7 @@ func (b *Binance) Income(assetType asset.Item, req FutureIncomeRequest) ([]Futur
 		params.Set("limit", strconv.FormatInt(req.Limit, 10))
 	}
 
-	var result []FutureIncomeResponse
+	var result []IncomeResponse
 	var resp []interface{}
 	var err error
 
@@ -152,7 +152,7 @@ func (b *Binance) Income(assetType asset.Item, req FutureIncomeRequest) ([]Futur
 	}
 
 	for _, v := range resp {
-		p := FutureIncomeResponse{}
+		p := IncomeResponse{}
 
 		mapObj := v.(map[string]interface{})
 
@@ -634,7 +634,7 @@ func (b *Binance) GetPremiumIndex(assetType asset.Item, symbol currency.Pair) (*
 }
 
 // GetFundingRate 查询资金费率历史
-func (b *Binance) GetFundingRate(assetType asset.Item, req FutureFundingRateRequest) ([]FutureFundingRateResponeItem, error) {
+func (b *Binance) GetFundingRate(assetType asset.Item, req FundingRateRequest) ([]FundingRateResponeItem, error) {
 
 	params := url.Values{}
 	if req.Symbol.String() != "" {
@@ -665,9 +665,9 @@ func (b *Binance) GetFundingRate(assetType asset.Item, req FutureFundingRateRequ
 		return nil, err
 	}
 
-	var result []FutureFundingRateResponeItem
+	var result []FundingRateResponeItem
 	for _, v := range resp {
-		p := FutureFundingRateResponeItem{}
+		p := FundingRateResponeItem{}
 
 		mapObj := v.(map[string]interface{})
 
