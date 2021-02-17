@@ -147,11 +147,15 @@ func main() {
 	// exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
 
 	// FutureAccount 账户信息V2 (USER_DATA)
-	// list, err := exch.FutureAccount()
+	// list, err := exch.GetContractAccount(asset.PerpetualContract)
 	// if err != nil {
 	// 	panic(err)
 	// } else {
+	// 	// for _, v := range list.Symbols {
+	// 	// 	if v.ContractType == "PERPETUAL" {
 	// 	fmt.Printf("%+v\n", list)
+	// 	// 	}
+	// 	// }
 	// }
 	// return
 
@@ -169,9 +173,9 @@ func main() {
 	// return
 
 	// 持仓ADL队列估算
-	// symbolFuturePair := currency.NewPair(currency.NewCode("XLM"), currency.NewCode("USDT"))
-	// symbolFuturePair.Delimiter = ""
-	// list, err := exch.ADLQuantile(symbolFuturePair)
+	// symbolPair := currency.NewPair(currency.NewCode("BTCUSD"), currency.NewCode("PERP"))
+	// symbolPair.Delimiter = "_"
+	// list, err := exch.GetContractADLQuantile(asset.PerpetualContract, symbolPair)
 	// if err != nil {
 	// 	panic(err)
 	// } else {
@@ -285,7 +289,7 @@ func main() {
 	// 查看持仓风险
 	// symbolFuturePair := currency.NewPair(currency.NewCode("SXP"), currency.NewCode("USDT"))
 	// symbolFuturePair.Delimiter = ""
-	// list, err := exch.PositionRiskFuture(symbolFuturePair.String())
+	// list, err := exch.PositionRisk(asset.Future, symbolFuturePair.String())
 	// if err != nil {
 	// 	panic(err)
 	// } else {
@@ -326,9 +330,11 @@ func main() {
 	// return
 
 	// 查询打开的订单
-	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
-	// symbolFuturePair.Delimiter = ""
-	// list, err := exch.OpenOrdersFuture(symbolFuturePair.String())
+	// symbolPair := currency.NewPair(currency.NewCode("SXP"), currency.NewCode("USDT"))
+	// symbolPair.Delimiter = ""
+	// symbolPair := currency.NewPair(currency.NewCode("BTCUSD"), currency.NewCode("PERP"))
+	// symbolPair.Delimiter = "_"
+	// list, err := exch.OpenOrdersContract(asset.PerpetualContract, symbolPair.String())
 	// if err != nil {
 	// 	panic(err)
 	// } else {
@@ -376,9 +382,9 @@ func main() {
 	// timeStat, _ := time.ParseInLocation("2006-01-02 15:04:05", todayTimeStat, loc)
 	// timeStatID := timeStat.UnixNano() / int64(time.Millisecond)
 	// fmt.Println("")
-	// // 1610381770000
-	// // 1610380800000
-	// list, err := exch.IncomeFuture(binance.FutureIncomeRequest{})
+	// 1610381770000
+	// 1610380800000
+	// list, err := exch.GetContractIncome(asset.PerpetualContract, binance.FutureIncomeRequest{})
 	// if err != nil {
 	// 	panic(err)
 	// } else {

@@ -9,11 +9,49 @@ import (
 )
 
 const (
-	pingServer              = "/api/v3/ping"
-	perpetualContractApiURL = "https://dapi.binance.com"
-	futureApiURL            = "https://fapi.binance.com"
+	pingServer      = "/api/v3/ping"
+	perpetualApiURL = "https://dapi.binance.com"
+	futureApiURL    = "https://fapi.binance.com"
+
+	binanceAPIVersion  = "1"
+	binanceAPIVersion2 = "2"
+
+	binanceFutureRESTBasePath    = "fapi"
+	binancePerpetualRESTBasePath = "dapi"
 
 	// PERPETUAL
+	binanceContractExchangeInfo = "exchangeInfo"
+	// 账户信息V2 (USER_DATA)
+	binanceContractAccount = "account"
+	// 持仓ADL队列估算 (USER_DATA)
+	binanceContractAdlQuantile = "adlQuantile"
+	// 获取账户损益资金流水(USER_DATA)
+	binanceContractIncome = "income"
+	// 调整开仓杠杆
+	binanceLeverage = "leverage"
+	// 查看当前全部挂单
+	binanceContractOpenOrders = "openOrders"
+	//下单 (TRADE)
+	binanceContractNewOrder = "order"
+	// 撤销订单 (TRADE)
+	binanceCancelOrder = "order"
+	// 用户强平单历史 (USER_DATA)
+	binanceContractForceOrder = "forceOrders"
+	//查询订单 (TRADE)
+	binanceContractQueryOrder = "order"
+	// binanceContractFundingRate 查询资金费率历史
+	binanceContractFundingRate = "fundingRate"
+	// binanceContractPreminuIndex 最新标记价格和资金费率
+	binanceContractPreminuIndex = "premiumIndex"
+	// 用户持仓风险
+	binancePositionRisk = "positionRisk"
+	// 变换逐全仓模式 (USER_DATA)
+	binanceMarginType = "marginType"
+	// 调整逐仓保证金 (TRADE)
+	binancePositionMargin = "positionMargin"
+	// 逐仓保证金变动历史 (TRADE)
+	binancePositionMarginHistory = "positionMargin/history"
+
 	PerpetualExchangeInfo = "/dapi/v1/exchangeInfo"
 	futureExchangeInfo    = "/fapi/v1/exchangeInfo"
 
@@ -22,37 +60,54 @@ const (
 	binanceFutureCandleStick            = "/fapi/v1/continuousKlines"
 
 	// binanceFuturePreminuIndex 最新标记价格和资金费率
-	binanceFuturePreminuIndex = "/fapi/v1/premiumIndex"
+	// binanceFuturePreminuIndex = "/fapi/v1/premiumIndex"
 	// binanceFutureFundingRate 查询资金费率历史
-	binanceFutureFundingRate = "/fapi/v1/fundingRate"
+	// binanceFutureFundingRate = "/fapi/v1/fundingRate"
 	//下单 (TRADE)
-	binanceFutureNewOrder = "/fapi/v1/order"
+	// binanceFutureNewOrder = "/fapi/v1/order"
 	//查询订单 (TRADE)
-	binanceFutureQueryOrder = "/fapi/v1/order"
+	// binanceFutureQueryOrder = "/fapi/v1/order"
 	// 撤销订单 (TRADE)
-	binanceFutureCancelOrder = "/fapi/v1/order"
+	// binanceFutureCancelOrder = "/fapi/v1/order"
 	// 查看当前全部挂单
-	binanceFutureOpenOrders = "/fapi/v1/openOrders"
+	// binanceFutureOpenOrders = "/fapi/v1/openOrders"
 	// 调整开仓杠杆
-	binanceFutureLeverage = "/fapi/v1/leverage"
+	// binanceFutureLeverage = "/fapi/v1/leverage"
 	// 获取账户损益资金流水(USER_DATA)
-	binanceFutureIncome = "/fapi/v1/income"
+	// binanceFutureIncome = "/fapi/v1/income"
 	// 用户持仓风险V2 (USER_DATA)
-	binanceFuturePositionRisk = "/fapi/v2/positionRisk"
+	// binanceFuturePositionRisk = "/fapi/v2/positionRisk"
 	// 变换逐全仓模式 (USER_DATA)
-	binanceFutureMarginType = "/fapi/v1/marginType"
+	// binanceFutureMarginType = "/fapi/v1/marginType"
 	// 调整逐仓保证金 (TRADE)
-	binanceFuturePositionMargin = "/fapi/v1/positionMargin"
-	// 逐仓保证金变动历史 (TRADE)
-	binanceFuturePositionMarginHistory = "/fapi/v1/positionMargin/history"
+	// binanceFuturePositionMargin = "/fapi/v1/positionMargin"
 	// 持仓ADL队列估算 (USER_DATA)
-	binanceFutureAdlQuantile = "/fapi/v1/adlQuantile"
+	// binanceFutureAdlQuantile = "/fapi/v1/adlQuantile"
 	// 用户强平单历史 (USER_DATA)
-	binanceFutureForceOrder = "/fapi/v1/forceOrders"
+	// binanceFutureForceOrder = "/fapi/v1/forceOrders"
 	// 账户余额V2 (USER_DATA)
-	binanceFutureBalance = "/fapi/v2/balance"
+	// binanceFutureBalance = "/fapi/v2/balance"
 	// 账户信息V2 (USER_DATA)
-	binanceFutureAccount = "/fapi/v2/account"
+	// binanceFutureAccount = "/fapi/v2/account"
+
+	// // binanceFuturePreminuIndex 最新标记价格和资金费率
+	// binancePerpetualPreminuIndex = "/dapi/v1/premiumIndex"
+	// // binanceFutureFundingRate 查询资金费率历史
+	// binancePerpetualFundingRate = "/dapi/v1/fundingRate"
+	// //下单 (TRADE)
+	// binancePerpetualNewOrder = "/dapi/v1/order"
+	// //查询订单 (TRADE)
+	// binancePerpetualQueryOrder = "/dapi/v1/order"
+	// // 撤销订单 (TRADE)
+	// binancePerpetualCancelOrder = "/dapi/v1/order"
+	// // 查看当前全部挂单
+	// binancePerpetualOpenOrders = "/dapi/v1/openOrders"
+	// // 调整开仓杠杆
+	// binancePerpetualLeverage = "/dapi/v1/leverage"
+	// // 获取账户损益资金流水(USER_DATA)
+	// // binancePerpetualIncome = "/dapi/v1/income"
+	// // 账户信息V2 (USER_DATA)
+	// binancePerpetualAccount = "/dapi/v2/account"
 
 	// 用户万向划转
 	binanceTransfer = "/sapi/v1/asset/transfer"
@@ -423,8 +478,8 @@ const (
 	ContractTypeNEXT_MONTH = ContractType("NEXT_MONTH")
 )
 
-// FutureNewOrderRequest request type
-type FutureNewOrderRequest struct {
+// NewOrderContractRequest request type
+type NewOrderContractRequest struct {
 	// Symbol (currency pair to trade)
 	Symbol string
 	// Side Buy or Sell
@@ -458,8 +513,8 @@ type FutureNewOrderRequest struct {
 	NewOrderRespType string
 }
 
-// FutureNewOrderResponse is the return structured response from the exchange
-type FutureNewOrderResponse struct {
+// NewOrderContractResponse is the return structured response from the exchange
+type NewOrderContractResponse struct {
 	Symbol        string  `json:"symbol"` //交易对
 	OrderID       int64   `json:"orderId"`
 	ClientOrderID string  `json:"clientOrderId"`
