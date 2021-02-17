@@ -598,9 +598,9 @@ func (b *Binance) GetPremiumIndex(assetType asset.Item, symbol currency.Pair) (*
 
 	var path string
 	if assetType == asset.Future { // U本位合约
-		path = fmt.Sprintf("%s/%s/v%s/%s", futureApiURL, binanceFutureRESTBasePath, binanceAPIVersion, binanceContractPreminuIndex)
+		path = fmt.Sprintf("%s/%s/v%s/%s?%s", futureApiURL, binanceFutureRESTBasePath, binanceAPIVersion, binanceContractPreminuIndex, params.Encode())
 	} else if assetType == asset.PerpetualContract { // 币本位合约
-		path = fmt.Sprintf("%s/%s/v%s/%s", perpetualApiURL, binancePerpetualRESTBasePath, binanceAPIVersion, binanceContractFundingRate)
+		path = fmt.Sprintf("%s/%s/v%s/%s?%s", perpetualApiURL, binancePerpetualRESTBasePath, binanceAPIVersion, binanceContractFundingRate, params.Encode())
 	} else {
 		return nil, fmt.Errorf("Error assetType")
 	}
