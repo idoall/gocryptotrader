@@ -32,6 +32,7 @@ type ExchangeInfo struct {
 		BaseAssetPrecision         int      `json:"baseAssetPrecision"`
 		QuoteAsset                 string   `json:"quoteAsset"`
 		QuotePrecision             int      `json:"quotePrecision"`
+		PricePrecision             int      `json:"pricePrecision"`
 		OrderTypes                 []string `json:"orderTypes"`
 		IcebergAllowed             bool     `json:"icebergAllowed"`
 		OCOAllowed                 bool     `json:"ocoAllowed"`

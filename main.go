@@ -247,13 +247,13 @@ func main() {
 	// return
 
 	//获取交易规则和交易对
-	// list, err := exch.GetExchangeInfo(asset.PerpetualContract)
+	// list, err := exch.GetExchangeInfo(asset.Future)
 	// if err != nil {
 	// 	panic(err)
 	// } else {
 
 	// 	for _, v := range list.Symbols {
-	// 		fmt.Printf("%s %s \t%+v\t%s\n", v.BaseAsset, v.QuoteAsset, v.Symbol, v.ContractType)
+	// 		fmt.Printf("%s %s \t%+v\t%s PricePrecision:%d\n", v.BaseAsset, v.QuoteAsset, v.Symbol, v.ContractType, v.PricePrecision)
 
 	// 	}
 	// }
