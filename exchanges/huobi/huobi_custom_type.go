@@ -4,6 +4,16 @@ import (
 	"time"
 )
 
+const (
+	futureApiURL    = "api.hbdm.com"
+	perpetualApiURL = "api.hbdm.com"
+
+	futureRESTBasePath    = "linear-swap-api"
+	perpetualRESTBasePath = "swap-api"
+
+	huobiAccountInfoContract = "swap_account_info"
+)
+
 //----------合约用用户帐号信息相关
 
 // SymbolBaseType 基础信息
@@ -22,8 +32,8 @@ type ContractAccountInfoRequest struct {
 	SymbolBaseType
 }
 
-// ContractAccountInfoResponseDataItem 帐号信息返回参数
-type ContractAccountInfoResponseDataItem struct {
+// AccountInfoResponseDataItem 帐号信息返回参数
+type AccountInfoResponseDataItem struct {
 	SymbolBaseType
 	MarginBalance     float64 `json:"margin_balance"`     //账户权益
 	MarginPosition    float64 `json:"margin_position"`    //持仓保证金（当前持有仓位所占用的保证金）

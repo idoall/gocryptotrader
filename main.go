@@ -129,10 +129,10 @@ func main() {
 
 	// {
 
-	// var exch binance.Binance
+	// var exch huobi.HUOBI
 	// exch.SetDefaults()
 	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
-	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
+	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Huobi")
 	// exchCfg.Verbose = true
 	// exchCfg.Features.Enabled.Websocket = true
 	// exchCfg.AuthenticatedWebsocketAPISupport = &exchCfg.Features.Enabled.Websocket
@@ -144,8 +144,20 @@ func main() {
 	// logCfg := gctlog.GenDefaultSettings()
 	// gctlog.GlobalLogConfig = &logCfg
 	// exch.Setup(exchCfg)
-	// exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
+	// // exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
 
+	// act, err := exch.GetAccountInfoContract(asset.Future, "")
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// for _, av := range act {
+	// 	// for _, v := range av. {
+	// 	// if av.Balance != 0.0 {
+	// 	fmt.Printf("%+v\n", av)
+	// 	// }
+	// 	// }
+	// }
+	// return
 	// FutureAccount 账户信息V2 (USER_DATA)
 	// list, err := exch.GetContractAccount(asset.PerpetualContract)
 	// if err != nil {
@@ -253,7 +265,7 @@ func main() {
 	// } else {
 
 	// 	for _, v := range list.Symbols {
-	// 		fmt.Printf("%s %s \t%+v\t%s PricePrecision:%d\n", v.BaseAsset, v.QuoteAsset, v.Symbol, v.ContractType, v.PricePrecision)
+	// 		fmt.Printf("%s %s \t%+v\t%s BaseAssetPrecision[%d]QuoteOrderQtyMarketAllowed[%d]PricePrecision:%d\n", v.BaseAsset, v.QuoteAsset, v.Symbol, v.ContractType, v.BaseAssetPrecision, v.QuotePrecision, v.PricePrecision)
 
 	// 	}
 	// }
