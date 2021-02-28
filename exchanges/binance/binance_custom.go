@@ -816,8 +816,10 @@ func (b *Binance) PositionRisk(assetType asset.Item, symbol string) ([]PositionR
 		if p.Leverage, err = strconv.ParseInt(mapObj["leverage"].(string), 10, 64); err != nil {
 			return nil, err
 		}
-		if p.MaxNotionalValue, err = strconv.ParseInt(mapObj["maxNotionalValue"].(string), 10, 64); err != nil {
-			return nil, err
+		if mapObj["maxNotionalValue"] != nil {
+			if p.MaxNotionalValue, err = strconv.ParseInt(mapObj["maxNotionalValue"].(string), 10, 64); err != nil {
+				return nil, err
+			}
 		}
 		p.MarginType = MarginType(mapObj["marginType"].(string))
 		if p.IsolatedMargin, err = strconv.ParseFloat(mapObj["isolatedMargin"].(string), 64); err != nil {

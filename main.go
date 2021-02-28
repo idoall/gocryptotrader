@@ -283,9 +283,12 @@ func main() {
 	// return
 
 	// 查看持仓风险
-	// symbolFuturePair := currency.NewPair(currency.NewCode("SXP"), currency.NewCode("USDT"))
-	// symbolFuturePair.Delimiter = ""
-	// list, err := exch.PositionRisk(asset.Future, symbolFuturePair.String())
+	// assetType := asset.PerpetualContract
+	// symbol, _ := currency.NewPairFromStrings("DOTUSD", "PERP")
+	// symbol.Delimiter = "_"
+	// // symbol := currency.NewPair(currency.NewCode("SXP"), currency.NewCode("USDT"))
+	// // symbol.Delimiter = ""
+	// list, err := exch.PositionRisk(assetType, symbol.Base.String())
 	// if err != nil {
 	// 	panic(err)
 	// } else {
