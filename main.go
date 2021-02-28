@@ -129,10 +129,10 @@ func main() {
 
 	// {
 
-	// var exch huobi.HUOBI
+	// var exch binance.Binance
 	// exch.SetDefaults()
 	// //获取交易所 -- 测试不需要使用 engine，直接使用 实例 ，也可以访问
-	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Huobi")
+	// exchCfg, _ := engine.Bot.Config.GetExchangeConfig("Binance")
 	// exchCfg.Verbose = true
 	// exchCfg.Features.Enabled.Websocket = true
 	// exchCfg.AuthenticatedWebsocketAPISupport = &exchCfg.Features.Enabled.Websocket
@@ -404,9 +404,12 @@ func main() {
 	// }
 	// return
 	// 最新标记价格和资金费率
-	// symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
-	// symbol.Delimiter = ""
-	// list, err := exch.GetPremiumIndex(asset.Future, symbol)
+	// assetType := asset.PerpetualContract
+	// // symbol, _ := currency.NewPairFromStrings("BTC", "USDT")
+	// // symbol.Delimiter = ""
+	// symbol := currency.NewPair(currency.NewCode("DOTUSD"), currency.NewCode("PERP"))
+	// symbol.Delimiter = "_"
+	// list, err := exch.GetPremiumIndex(assetType, symbol)
 	// if err != nil {
 	// 	panic(err)
 	// } else {

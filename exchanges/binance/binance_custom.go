@@ -667,7 +667,7 @@ func (b *Binance) GetPremiumIndex(assetType asset.Item, symbol currency.Pair) (*
 	if assetType == asset.Future { // U本位合约
 		path = fmt.Sprintf("%s/%s/v%s/%s?%s", futureApiURL, binanceFutureRESTBasePath, binanceAPIVersion, binanceContractPreminuIndex, params.Encode())
 	} else if assetType == asset.PerpetualContract { // 币本位合约
-		path = fmt.Sprintf("%s/%s/v%s/%s?%s", perpetualApiURL, binancePerpetualRESTBasePath, binanceAPIVersion, binanceContractFundingRate, params.Encode())
+		path = fmt.Sprintf("%s/%s/v%s/%s?%s", perpetualApiURL, binancePerpetualRESTBasePath, binanceAPIVersion, binanceContractPreminuIndex, params.Encode())
 	} else {
 		return nil, fmt.Errorf("Error assetType")
 	}
@@ -680,22 +680,42 @@ func (b *Binance) GetPremiumIndex(assetType asset.Item, symbol currency.Pair) (*
 
 	p := new(PreminuIndexResponse)
 
-	mapObj := resp.(map[string]interface{})
+	if assetType == asset.Future {
+		mapObj := resp.(map[string]interface{})
 
-	if p.MarkPrice, err = strconv.ParseFloat(mapObj["markPrice"].(string), 64); err != nil {
-		return nil, err
+		if p.MarkPrice, err = strconv.ParseFloat(mapObj["markPrice"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.IndexPrice, err = strconv.ParseFloat(mapObj["indexPrice"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.LastFundingRate, err = strconv.ParseFloat(mapObj["lastFundingRate"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.InterestRate, err = strconv.ParseFloat(mapObj["interestRate"].(string), 64); err != nil {
+			return nil, err
+		}
+		p.NextFundingTime = time.Unix(0, int64(mapObj["nextFundingTime"].(float64))*int64(time.Millisecond))
+		p.Time = time.Unix(0, int64(mapObj["time"].(float64))*int64(time.Millisecond))
+	} else if assetType == asset.PerpetualContract {
+		mapObjArr := resp.([]interface{})
+		mapObj := mapObjArr[0].(map[string]interface{})
+
+		if p.MarkPrice, err = strconv.ParseFloat(mapObj["markPrice"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.IndexPrice, err = strconv.ParseFloat(mapObj["indexPrice"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.LastFundingRate, err = strconv.ParseFloat(mapObj["lastFundingRate"].(string), 64); err != nil {
+			return nil, err
+		}
+		if p.InterestRate, err = strconv.ParseFloat(mapObj["interestRate"].(string), 64); err != nil {
+			return nil, err
+		}
+		p.NextFundingTime = time.Unix(0, int64(mapObj["nextFundingTime"].(float64))*int64(time.Millisecond))
+		p.Time = time.Unix(0, int64(mapObj["time"].(float64))*int64(time.Millisecond))
 	}
-	if p.IndexPrice, err = strconv.ParseFloat(mapObj["indexPrice"].(string), 64); err != nil {
-		return nil, err
-	}
-	if p.LastFundingRate, err = strconv.ParseFloat(mapObj["lastFundingRate"].(string), 64); err != nil {
-		return nil, err
-	}
-	if p.InterestRate, err = strconv.ParseFloat(mapObj["interestRate"].(string), 64); err != nil {
-		return nil, err
-	}
-	p.NextFundingTime = time.Unix(0, int64(mapObj["nextFundingTime"].(float64))*int64(time.Millisecond))
-	p.Time = time.Unix(0, int64(mapObj["time"].(float64))*int64(time.Millisecond))
 
 	return p, nil
 }
