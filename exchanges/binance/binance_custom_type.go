@@ -119,6 +119,23 @@ const (
 	userAccountFutureStream = "/fapi/v1/listenKey"
 )
 
+// Submit contains all properties of an order that may be required
+// for an order to be created on an exchange
+// Each exchange has their own requirements, so not all fields
+// are required to be populated
+type SpotSubmit struct {
+	AssetType        asset.Item
+	Symbol           currency.Pair
+	Side             order.Side
+	Type             order.Type
+	TimeInForce      RequestParamsTimeForceType
+	Amount           float64
+	Price            float64
+	NewClientOrderId string
+	StopPrice        float64
+	IcebergQty       float64
+}
+
 // AccountInfoFuture U本位合约	账户信息V2 (
 type AccountInfoFuture struct {
 	FeeTier                     int     `json:"feeTier"`                            // 手续费等级

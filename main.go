@@ -146,15 +146,15 @@ func main() {
 	// exch.Setup(exchCfg)
 	// // exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
 
-	// act, err := exch.GetAccountInfoContract(asset.Future, "")
+	// act, err := exch.FetchAccountInfo()
 	// if err != nil {
 	// 	panic(err)
 	// }
-	// for _, av := range act {
+	// for _, av := range act.Accounts[0].Currencies {
 	// 	// for _, v := range av. {
-	// 	// if av.Balance != 0.0 {
+	// 	if av.TotalValue != 0.0 {
 	// 	fmt.Printf("%+v\n", av)
-	// 	// }
+	// 	}
 	// 	// }
 	// }
 	// return

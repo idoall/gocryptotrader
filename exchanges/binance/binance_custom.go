@@ -1,6 +1,7 @@
 package binance
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -14,6 +15,72 @@ import (
 	"github.com/idoall/gocryptotrader/exchanges/kline"
 	"github.com/idoall/gocryptotrader/exchanges/order"
 )
+
+// SpotSubmitOrder submits a new order
+func (b *Binance) SpotSubmitOrder(s *SpotSubmit) (order.SubmitResponse, error) {
+	var submitOrderResponse order.SubmitResponse
+
+	var sideType string
+	if s.Side == order.Buy {
+		sideType = order.Buy.String()
+	} else {
+		sideType = order.Sell.String()
+	}
+
+	timeInForce := s.TimeInForce
+	var requestParamsOrderType RequestParamsOrderType
+	switch s.Type {
+	case order.Market:
+		timeInForce = ""
+		requestParamsOrderType = BinanceRequestParamsOrderMarket
+	case order.Limit:
+		requestParamsOrderType = BinanceRequestParamsOrderLimit
+	default:
+		submitOrderResponse.IsOrderPlaced = false
+		return submitOrderResponse, errors.New("unsupported order type")
+	}
+
+	fPair, err := b.FormatExchangeCurrency(s.Symbol, s.AssetType)
+	if err != nil {
+		return submitOrderResponse, err
+	}
+
+	var orderRequest = NewOrderRequest{
+		Symbol:           fPair.String(),
+		Side:             sideType,
+		Price:            s.Price,
+		Quantity:         s.Amount,
+		TradeType:        requestParamsOrderType,
+		TimeInForce:      timeInForce,
+		NewClientOrderID: s.NewClientOrderId,
+		StopPrice:        s.StopPrice,
+		IcebergQty:       s.IcebergQty,
+	}
+
+	response, err := b.NewOrder(&orderRequest)
+	if err != nil {
+		return submitOrderResponse, err
+	}
+
+	if response.OrderID > 0 {
+		submitOrderResponse.OrderID = strconv.FormatInt(response.OrderID, 10)
+	}
+	if response.ExecutedQty == response.OrigQty {
+		submitOrderResponse.FullyMatched = true
+	}
+	submitOrderResponse.IsOrderPlaced = true
+
+	for i := range response.Fills {
+		submitOrderResponse.Trades = append(submitOrderResponse.Trades, order.TradeHistory{
+			Price:    response.Fills[i].Price,
+			Amount:   response.Fills[i].Qty,
+			Fee:      response.Fills[i].Commission,
+			FeeAsset: response.Fills[i].CommissionAsset,
+		})
+	}
+
+	return submitOrderResponse, nil
+}
 
 // Ping 测试服务器连通性
 func (b *Binance) Ping(assetType asset.Item) (ping bool, err error) {
