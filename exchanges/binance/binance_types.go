@@ -28,6 +28,7 @@ type ExchangeInfo struct {
 		Symbol                     string   `json:"symbol"`
 		Status                     string   `json:"status"`
 		ContractType               string   `json:"contractType"`
+		ContractSize               int      `json:"contractSize"`
 		BaseAsset                  string   `json:"baseAsset"`
 		BaseAssetPrecision         int      `json:"baseAssetPrecision"`
 		QuoteAsset                 string   `json:"quoteAsset"`

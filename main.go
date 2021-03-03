@@ -259,14 +259,14 @@ func main() {
 	// return
 
 	//获取交易规则和交易对
-	// list, err := exch.GetExchangeInfo(asset.Future)
+	// list, err := exch.GetExchangeInfo(asset.PerpetualContract)
 	// if err != nil {
 	// 	panic(err)
 	// } else {
 
 	// 	for _, v := range list.Symbols {
 	// 		fmt.Printf("%s %s \t%+v\t%s BaseAssetPrecision[%d]QuoteOrderQtyMarketAllowed[%d]PricePrecision:%d\n", v.BaseAsset, v.QuoteAsset, v.Symbol, v.ContractType, v.BaseAssetPrecision, v.QuotePrecision, v.PricePrecision)
-
+	// 		fmt.Println(v.ContractSize)
 	// 	}
 	// }
 	// return
@@ -318,9 +318,10 @@ func main() {
 	// return
 
 	// 查询合约订单
-	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
-	// symbolFuturePair.Delimiter = ""
-	// oresp, err := exch.QueryOrderFuture(symbolFuturePair.String(), 8389765490780171484, "")
+	// symbolFuturePair := currency.NewPair(currency.NewCode("DOTUSD"), currency.NewCode("PERP"))
+	// symbolFuturePair.Delimiter = "_"
+	// assetType := asset.PerpetualContract
+	// oresp, err := exch.QueryOrderContract(assetType, symbolFuturePair.String(), 620332404, "")
 	// if err != nil {
 	// 	panic(err)
 	// } else {
