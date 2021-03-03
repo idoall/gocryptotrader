@@ -152,6 +152,7 @@ func (b *Binance) SetDefaults() {
 	b.API.Endpoints.URL = b.API.Endpoints.URLDefault
 	b.Websocket = stream.New()
 	b.WebsocketFuture = stream.New()
+	b.WebsocketPerp = stream.New()
 	b.API.Endpoints.WebsocketURL = binanceDefaultWebsocketURL
 	b.WebsocketResponseMaxLimit = exchange.DefaultWebsocketResponseMaxLimit
 	b.WebsocketResponseCheckTimeout = exchange.DefaultWebsocketResponseCheckTimeout
@@ -202,6 +203,37 @@ func (b *Binance) Setup(exch *config.ExchangeConfig) error {
 			DefaultURL:                       binanceDefaultWebsocketFutureURL,
 			ExchangeName:                     exch.Name,
 			RunningURL:                       binanceDefaultWebsocketFutureURL,
+			Connector:                        b.WsConnectFuture,
+			Subscriber:                       b.SubscribeFuture,
+			UnSubscriber:                     b.UnsubscribeFuture,
+			GenerateSubscriptions:            b.GenerateSubscriptionsFuture,
+			Features:                         &b.Features.Supports.WebsocketCapabilities,
+			OrderbookBufferLimit:             exch.WebsocketOrderbookBufferLimit,
+			SortBuffer:                       true,
+			SortBufferByUpdateIDs:            true,
+		})
+		if err != nil {
+			return err
+		}
+
+		err = b.WebsocketFuture.SetupNewConnection(stream.ConnectionSetup{
+			ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
+			ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
+		})
+		if err != nil {
+			return err
+		}
+	}
+	{
+
+		err = b.WebsocketPerp.Setup(&stream.WebsocketSetup{
+			Enabled:                          exch.Features.Enabled.Websocket,
+			Verbose:                          exch.Verbose,
+			AuthenticatedWebsocketAPISupport: exch.API.AuthenticatedWebsocketSupport,
+			WebsocketTimeout:                 exch.WebsocketTrafficTimeout,
+			DefaultURL:                       binanceDefaultWebsocketPerpURL,
+			ExchangeName:                     exch.Name,
+			RunningURL:                       binanceDefaultWebsocketPerpURL,
 			Connector:                        b.WsConnectFuture,
 			Subscriber:                       b.SubscribeFuture,
 			UnSubscriber:                     b.UnsubscribeFuture,
