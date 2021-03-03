@@ -247,7 +247,7 @@ func (b *Binance) Setup(exch *config.ExchangeConfig) error {
 			return err
 		}
 
-		err = b.WebsocketFuture.SetupNewConnection(stream.ConnectionSetup{
+		err = b.WebsocketPerp.SetupNewConnection(stream.ConnectionSetup{
 			ResponseCheckTimeout: exch.WebsocketResponseCheckTimeout,
 			ResponseMaxLimit:     exch.WebsocketResponseMaxLimit,
 		})
