@@ -243,12 +243,12 @@ func main() {
 	// return
 
 	// 获取用户手续费率
-	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
-	// symbolFuturePair.Delimiter = ""
+	// symbolFuturePair := currency.NewPair(currency.NewCode("DOTUSD"), currency.NewCode("PERP"))
+	// symbolFuturePair.Delimiter = "_"
 
-	// symbolPair := currency.NewPair(currency.NewCode("SXP"), currency.NewCode("USDT"))
+	// // symbolPair := currency.NewPair(currency.NewCode("SXP"), currency.NewCode("USDT"))
 	// // symbolPair.Delimiter = "-"
-	// list, err := exch.MarginTypeFuture(symbolPair, binance.MarginType_CROSSED)
+	// list, err := exch.MarginType(asset.PerpetualContract, symbolFuturePair, binance.MarginType_CROSSED)
 	// if err != nil {
 	// 	panic(err)
 	// } else {
@@ -272,9 +272,9 @@ func main() {
 	// return
 
 	// 设置杠杆倍数
-	// symbolFuturePair := currency.NewPair(currency.NewCode("ETH"), currency.NewCode("USDT"))
-	// symbolFuturePair.Delimiter = ""
-	// futureLeverageResponse, err := exch.FutureLeverage(symbolFuturePair.String(), 10)
+	// symbolFuturePair := currency.NewPair(currency.NewCode("DOTUSD"), currency.NewCode("PERP"))
+	// symbolFuturePair.Delimiter = "_"
+	// futureLeverageResponse, err := exch.Leverage(asset.PerpetualContract, symbolFuturePair.String(), 10)
 	// if err != nil {
 	// 	panic(err)
 	// } else {

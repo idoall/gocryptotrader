@@ -277,8 +277,10 @@ func (b *Binance) Leverage(assetType asset.Item, symbol string, leverage int) (*
 	result := &FutureLeverageResponse{}
 	result.Symbol = mapObj["symbol"].(string)
 	result.Leverage = int(mapObj["leverage"].(float64))
-	if result.MaxNotionalValue, err = strconv.ParseInt(mapObj["maxNotionalValue"].(string), 10, 64); err != nil {
-		return nil, err
+	if mapObj["maxNotionalValue"] != nil {
+		if result.MaxNotionalValue, err = strconv.ParseInt(mapObj["maxNotionalValue"].(string), 10, 64); err != nil {
+			return nil, err
+		}
 	}
 	return result, err
 }
@@ -847,7 +849,7 @@ func (b *Binance) MarginType(assetType asset.Item, symbol currency.Pair, marginT
 	if assetType == asset.Future { // U本位合约
 		path = fmt.Sprintf("%s/%s/v%s/%s", futureApiURL, binanceFutureRESTBasePath, binanceAPIVersion, binanceMarginType)
 	} else if assetType == asset.PerpetualContract { // 币本位合约
-		path = fmt.Sprintf("%s/%s/v%s/%s", perpetualApiURL, binancePerpetualRESTBasePath, binanceAPIVersion, binancePositionRisk)
+		path = fmt.Sprintf("%s/%s/v%s/%s", perpetualApiURL, binancePerpetualRESTBasePath, binanceAPIVersion, binanceMarginType)
 	} else {
 		return false, fmt.Errorf("Error assetType")
 	}
