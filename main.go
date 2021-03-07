@@ -146,14 +146,14 @@ func main() {
 	// exch.Setup(exchCfg)
 	// // exch.WebsocketFuture.SetCanUseAuthenticatedEndpoints(true)
 
-	// act, err := exch.FetchAccountInfo()
+	// act, err := exch.Account(asset.PerpetualContract)
 	// if err != nil {
 	// 	panic(err)
 	// }
-	// for _, av := range act.Accounts[0].Currencies {
+	// for _, av := range act.Assets {
 	// 	// for _, v := range av. {
-	// 	if av.TotalValue != 0.0 {
-	// 	fmt.Printf("%+v\n", av)
+	// 	if av.AvailableBalance != 0.0 {
+	// 		fmt.Printf("%+v\n", av)
 	// 	}
 	// 	// }
 	// }
@@ -246,7 +246,7 @@ func main() {
 	// symbolFuturePair := currency.NewPair(currency.NewCode("DOTUSD"), currency.NewCode("PERP"))
 	// symbolFuturePair.Delimiter = "_"
 
-	// // symbolPair := currency.NewPair(currency.NewCode("SXP"), currency.NewCode("USDT"))
+	// // symbolPair := currency.NewPair(currency.NewCode("DOTUSD"), currency.NewCode("PERP"))
 	// // symbolPair.Delimiter = "-"
 	// list, err := exch.MarginType(asset.PerpetualContract, symbolFuturePair, binance.MarginType_CROSSED)
 	// if err != nil {

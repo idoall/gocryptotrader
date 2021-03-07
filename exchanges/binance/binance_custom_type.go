@@ -399,6 +399,7 @@ type FutureLeverageResponse struct {
 type FutureQueryOrderData struct {
 	AvgPrice      float64                    `json:"avgPrice,string"`    // 平均成交价
 	ClientOrderID string                     `json:"clientOrderId"`      // 用户自定义的订单号
+	CumBase       float64                    `json:"cumBase,string"`     //成交额(标的数量)
 	CumQuote      float64                    `json:"cumQuote,string"`    //成交金额
 	ExecutedQty   float64                    `json:"executedQty,string"` //成交量
 	OrderID       int64                      `json:"orderId"`
