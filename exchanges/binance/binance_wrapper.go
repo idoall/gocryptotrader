@@ -991,6 +991,12 @@ func (b *Binance) FormatExchangeKlineInterval(in kline.Interval) string {
 	if in == kline.OneDay {
 		return "1d"
 	}
+	if in == kline.ThreeDay {
+		return "3d"
+	}
+	if in == kline.OneWeek {
+		return "1w"
+	}
 	if in == kline.OneMonth {
 		return "1M"
 	}
